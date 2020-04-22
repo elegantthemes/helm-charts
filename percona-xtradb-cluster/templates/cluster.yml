@@ -41,11 +41,11 @@ spec:
       requests:
         memory: 1G
         cpu: 600m
-          limits:
-            memory: 1G
-    #       cpu: "1"
-    #   nodeSelector:
-    #     disktype: ssd
+      limits:
+    #   memory: 1G
+    #   cpu: "1"
+    # nodeSelector:
+    #   disktype: ssd
     affinity:
       antiAffinityTopologyKey: "kubernetes.io/hostname"
     #      advanced:
