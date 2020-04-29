@@ -190,8 +190,8 @@ spec:
           credentialsSecret: {{ .Values.s3_credentials_secret_name }}
           endpointUrl: {{ .Values.s3_endpoint }}
           region: {{ .Values.s3_region }}
-      fs-pvc:
-        type: filesystem
+      #fs-pvc:
+      #  type: filesystem
         #        nodeSelector:
         #          storage: tape
         #          backupWorker: 'True'
@@ -224,13 +224,13 @@ spec:
         #        podSecurityContext:
         #          fsGroup: 1001
         #          supplementalGroups: [1001, 1002, 1003]
-        volume:
-          persistentVolumeClaim:
-            storageClassName: ***REMOVED***
-            accessModes: [ "ReadWriteOnce" ]
-            resources:
-              requests:
-                storage: 5Gi
+        #volume:
+        #  persistentVolumeClaim:
+        #    storageClassName: ***REMOVED***
+        #    accessModes: [ "ReadWriteOnce" ]
+        #    resources:
+        #      requests:
+        #        storage: 5Gi
     schedule:
       - name: "weekly-backup"
         schedule: "0 0 * * 6"
@@ -239,4 +239,4 @@ spec:
       - name: "daily-backup"
         schedule: "0 0 * * *"
         keep: 5
-        storageName: fs-pvc
+        storageName: backup-s3
