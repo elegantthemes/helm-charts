@@ -1,4 +1,4 @@
-apiVersion: pxc.percona.com/v1-3-0
+apiVersion: pxc.percona.com/v1-4-0
 kind: PerconaXtraDBCluster
 metadata:
   name: ***REMOVED***
@@ -8,24 +8,25 @@ metadata:
 #   - delete-pxc-pvc
   annotations:
     kubectl.kubernetes.io/last-applied-configuration: |
-      {"apiVersion":"pxc.percona.com/v1-3-0","kind":"PerconaXtraDBCluster"}
+      {"apiVersion":"pxc.percona.com/v1-4-0","kind":"PerconaXtraDBCluster"}
 spec:
-  secretsName: pxc-secrets
+  secretsName: ***REMOVED***
   sslSecretName: ***REMOVED***
   sslInternalSecretName: ***REMOVED***-internal
+  vaultSecretName: ***REMOVED***
   allowUnsafeConfigurations: false
   #  pause: false
   #  updateStrategy: RollingUpdate
   pxc:
     size: 3
-    image: percona/percona-xtradb-cluster-operator:1.3.0-pxc
+    image: percona/percona-xtradb-cluster-operator:1.4.0-pxc8.0
     #    schedulerName: mycustom-scheduler
     #    readinessDelaySec: 15
     #    livenessDelaySec: 300
     # forceUnsafeBootstrap: true
     configuration: |
       [mysqld]
-      wsrep_debug=ON
+      wsrep_debug=OFF
       wsrep_provider_options="gcache.size=1G; gcache.recover=yes"
     #    imagePullSecrets:
     #      - name: private-registry-credentials
@@ -80,7 +81,7 @@ spec:
   proxysql:
     enabled: true
     size: 3
-    image: percona/percona-xtradb-cluster-operator:1.3.0-proxysql
+    image: percona/percona-xtradb-cluster-operator:1.4.0-proxysql
     #    schedulerName: mycustom-scheduler
     #    imagePullSecrets:
     #      - name: private-registry-credentials
@@ -141,7 +142,7 @@ spec:
     gracePeriod: 30
   pmm:
     enabled: false
-    image: percona/percona-xtradb-cluster-operator:1.3.0-pmm
+    image: percona/percona-xtradb-cluster-operator:1.4.0-pmm
     serverHost: monitoring-service
     serverUser: pmm
     resources:
@@ -149,7 +150,7 @@ spec:
         memory: 200M
         cpu: 500m
   backup:
-    image: percona/percona-xtradb-cluster-operator:1.3.0-backup
+    image: percona/percona-xtradb-cluster-operator:1.4.0-pxc8.0-backup
     serviceAccountName: percona-xtradb-cluster-operator
     #    imagePullSecrets:
     #      - name: private-registry-credentials
@@ -190,47 +191,47 @@ spec:
           credentialsSecret: {{ .Values.s3_credentials_secret_name }}
           endpointUrl: {{ .Values.s3_endpoint }}
           region: {{ .Values.s3_region }}
-      fs-pvc:
-        type: filesystem
-        #        nodeSelector:
-        #          storage: tape
-        #          backupWorker: 'True'
-        #        resources:
-        #          requests:
-        #            memory: 1G
-        #            cpu: 600m
-        #        affinity:
-        #          nodeAffinity:
-        #            requiredDuringSchedulingIgnoredDuringExecution:
-        #              nodeSelectorTerms:
-        #              - matchExpressions:
-        #                - key: backupWorker
-        #                  operator: In
-        #                  values:
-        #                  - 'True'
-        #        tolerations:
-        #          - key: "backupWorker"
-        #            operator: "Equal"
-        #            value: "True"
-        #            effect: "NoSchedule"
-        #        annotations:
-        #          testName: scheduled-backup
-        #        labels:
-        #          backupWorker: 'True'
-        #        schedulerName: 'default-scheduler'
-        #        priorityClassName: 'high-priority'
-        #        containerSecurityContext:
-        #          privileged: true
-        #        podSecurityContext:
-        #          fsGroup: 1001
-        #          supplementalGroups: [1001, 1002, 1003]
-        volume:
-          persistentVolumeClaim:
-            storageClassName: ***REMOVED***
-            accessModes: [ "ReadWriteOnce" ]
-            resources:
-              requests:
-                storage: 5Gi
+      #fs-pvc:
+      #  type: filesystem
+      #  #        nodeSelector:
+      #  #          storage: tape
+      #  #          backupWorker: 'True'
+      #  #        resources:
+      #  #          requests:
+      #  #            memory: 1G
+      #  #            cpu: 600m
+      #  #        affinity:
+      #  #          nodeAffinity:
+      #  #            requiredDuringSchedulingIgnoredDuringExecution:
+      #  #              nodeSelectorTerms:
+      #  #              - matchExpressions:
+      #  #                - key: backupWorker
+      #  #                  operator: In
+      #  #                  values:
+      #  #                  - 'True'
+      #  #        tolerations:
+      #  #          - key: "backupWorker"
+      #  #            operator: "Equal"
+      #  #            value: "True"
+      #  #            effect: "NoSchedule"
+      #  #        annotations:
+      #  #          testName: scheduled-backup
+      #  #        labels:
+      #  #          backupWorker: 'True'
+      #  #        schedulerName: 'default-scheduler'
+      #  #        priorityClassName: 'high-priority'
+      #  #        containerSecurityContext:
+      #  #          privileged: true
+      #  #        podSecurityContext:
+      #  #          fsGroup: 1001
+      #  #          supplementalGroups: [1001, 1002, 1003]
+      #  volume:
+      #    persistentVolumeClaim:
+      #      storageClassName: ***REMOVED***
+      #      accessModes: [ "ReadWriteOnce" ]
+      #      resources:
+      #        requests:
+      #          storage: 5Gi
     schedule:
       - name: "weekly-backup"
         schedule: "0 0 * * 6"
