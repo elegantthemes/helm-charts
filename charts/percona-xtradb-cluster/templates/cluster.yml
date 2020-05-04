@@ -1,7 +1,7 @@
 apiVersion: pxc.percona.com/v1-4-0
 kind: PerconaXtraDBCluster
 metadata:
-  name: ***REMOVED***
+  name: {{ .Values.cluster_name }}
   finalizers:
     - delete-pxc-pods-in-order
 #   - delete-proxysql-pvc
@@ -10,10 +10,10 @@ metadata:
     kubectl.kubernetes.io/last-applied-configuration: |
       {"apiVersion":"pxc.percona.com/v1-4-0","kind":"PerconaXtraDBCluster"}
 spec:
-  secretsName: ***REMOVED***
-  sslSecretName: ***REMOVED***
-  sslInternalSecretName: ***REMOVED***-internal
-  vaultSecretName: ***REMOVED***
+  secretsName: {{ .Values.secrets_name }}
+  sslSecretName: {{ .Values.ssl_secrets_name }}
+  sslInternalSecretName: {{ .Values.ssl_internal_secrets_name }}
+  vaultSecretName: {{ .Values.vault_secrets_name }}
   allowUnsafeConfigurations: false
   #  pause: false
   #  updateStrategy: RollingUpdate
@@ -72,7 +72,7 @@ spec:
       #        path: /data
       #        type: Directory
       persistentVolumeClaim:
-        storageClassName: ***REMOVED***
+        storageClassName: {{ .Values.storage_class_name }}
         #        accessModes: [ "ReadWriteOnce" ]
         resources:
           requests:
@@ -131,7 +131,7 @@ spec:
       #        path: /data
       #        type: Directory
       persistentVolumeClaim:
-        storageClassName: ***REMOVED***
+        storageClassName: {{ .Values.storage_class_name }}
         #        accessModes: [ "ReadWriteOnce" ]
         resources:
           requests:
@@ -227,7 +227,7 @@ spec:
       #  #          supplementalGroups: [1001, 1002, 1003]
       #  volume:
       #    persistentVolumeClaim:
-      #      storageClassName: ***REMOVED***
+      #      storageClassName: {{ .Values.storage_class_name }}
       #      accessModes: [ "ReadWriteOnce" ]
       #      resources:
       #        requests:
