@@ -24,7 +24,7 @@ spec:
     #    readinessDelaySec: 15
     #    livenessDelaySec: 300
     # forceUnsafeBootstrap: true
-    configuration: |
+    #configuration: |
     #  [mysqld]
     #  wsrep_debug=OFF
     #  wsrep_provider_options="gcache.size=1G; gcache.recover=yes"
