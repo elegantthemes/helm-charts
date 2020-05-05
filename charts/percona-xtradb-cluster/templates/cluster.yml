@@ -25,9 +25,9 @@ spec:
     #    livenessDelaySec: 300
     # forceUnsafeBootstrap: true
     configuration: |
-      [mysqld]
-      wsrep_debug=OFF
-      wsrep_provider_options="gcache.size=1G; gcache.recover=yes"
+    #  [mysqld]
+    #  wsrep_debug=OFF
+    #  wsrep_provider_options="gcache.size=1G; gcache.recover=yes"
     #    imagePullSecrets:
     #      - name: private-registry-credentials
     #    priorityClassName: high-priority
