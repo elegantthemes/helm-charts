@@ -3,6 +3,16 @@ entries:
   percona-xtradb-cluster:
   - apiVersion: v2
     appVersion: 1.4.0
+    created: "2020-05-11T23:59:57.424421934Z"
+    description: Percona XtraDB Cluster managed by PXC K8s Operator
+    digest: 7114584058c0e5fa1ae84cf0871d6481661077b662ccd9ac7a4177178719f6f2
+    name: percona-xtradb-cluster
+    type: application
+    urls:
+    - https://github.com/elegantthemes/helm-charts/releases/download/percona-xtradb-cluster-1.0.9/percona-xtradb-cluster-1.0.9.tgz
+    version: 1.0.9
+  - apiVersion: v2
+    appVersion: 1.4.0
     created: "2020-05-05T20:25:19.395190129Z"
     description: Percona XtraDB Cluster managed by PXC K8s Operator
     digest: 63917be6d6632a18e402fe9c160700dfe40b796b507011938ea7a172ec709d7b
@@ -59,6 +69,16 @@ entries:
   percona-xtradb-cluster-operator:
   - apiVersion: v2
     appVersion: 1.4.0
+    created: "2020-05-11T23:59:57.533781964Z"
+    description: A Helm chart for percona-xtradb-cluster-operator
+    digest: babc9b58c46c0d0cfbb4a82eece3e5048d66f57faa00ef7e4ccb431bf5bf7648
+    name: percona-xtradb-cluster-operator
+    type: application
+    urls:
+    - https://github.com/elegantthemes/helm-charts/releases/download/percona-xtradb-cluster-operator-1.0.3/percona-xtradb-cluster-operator-1.0.3.tgz
+    version: 1.0.3
+  - apiVersion: v2
+    appVersion: 1.4.0
     created: "2020-05-04T20:28:24.020047848Z"
     description: A Helm chart for percona-xtradb-cluster-operator
     digest: 9169b6effca629c27a534aa7d74e425f062ed01341755766f58c8af5430bfbd5
@@ -67,4 +87,29 @@ entries:
     urls:
     - https://github.com/elegantthemes/helm-charts/releases/download/percona-xtradb-cluster-operator-1.0.2/percona-xtradb-cluster-operator-1.0.2.tgz
     version: 1.0.2
+  wordpress:
+  - apiVersion: v2
+    appVersion: 0.0.1
+    created: "2020-05-11T23:59:57.610874382Z"
+    description: Web publishing platform for building blogs and websites.
+    digest: 7a1acfc8fbac01c8deea5fe9abe6675714a7cf3c262ddadbfd2f94760044f6c9
+    home: http://www.wordpress.com/
+    icon: https://bitnami.com/assets/stacks/wordpress/img/wordpress-stack-220x234.png
+    keywords:
+    - wordpress
+    - cms
+    - blog
+    - http
+    - web
+    - application
+    - php
+    maintainers:
+    - email: containers@bitnami.com
+      name: Bitnami
+    name: wordpress
+    sources:
+    - https://github.com/bitnami/bitnami-docker-wordpress
+    urls:
+    - https://github.com/elegantthemes/helm-charts/releases/download/wordpress-0.0.1/wordpress-0.0.1.tgz
+    version: 0.0.1
 generated: "2020-05-04T20:28:23.765353727Z"
