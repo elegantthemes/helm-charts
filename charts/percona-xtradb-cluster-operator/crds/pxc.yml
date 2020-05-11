@@ -45,7 +45,7 @@ spec:
       JSONPath: .status.pxc.ready
     - name: proxysql
       type: string
-      description: Ready pxc nodes
+      description: Ready proxysql nodes
       JSONPath: .status.proxysql.ready
     - name: Age
       type: date

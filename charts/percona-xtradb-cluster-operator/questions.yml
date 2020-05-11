@@ -1,0 +1,11 @@
+questions:
+  - variable: label_name
+    label: Label
+    descriptions: Name of label to be applied to resources.
+    group: Label
+
+  - variable: label_value
+    label: Label
+    descriptions: Value of label to be applied to resources.
+    group: Label
+

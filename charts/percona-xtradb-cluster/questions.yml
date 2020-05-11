@@ -1,0 +1,40 @@
+questions:
+  - variable: s3_bucket_name
+    label: S3 Bucket Name
+
+  - variable: s3_credentials_secret_name
+    label: S3 Credentials Secret Name
+
+  - variable: s3_endpoint
+    label: S3 Endpoint
+
+  - variable: s3_region
+    label: S3 Region
+
+  - variable: cluster_name
+    label: cluster_name
+
+  - variable: secrets_name
+    label: secrets_name
+
+  - variable: ssl_secrets_name
+    label: ssl_secrets_name
+
+  - variable: ssl_internal_secrets_name
+    label: ssl_internal_secrets_name
+
+  - variable: storage_class_name
+    label: storage_class_name
+
+  - variable: vault_secrets_name
+    label: vault_secrets_name
+
+  - variable: label
+    label: Label
+    descriptions: Name of label to be applied to resources.
+    group: label1
+
+  - variable: label
+    label: Label
+    descriptions: Value of label to be applied to resources.
+    group: label1
