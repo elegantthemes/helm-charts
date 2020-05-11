@@ -29,12 +29,12 @@ questions:
   - variable: vault_secrets_name
     label: vault_secrets_name
 
-  - variable: label
+  - variable: label_name
     label: Label
     descriptions: Name of label to be applied to resources.
     group: label1
 
-  - variable: label
+  - variable: label_value
     label: Label
     descriptions: Value of label to be applied to resources.
     group: label1
