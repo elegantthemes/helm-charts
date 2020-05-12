@@ -4,6 +4,7 @@ metadata:
   name: {{ .Values.cluster_name }}
   labels:
     {{ .Values.label_name }}: {{ .Values.label_value }}
+    release: {{ .Values.label_value }}
   finalizers:
     - delete-pxc-pods-in-order
 #   - delete-proxysql-pvc
@@ -24,6 +25,7 @@ spec:
     image: percona/percona-xtradb-cluster-operator:1.4.0-pxc8.0
     labels:
       {{ .Values.label_name }}: {{ .Values.label_value }}
+      release: {{ .Values.label_value }}
     #    schedulerName: mycustom-scheduler
     #    readinessDelaySec: 15
     #    livenessDelaySec: 300
@@ -88,6 +90,7 @@ spec:
     image: percona/percona-xtradb-cluster-operator:1.4.0-proxysql
     labels:
       {{ .Values.label_name }}: {{ .Values.label_value }}
+      release: {{ .Values.label_value }}
     #    schedulerName: mycustom-scheduler
     #    imagePullSecrets:
     #      - name: private-registry-credentials
@@ -165,6 +168,7 @@ spec:
         type: s3
         labels:
           {{ .Values.label_name }}: {{ .Values.label_value }}
+          release: {{ .Values.label_value }}
         #        nodeSelector:
         #          storage: tape
         #          backupWorker: 'True'
