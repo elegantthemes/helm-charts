@@ -1,21 +1,9 @@
 apiVersion: v2
 appVersion: 0.0.1
-description: Web publishing platform for building blogs and websites.
-engine: gotpl
-home: http://www.wordpress.com/
+description: Elegant Themes Cloud Server
 icon: https://bitnami.com/assets/stacks/wordpress/img/wordpress-stack-220x234.png
-keywords:
-- wordpress
-- cms
-- blog
-- http
-- web
-- application
-- php
 maintainers:
-- email: containers@bitnami.com
-  name: Bitnami
-name: wordpress
-sources:
-- https://github.com/bitnami/bitnami-docker-wordpress
-version: 0.0.1
+  - email: dustin@elegantthemes.com
+    name: Elegant Themes
+name: cloud-server
+version: 0.0.2
