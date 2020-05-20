@@ -24,7 +24,6 @@ data:
   SERVER_PORT:        $server_port
   SERVER_NAME:        $server_name
   REDIRECT_STATUS:    "200"
-
 ---
 
 apiVersion: networking.k8s.io/v1beta1
@@ -46,10 +45,10 @@ metadata:
 spec:
   tls:
     - hosts:
-        - cloud.staging.etdevs.com
+        - {{ .Values.VIRTUAL_HOST }}
       secretName: cloud-server-tls
   rules:
-    - host: cloud.staging.etdevs.com
+    - host: {{ .Values.VIRTUAL_HOST }}
       http:
         paths:
           - path: ^(/api/[^/]+)?(/wp-.*)
