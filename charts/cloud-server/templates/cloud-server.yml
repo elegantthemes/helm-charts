@@ -2,56 +2,73 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: cloud-server
-  namespace: cloud-server
+    name: cloud-server
+    namespace: cloud-server
 spec:
-  selector:
-    app: cloud-server
-  ports:
-    - port: 9000
-      targetPort: 9000
-      name: fastcgi
+    selector:
+        app: cloud-server
+    ports:
+        - port: 9000
+          targetPort: 9000
+          name: fastcgi
 ---
 
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: cloud-server
-  namespace: cloud-server
-  labels:
-    app: cloud-server
-spec:
-  replicas: 3
-  selector:
-    matchLabels:
-      app: cloud-server
-  template:
-    metadata:
-      labels:
+    name: cloud-server
+    namespace: cloud-server
+    labels:
         app: cloud-server
-    spec:
-      containers:
-        - name: cloud-server
-          image: elegantthemes/cloud-server:{{ .Chart.appVersion }}
-          ports:
-            - name: fastcgi
-              containerPort: 9000
-          resources:
-            requests:
-              cpu: 100m
-              memory: 100Mi
-            limits:
-              cpu: 1000m
-              memory: 600Mi
-          volumeMounts:
-            - name: workspace
-              mountPath: /workspace
-            - name: config
-              mountPath: /config
-              readOnly: true
-      volumes:
-        - name: workspace
-          emptyDir: {}
-        - name: config
-          secret:
-            secretName: wp-config
+spec:
+    replicas: 3
+    selector:
+        matchLabels:
+            app: cloud-server
+    template:
+        metadata:
+            labels:
+                app: cloud-server
+        spec:
+            containers:
+                - name: cloud-server
+                  image: 'elegantthemes/cloud-server:{{ .Chart.appVersion }}'
+                  livenessProbe:
+                      httpGet:
+                          host: {{ .Values.VIRTUAL_HOST }}
+                          port: 443
+                          scheme: HTTPS
+                      periodSeconds: 30
+                  ports:
+                      - name: fastcgi
+                        containerPort: 9000
+                  readinessProbe:
+                      tcpSocket:
+                          port: fastcgi
+                      periodSeconds: 10
+                  resources:
+                      requests:
+                          cpu: 100m
+                          memory: 100Mi
+                      limits:
+                          cpu: 1000m
+                          memory: 600Mi
+                  startupProbe:
+                      exec:
+                          command:
+                              - cat
+                              - {{ .Values.VIRTUAL_ROOT }}/healthz
+                      failureThreshold: 30
+                      periodSeconds: 10
+                  volumeMounts:
+                      - name: workspace
+                        mountPath: /workspace
+                      - name: config
+                        mountPath: /config
+                        readOnly: true
+            volumes:
+                - name: workspace
+                  emptyDir: {}
+                - name: config
+                  secret:
+                      secretName: wp-config
