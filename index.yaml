@@ -3,6 +3,19 @@ entries:
   cloud-server:
   - apiVersion: v2
     appVersion: 0.0.1
+    created: "2020-05-20T22:22:21.641382959Z"
+    description: Elegant Themes Cloud Server
+    digest: bec40d385ebcb6b7b62cade3b3bc0fc9bba4f6f046440997560f7a9326c9cc58
+    icon: https://bitnami.com/assets/stacks/wordpress/img/wordpress-stack-220x234.png
+    maintainers:
+    - email: dustin@elegantthemes.com
+      name: Elegant Themes
+    name: cloud-server
+    urls:
+    - https://github.com/elegantthemes/helm-charts/releases/download/cloud-server-0.0.4/cloud-server-0.0.4.tgz
+    version: 0.0.4
+  - apiVersion: v2
+    appVersion: 0.0.1
     created: "2020-05-20T20:54:01.221840914Z"
     description: Elegant Themes Cloud Server
     digest: df9c5969cbe4d789b42713eb3037e2bc4210573707576c5aca041aa943cafd6f
