@@ -32,7 +32,7 @@ spec:
         spec:
             containers:
                 - name: cloud-server
-                  image: 'elegantthemes/cloud-server:{{ .Chart.appVersion }}'
+                  image: 'elegantthemes/cloud-server:{{ .Chart.AppVersion }}'
                   livenessProbe:
                       httpGet:
                           host: {{ .Values.VIRTUAL_HOST }}
