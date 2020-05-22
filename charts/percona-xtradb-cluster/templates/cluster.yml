@@ -87,7 +87,7 @@ spec:
   proxysql:
     enabled: true
     size: 3
-    image: percona/percona-xtradb-cluster-operator:1.4.0-proxysql
+    image: elegantthemes/percona-xtradb-cluster-operator:1.4.0-proxysql
     labels:
       {{ .Values.label_name }}: {{ .Values.label_value }}
       release: {{ .Values.label_value }}
