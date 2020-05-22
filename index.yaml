@@ -2,6 +2,19 @@ apiVersion: v1
 entries:
   cloud-server:
   - apiVersion: v1
+    appVersion: 0.0.3
+    created: "2020-05-22T13:01:25.311570903Z"
+    description: Elegant Themes Cloud Server
+    digest: bce890c9ffe44812564a8c901a9535ea317d8895408fe9061982357a6612b10c
+    icon: https://bitnami.com/assets/stacks/wordpress/img/wordpress-stack-220x234.png
+    maintainers:
+    - email: dustin@elegantthemes.com
+      name: Elegant Themes
+    name: cloud-server
+    urls:
+    - https://github.com/elegantthemes/helm-charts/releases/download/cloud-server-0.1.1/cloud-server-0.1.1.tgz
+    version: 0.1.1
+  - apiVersion: v1
     appVersion: 0.0.2
     created: "2020-05-21T19:37:25.311570903Z"
     description: Elegant Themes Cloud Server
@@ -222,29 +235,4 @@ entries:
     urls:
     - https://github.com/elegantthemes/helm-charts/releases/download/percona-xtradb-cluster-operator-1.0.2/percona-xtradb-cluster-operator-1.0.2.tgz
     version: 1.0.2
-  wordpress:
-  - apiVersion: v2
-    appVersion: 0.0.1
-    created: "2020-05-11T23:59:57.610874382Z"
-    description: Web publishing platform for building blogs and websites.
-    digest: 7a1acfc8fbac01c8deea5fe9abe6675714a7cf3c262ddadbfd2f94760044f6c9
-    home: http://www.wordpress.com/
-    icon: https://bitnami.com/assets/stacks/wordpress/img/wordpress-stack-220x234.png
-    keywords:
-    - wordpress
-    - cms
-    - blog
-    - http
-    - web
-    - application
-    - php
-    maintainers:
-    - email: containers@bitnami.com
-      name: Bitnami
-    name: wordpress
-    sources:
-    - https://github.com/bitnami/bitnami-docker-wordpress
-    urls:
-    - https://github.com/elegantthemes/helm-charts/releases/download/wordpress-0.0.1/wordpress-0.0.1.tgz
-    version: 0.0.1
 generated: "2020-05-04T20:28:23.765353727Z"
