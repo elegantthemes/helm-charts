@@ -36,13 +36,13 @@ stringData:
     if ( ! defined( 'WP_INSTALLING' ) || ! WP_INSTALLING ) {
         define( 'WP_ALLOW_MULTISITE', true );
 
-        if ( ! defined( 'WP_CLI' ) || array( 'core', 'multisite-install' ) != WP_CLI::$runner->arguments ) {
+        if ( ! defined( 'WP_CLI' ) || array( 'core', 'multisite-install' ) != WP_CLI::get_runner()->arguments ) {
             define( 'MULTISITE', true );
             define( 'SUBDOMAIN_INSTALL', false );
             $base = '/';
             define( 'DOMAIN_CURRENT_SITE', getenv( 'VIRTUAL_HOST' ) );
             define( 'PATH_CURRENT_SITE', '/' );
-            define( 'SITE_ID_CURRENT_SITE', 1 );
+            define( 'SITE_ID_CURRENT_SITE', 3 );
             define( 'BLOG_ID_CURRENT_SITE', 1 );
         }
     }
