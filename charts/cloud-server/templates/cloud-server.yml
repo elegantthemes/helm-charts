@@ -34,15 +34,15 @@ spec:
                 - name: cloud-server
                   env:
                       - name: VIRTUAL_ROOT
-                        value: {{ .Values.VIRTUAL_ROOT }}
+                        value: '{{ .Values.VIRTUAL_ROOT }}'
                       - name: VIRTUAL_HOST
-                        value: {{ .Values.VIRTUAL_HOST }}
+                        value: '{{ .Values.VIRTUAL_HOST }}'
                       - name: CLOUD_SERVER_REPO_URL
-                        value: {{ .Values.CLOUD_SERVER_REPO_URL }}
+                        value: '{{ .Values.CLOUD_SERVER_REPO_URL }}'
                   image: 'elegantthemes/cloud-server:{{ .Chart.AppVersion }}'
                   livenessProbe:
                       httpGet:
-                          host: {{ .Values.VIRTUAL_HOST }}
+                          host: '{{ .Values.VIRTUAL_HOST }}'
                           port: 443
                           scheme: HTTPS
                       periodSeconds: 30
