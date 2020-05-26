@@ -74,7 +74,7 @@ spec:
                         mountPath: /config
                         readOnly: true
             volumes:
-                - name: workspace
+                - name: wordpress
                   emptyDir: {}
                 - name: config
                   secret:
