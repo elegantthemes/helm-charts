@@ -7,6 +7,7 @@ stringData:
   ADMIN_USER: {{ .Values.ADMIN_USER }}
   ADMIN_PASSWORD: {{ .Values.ADMIN_PASSWORD }}
   ADMIN_EMAIL: {{ .Values.ADMIN_EMAIL }}
+  GITHUB_TOKEN: {{ .Values.GITHUB_TOKEN }}
   wp-config.php: |
     <?php
     define( 'DB_NAME', '{{ .Values.DB_NAME }}' );
