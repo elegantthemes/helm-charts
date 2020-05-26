@@ -64,7 +64,7 @@ spec:
                       exec:
                           command:
                               - cat
-                              - {{ .Values.VIRTUAL_ROOT }}/healthz
+                              - {{ .Values.VIRTUAL_ROOT }}/healthz.php
                       failureThreshold: 30
                       periodSeconds: 10
                   volumeMounts:
