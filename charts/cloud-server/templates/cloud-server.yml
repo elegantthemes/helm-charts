@@ -68,8 +68,8 @@ spec:
                       failureThreshold: 30
                       periodSeconds: 10
                   volumeMounts:
-                      - name: workspace
-                        mountPath: /workspace
+                      - name: wordpress
+                        mountPath: /srv/wordpress
                       - name: config
                         mountPath: /config
                         readOnly: true

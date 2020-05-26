@@ -31,15 +31,21 @@ stringData:
         define( 'WP_DEBUG_LOG', true );
     }
 
-    define( 'WP_ALLOW_MULTISITE', true );
-    define( 'MULTISITE', true );
-    define( 'SUBDOMAIN_INSTALL', false );
-    $base         = '/';
     $table_prefix = 'dc_';
-    define( 'DOMAIN_CURRENT_SITE', getenv( 'VIRTUAL_HOST' ) );
-    define( 'PATH_CURRENT_SITE', '/' );
-    define( 'SITE_ID_CURRENT_SITE', 1 );
-    define( 'BLOG_ID_CURRENT_SITE', 1 );
+
+    if ( ! defined( 'WP_INSTALLING' ) || ! WP_INSTALLING ) {
+        define( 'WP_ALLOW_MULTISITE', true );
+
+        if ( ! defined( 'WP_CLI' ) || array( 'core', 'multisite-install' ) != WP_CLI::$runner->arguments ) {
+            define( 'MULTISITE', true );
+            define( 'SUBDOMAIN_INSTALL', false );
+            $base = '/';
+            define( 'DOMAIN_CURRENT_SITE', getenv( 'VIRTUAL_HOST' ) );
+            define( 'PATH_CURRENT_SITE', '/' );
+            define( 'SITE_ID_CURRENT_SITE', 1 );
+            define( 'BLOG_ID_CURRENT_SITE', 1 );
+        }
+    }
 
     /* That's all, stop editing! Happy blogging. */
 
