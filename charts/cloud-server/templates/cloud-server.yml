@@ -43,6 +43,8 @@ spec:
                   livenessProbe:
                       exec:
                           command:
+                              - 'bash'
+                              - '-c'
                               - 'SCRIPT_NAME=/healthz'
                               - 'SCRIPT_FILENAME={{ .Values.VIRTUAL_ROOT }}/healthz.php'
                               - 'REQUEST_METHOD=GET'
@@ -57,6 +59,8 @@ spec:
                   readinessProbe:
                       exec:
                           command:
+                              - 'bash'
+                              - '-c'
                               - 'SCRIPT_NAME=/healthz'
                               - 'SCRIPT_FILENAME={{ .Values.VIRTUAL_ROOT }}/healthz.php'
                               - 'REQUEST_METHOD=GET'
