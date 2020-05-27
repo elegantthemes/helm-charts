@@ -41,17 +41,29 @@ spec:
                         value: '{{ .Values.CLOUD_SERVER_REPO_URL }}'
                   image: 'elegantthemes/cloud-server:{{ .Chart.AppVersion }}'
                   livenessProbe:
-                      httpGet:
-                          host: '{{ .Values.VIRTUAL_HOST }}'
-                          port: 443
-                          scheme: HTTPS
+                      exec:
+                          command:
+                              - 'SCRIPT_NAME=/healthz'
+                              - 'SCRIPT_FILENAME={{ .Values.VIRTUAL_ROOT }}/healthz.php'
+                              - 'REQUEST_METHOD=GET'
+                              - 'cgi-fcgi'
+                              - '-bind'
+                              - '-connect'
+                              - '127.0.0.1:9000'
                       periodSeconds: 30
                   ports:
                       - name: fastcgi
                         containerPort: 9000
                   readinessProbe:
-                      tcpSocket:
-                          port: fastcgi
+                      exec:
+                          command:
+                              - 'SCRIPT_NAME=/healthz'
+                              - 'SCRIPT_FILENAME={{ .Values.VIRTUAL_ROOT }}/healthz.php'
+                              - 'REQUEST_METHOD=GET'
+                              - 'cgi-fcgi'
+                              - '-bind'
+                              - '-connect'
+                              - '127.0.0.1:9000'
                       periodSeconds: 10
                   resources:
                       requests:
