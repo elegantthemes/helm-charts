@@ -4,8 +4,8 @@ metadata:
   name: ingress-fcgi-params
   namespace: cloud-server
 data:
-  SCRIPT_FILENAME:    /srv/wordpress/5.4.1$fastcgi_script_name
-  REDIRECT_STATUS:    "200"
+  SCRIPT_FILENAME:  /srv/wordpress/$fastcgi_script_name
+  REDIRECT_STATUS:  "200"
 ---
 
 apiVersion: networking.k8s.io/v1beta1
