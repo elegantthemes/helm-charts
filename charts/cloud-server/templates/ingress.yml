@@ -52,15 +52,7 @@ spec:
         -   host: {{ .Values.VIRTUAL_HOST }}
             http:
                 paths:
-                    -   path: /api(/[^/]+)?(/wp-.*)
-                        backend:
-                            serviceName: cloud-server
-                            servicePort: fastcgi
-                    -   path: /api(/[^/]+)?(/.*\.php)
-                        backend:
-                            serviceName: cloud-server
-                            servicePort: fastcgi
-                    -   path: /api(/|$)(.*)
+                    -   path: /api(/|$)(.*\.php)
                         backend:
                             serviceName: cloud-server
                             servicePort: fastcgi
