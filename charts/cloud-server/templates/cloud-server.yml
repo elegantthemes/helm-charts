@@ -2,96 +2,98 @@
 apiVersion: v1
 kind: Service
 metadata:
-    name: cloud-server
-    namespace: cloud-server
+  name: cloud-server
+  namespace: cloud-server
 spec:
-    selector:
-        app: cloud-server
-    ports:
-        - port: 9000
-          targetPort: 9000
-          name: fastcgi
+  selector:
+    app: cloud-server
+  ports:
+    - port: 9000
+      targetPort: 9000
+      name: fastcgi
 ---
 
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-    name: cloud-server
-    namespace: cloud-server
-    labels:
-        app: cloud-server
+  name: cloud-server
+  namespace: cloud-server
+  labels:
+    app: cloud-server
 spec:
-    replicas: 1
-    selector:
-        matchLabels:
-            app: cloud-server
-    template:
-        metadata:
-            labels:
-                app: cloud-server
-        spec:
-            containers:
-                - name: cloud-server
-                  env:
-                      - name: VIRTUAL_ROOT
-                        value: '{{ .Values.VIRTUAL_ROOT }}'
-                      - name: VIRTUAL_HOST
-                        value: '{{ .Values.VIRTUAL_HOST }}'
-                      - name: CLOUD_SERVER_REPO_URL
-                        value: '{{ .Values.CLOUD_SERVER_REPO_URL }}'
-                  image: 'elegantthemes/cloud-server:{{ .Chart.AppVersion }}'
-                  livenessProbe:
-                      exec:
-                          command:
-                              - 'bash'
-                              - '-c'
-                              - 'SCRIPT_NAME=/healthz'
-                              - 'SCRIPT_FILENAME={{ .Values.VIRTUAL_ROOT }}/healthz.php'
-                              - 'REQUEST_METHOD=GET'
-                              - 'cgi-fcgi'
-                              - '-bind'
-                              - '-connect'
-                              - '127.0.0.1:9000'
-                      periodSeconds: 30
-                  ports:
-                      - name: fastcgi
-                        containerPort: 9000
-                  readinessProbe:
-                      exec:
-                          command:
-                              - 'bash'
-                              - '-c'
-                              - 'SCRIPT_NAME=/healthz'
-                              - 'SCRIPT_FILENAME={{ .Values.VIRTUAL_ROOT }}/healthz.php'
-                              - 'REQUEST_METHOD=GET'
-                              - 'cgi-fcgi'
-                              - '-bind'
-                              - '-connect'
-                              - '127.0.0.1:9000'
-                      periodSeconds: 10
-                  resources:
-                      requests:
-                          cpu: 100m
-                          memory: 100Mi
-                      limits:
-                          cpu: 1000m
-                          memory: 600Mi
-                  startupProbe:
-                      exec:
-                          command:
-                              - cat
-                              - {{ .Values.VIRTUAL_ROOT }}/healthz.php
-                      failureThreshold: 30
-                      periodSeconds: 10
-                  volumeMounts:
-                      - name: wordpress
-                        mountPath: /srv
-                      - name: config
-                        mountPath: /config
-                        readOnly: true
-            volumes:
-                - name: wordpress
-                  emptyDir: {}
-                - name: config
-                  secret:
-                      secretName: wp-config
+  replicas: 1
+  selector:
+    matchLabels:
+      app: cloud-server
+  template:
+    metadata:
+      labels:
+        app: cloud-server
+    spec:
+      containers:
+        - name: cloud-server
+          env:
+            - name: VIRTUAL_ROOT
+              value: '{{ .Values.VIRTUAL_ROOT }}'
+            - name: VIRTUAL_HOST
+              value: '{{ .Values.VIRTUAL_HOST }}'
+            - name: CLOUD_SERVER_REPO_URL
+              value: '{{ .Values.CLOUD_SERVER_REPO_URL }}'
+          image: 'elegantthemes/cloud-server:{{ .Chart.AppVersion }}'
+          livenessProbe:
+            exec:
+              command:
+                - 'bash'
+                - '-c'
+                - 'SCRIPT_NAME=/healthz'
+                - 'SCRIPT_FILENAME={{ .Values.VIRTUAL_ROOT }}/healthz.php'
+                - 'REQUEST_METHOD=GET'
+                - 'cgi-fcgi'
+                - '-bind'
+                - '-connect'
+                - '127.0.0.1:9000'
+            periodSeconds: 30
+          ports:
+            - name: fastcgi
+              containerPort: 9000
+          readinessProbe:
+            exec:
+              command:
+                - 'bash'
+                - '-c'
+                - 'SCRIPT_NAME=/healthz'
+                - 'SCRIPT_FILENAME={{ .Values.VIRTUAL_ROOT }}/healthz.php'
+                - 'REQUEST_METHOD=GET'
+                - 'cgi-fcgi'
+                - '-bind'
+                - '-connect'
+                - '127.0.0.1:9000'
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 100m
+              memory: 100Mi
+            limits:
+              cpu: 1000m
+              memory: 600Mi
+          startupProbe:
+            exec:
+              command:
+                - cat
+                - {{ .Values.VIRTUAL_ROOT }}/healthz.php
+            failureThreshold: 30
+            periodSeconds: 10
+          volumeMounts:
+            - name: wordpress
+              mountPath: /srv
+            - name: config
+              mountPath: /config
+              readOnly: true
+      volumes:
+        - name: wordpress
+          hostPath:
+            path: /srv
+            type: DirectoryOrCreate
+        - name: config
+          secret:
+            secretName: wp-config
