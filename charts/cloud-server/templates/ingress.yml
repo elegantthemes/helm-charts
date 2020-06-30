@@ -40,9 +40,6 @@ metadata:
         nginx.ingress.kubernetes.io/fastcgi-params-configmap: cloud-server/ingress-fcgi-params
         nginx.ingress.kubernetes.io/limit-connections: "10"
         nginx.ingress.kubernetes.io/limit-rps: "10"
-        nginx.ingress.kubernetes.io/rewrite-target: /$2
-        nginx.ingress.kubernetes.io/use-regex: "true"
-        nginx.ingress.kubernetes.io/enable-rewrite-log: "true"
 spec:
     tls:
         -   hosts:
@@ -52,10 +49,6 @@ spec:
         -   host: {{ .Values.VIRTUAL_HOST }}
             http:
                 paths:
-                    - path: /api(/|$)(.*)
-                      backend:
-                          serviceName: cloud-server
-                          servicePort: fastcgi
                     - path: /api
                       backend:
                           serviceName: cloud-server
