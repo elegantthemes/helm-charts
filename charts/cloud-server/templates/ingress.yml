@@ -1,55 +1,57 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-    name: ingress-fcgi-params
-    namespace: cloud-server
+  name: ingress-fcgi-params
+  namespace: cloud-server
 data:
-    SCRIPT_FILENAME:   /srv/wordpress$fastcgi_script_name
-    QUERY_STRING:      $query_string
-    REQUEST_METHOD:    $request_method
-    CONTENT_TYPE:      $content_type
-    CONTENT_LENGTH:    $content_length
-    SCRIPT_NAME:       $fastcgi_script_name
-    REQUEST_URI:       $request_uri
-    DOCUMENT_URI:      $document_uri
-    DOCUMENT_ROOT:     /srv/wordpress
-    SERVER_PROTOCOL:   $server_protocol
-    REQUEST_SCHEME:    $scheme
-    HTTPS:             $https if_not_empty
-    GATEWAY_INTERFACE: CGI/1.1
-    SERVER_SOFTWARE:   nginx/$nginx_version
-    REMOTE_ADDR:       $remote_addr
-    REMOTE_PORT:       $remote_port
-    SERVER_ADDR:       $server_addr
-    SERVER_PORT:       $server_port
-    SERVER_NAME:       $server_name
-    REDIRECT_STATUS:   "200"
+  SCRIPT_FILENAME:   /srv/wordpress$fastcgi_script_name
+  QUERY_STRING:      $query_string
+  REQUEST_METHOD:    $request_method
+  CONTENT_TYPE:      $content_type
+  CONTENT_LENGTH:    $content_length
+  SCRIPT_NAME:       $fastcgi_script_name
+  REQUEST_URI:       $request_uri
+  DOCUMENT_URI:      $document_uri
+  DOCUMENT_ROOT:     /srv/wordpress
+  SERVER_PROTOCOL:   $server_protocol
+  REQUEST_SCHEME:    $scheme
+  HTTPS:             $https if_not_empty
+  GATEWAY_INTERFACE: CGI/1.1
+  SERVER_SOFTWARE:   nginx/$nginx_version
+  REMOTE_ADDR:       $remote_addr
+  REMOTE_PORT:       $remote_port
+  SERVER_ADDR:       $server_addr
+  SERVER_PORT:       $server_port
+  SERVER_NAME:       $server_name
+  REDIRECT_STATUS:   "200"
 ---
 
 apiVersion: networking.k8s.io/v1beta1
 kind: Ingress
 metadata:
-    name: cloud-server
-    namespace: cloud-server
-    annotations:
-        cert-manager.io/cluster-issuer: letsencrypt
-        kubernetes.io/ingress.class: nginx
-        nginx.ingress.kubernetes.io/backend-protocol: FCGI
-        nginx.ingress.kubernetes.io/enable-cors: "true"
-        nginx.ingress.kubernetes.io/fastcgi-index: index.php
-        nginx.ingress.kubernetes.io/fastcgi-params-configmap: cloud-server/ingress-fcgi-params
-        nginx.ingress.kubernetes.io/limit-connections: "10"
-        nginx.ingress.kubernetes.io/limit-rps: "10"
+  name: cloud-server
+  namespace: cloud-server
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt
+    kubernetes.io/ingress.class: nginx
+    nginx.ingress.kubernetes.io/backend-protocol: FCGI
+    nginx.ingress.kubernetes.io/enable-cors: "true"
+    nginx.ingress.kubernetes.io/fastcgi-index: index.php
+    nginx.ingress.kubernetes.io/fastcgi-params-configmap: cloud-server/ingress-fcgi-params
+    nginx.ingress.kubernetes.io/limit-connections: "10"
+    nginx.ingress.kubernetes.io/limit-rps: "10"
+    nginx.ingress.kubernetes.io/use-regex: "true"
+    # nginx.ingress.kubernetes.io/enable-rewrite-log: "true"
 spec:
-    tls:
-        -   hosts:
-                - {{ .Values.VIRTUAL_HOST }}
-            secretName: cloud-server-tls
-    rules:
-        -   host: {{ .Values.VIRTUAL_HOST }}
-            http:
-                paths:
-                    - path: /api
-                      backend:
-                          serviceName: cloud-server
-                          servicePort: fastcgi
+  tls:
+    - hosts:
+        - {{ .Values.VIRTUAL_HOST }}
+      secretName: cloud-server-tls
+  rules:
+    - host: {{ .Values.VIRTUAL_HOST }}
+      http:
+        paths:
+          - path: /api/.*\.php(/|$)
+            backend:
+              serviceName: cloud-server
+              servicePort: fastcgi
