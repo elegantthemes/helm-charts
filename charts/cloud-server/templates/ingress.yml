@@ -4,7 +4,7 @@ metadata:
   name: ingress-fcgi-params
   namespace: cloud-server
 data:
-  SCRIPT_FILENAME:   /srv/wordpress$fastcgi_script_name
+  SCRIPT_FILENAME:   $document_root$fastcgi_script_name
   QUERY_STRING:      $query_string
   REQUEST_METHOD:    $request_method
   CONTENT_TYPE:      $content_type
@@ -12,7 +12,7 @@ data:
   SCRIPT_NAME:       $fastcgi_script_name
   REQUEST_URI:       $request_uri
   DOCUMENT_URI:      $document_uri
-  DOCUMENT_ROOT:     /srv/wordpress
+  DOCUMENT_ROOT:     $document_root
   SERVER_PROTOCOL:   $server_protocol
   REQUEST_SCHEME:    $scheme
   HTTPS:             $https if_not_empty
@@ -41,7 +41,7 @@ metadata:
     nginx.ingress.kubernetes.io/limit-connections: "10"
     nginx.ingress.kubernetes.io/limit-rps: "10"
     nginx.ingress.kubernetes.io/use-regex: "true"
-    # nginx.ingress.kubernetes.io/enable-rewrite-log: "true"
+    nginx.ingress.kubernetes.io/enable-rewrite-log: "true"
 spec:
   tls:
     - hosts:
@@ -51,7 +51,7 @@ spec:
     - host: {{ .Values.VIRTUAL_HOST }}
       http:
         paths:
-          - path: /api/.*\.php(/|$)
+          - path: /
             backend:
               serviceName: cloud-server
               servicePort: fastcgi
