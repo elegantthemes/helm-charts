@@ -100,4 +100,4 @@ spec:
             type: DirectoryOrCreate
         - name: config
           secret:
-            secretName: .env
+            secretName: secrets
