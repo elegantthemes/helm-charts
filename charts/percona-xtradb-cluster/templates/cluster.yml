@@ -159,7 +159,7 @@ spec:
   pmm:
     enabled: true
     image: percona/percona-xtradb-cluster-operator:1.5.0-pmm
-    serverHost: percona-monitoring-server
+    serverHost: percona-monitoring-server-service
     serverUser: admin
     resources:
       requests:
