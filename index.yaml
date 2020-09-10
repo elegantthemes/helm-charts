@@ -2,6 +2,19 @@ apiVersion: v1
 entries:
   cloud-server:
   - apiVersion: v1
+    appVersion: 0.1.2
+    created: "2020-09-10T19:52:25.959491616Z"
+    description: Elegant Themes Cloud Server
+    digest: a660a28a78390f850996d41504b53e5e09f777e0e0591e34b706c773c6963848
+    icon: https://bitnami.com/assets/stacks/wordpress/img/wordpress-stack-220x234.png
+    maintainers:
+    - email: dustin@elegantthemes.com
+      name: Elegant Themes
+    name: cloud-server
+    urls:
+    - https://github.com/elegantthemes/helm-charts/releases/download/cloud-server-0.5.1/cloud-server-0.5.1.tgz
+    version: 0.5.1
+  - apiVersion: v1
     appVersion: 0.1.1
     created: "2020-09-01T21:58:04.918921061Z"
     description: Elegant Themes Cloud Server
@@ -627,6 +640,16 @@ entries:
     version: 0.0.2
   percona-xtradb-cluster:
   - apiVersion: v2
+    appVersion: 1.5.0
+    created: "2020-09-10T19:52:26.054978026Z"
+    description: Percona XtraDB Cluster managed by PXC K8s Operator
+    digest: e9ea012758333f77195aa928b7717e76a7ee40acf2a389683e03707761249aa3
+    name: percona-xtradb-cluster
+    type: application
+    urls:
+    - https://github.com/elegantthemes/helm-charts/releases/download/percona-xtradb-cluster-1.1.2/percona-xtradb-cluster-1.1.2.tgz
+    version: 1.1.2
+  - apiVersion: v2
     appVersion: 1.4.0
     created: "2020-05-22T03:15:48.556033783Z"
     description: Percona XtraDB Cluster managed by PXC K8s Operator
@@ -722,6 +745,16 @@ entries:
     - https://github.com/elegantthemes/helm-charts/releases/download/percona-xtradb-cluster-1.0.2/percona-xtradb-cluster-1.0.2.tgz
     version: 1.0.2
   percona-xtradb-cluster-operator:
+  - apiVersion: v2
+    appVersion: 1.5.0
+    created: "2020-09-10T19:52:26.161462396Z"
+    description: A Helm chart for percona-xtradb-cluster-operator
+    digest: 017232067a4cf3107711232ac6ecf4a618b5bc7e70073e6fdffdb2428d8fb454
+    name: percona-xtradb-cluster-operator
+    type: application
+    urls:
+    - https://github.com/elegantthemes/helm-charts/releases/download/percona-xtradb-cluster-operator-1.0.4/percona-xtradb-cluster-operator-1.0.4.tgz
+    version: 1.0.4
   - apiVersion: v2
     appVersion: 1.4.0
     created: "2020-05-11T23:59:57.533781964Z"
