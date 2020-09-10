@@ -1,4 +1,4 @@
-apiVersion: pxc.percona.com/v1-4-0
+apiVersion: pxc.percona.com/v1-5-0
 kind: PerconaXtraDBCluster
 metadata:
   name: {{ .Values.cluster_name }}
@@ -9,9 +9,9 @@ metadata:
     - delete-pxc-pods-in-order
 #   - delete-proxysql-pvc
 #   - delete-pxc-pvc
-  annotations:
-    kubectl.kubernetes.io/last-applied-configuration: |
-      {"apiVersion":"pxc.percona.com/v1-4-0","kind":"PerconaXtraDBCluster"}
+#  annotations:
+#    kubectl.kubernetes.io/last-applied-configuration: |
+#      {"apiVersion":"pxc.percona.com/v1-5-0","kind":"PerconaXtraDBCluster"}
 spec:
   secretsName: {{ .Values.secrets_name }}
   sslSecretName: {{ .Values.ssl_secrets_name }}
@@ -19,30 +19,40 @@ spec:
   vaultSecretName: {{ .Values.vault_secrets_name }}
   allowUnsafeConfigurations: false
   #  pause: false
-  #  updateStrategy: RollingUpdate
+  updateStrategy: SmartUpdate
+  upgradeOptions:
+    versionServiceEndpoint: https://check.percona.com/versions
+    apply: recommended
+    schedule: "0 4 * * *"
   pxc:
     size: 3
-    image: percona/percona-xtradb-cluster-operator:1.4.0-pxc8.0
-    labels:
-      {{ .Values.label_name }}: {{ .Values.label_value }}
-      release: {{ .Values.label_value }}
-    #    schedulerName: mycustom-scheduler
-    #    readinessDelaySec: 15
-    #    livenessDelaySec: 300
-    # forceUnsafeBootstrap: true
-    #configuration: |
-    #  [mysqld]
-    #  wsrep_debug=OFF
-    #  wsrep_provider_options="gcache.size=1G; gcache.recover=yes"
-    #    imagePullSecrets:
-    #      - name: private-registry-credentials
-    #    priorityClassName: high-priority
-    #    annotations:
-    #      iam.amazonaws.com/role: role-arn
-    #    labels:
-    #      rack: rack-22
-    #    containerSecurityContext:
-    #      privileged: false
+    image: percona/percona-xtradb-cluster:8.0.19-10.1
+#    schedulerName: mycustom-scheduler
+#    readinessDelaySec: 15
+#    livenessDelaySec: 300
+#    forceUnsafeBootstrap: false
+    configuration: |
+#     [mysqld]
+#     wsrep_debug=ON
+#     wsrep_provider_options="gcache.size=1G; gcache.recover=yes"
+      [sst]
+      xbstream-opts=--decompress
+      [xtrabackup]
+      compress=lz4
+#    imagePullSecrets:
+#      - name: private-registry-credentials
+#    priorityClassName: high-priority
+#    annotations:
+#      iam.amazonaws.com/role: role-arn
+#    labels:
+#      rack: rack-22
+#    containerSecurityContext:
+#      privileged: false
+#    podSecurityContext:
+#      runAsUser: 1001
+#      runAsGroup: 1001
+#      supplementalGroups: [1001]
+#    serviceAccountName: percona-xtradb-cluster-operator-workload
     resources:
       requests:
         memory: 1G
@@ -82,12 +92,12 @@ spec:
         #        accessModes: [ "ReadWriteOnce" ]
         resources:
           requests:
-            storage: 5Gi
+            storage: 6Gi
     gracePeriod: 600
   proxysql:
     enabled: true
     size: 3
-    image: elegantthemes/percona-xtradb-cluster-operator:1.4.0-proxysql
+    image: percona/percona-xtradb-cluster-operator:1.5.0-proxysql
     labels:
       {{ .Values.label_name }}: {{ .Values.label_value }}
       release: {{ .Values.label_value }}
@@ -104,9 +114,9 @@ spec:
       requests:
         memory: 1G
         cpu: 600m
-    #      limits:
-    #        memory: 1G
-    #        cpu: 700m
+      limits:
+        memory: 1G
+        cpu: 700m
     #    priorityClassName: high-priority
     #    nodeSelector:
     #      disktype: ssd
@@ -150,21 +160,21 @@ spec:
     #      minAvailable: 0
     gracePeriod: 30
   pmm:
-    enabled: false
-    image: percona/percona-xtradb-cluster-operator:1.4.0-pmm
-    serverHost: monitoring-service
-    serverUser: pmm
+    enabled: true
+    image: percona/percona-xtradb-cluster-operator:1.5.0-pmm
+    serverHost: percona-monitoring-server
+    serverUser: admin
     resources:
       requests:
         memory: 200M
         cpu: 500m
   backup:
-    image: percona/percona-xtradb-cluster-operator:1.4.0-pxc8.0-backup
+    image: percona/percona-xtradb-cluster-operator:1.5.0-pxc8.0-backup
     serviceAccountName: percona-xtradb-cluster-operator
     #    imagePullSecrets:
     #      - name: private-registry-credentials
     storages:
-      backup-s3:
+      do-sfo2:
         type: s3
         labels:
           {{ .Values.label_name }}: {{ .Values.label_value }}
@@ -245,11 +255,11 @@ spec:
       #        requests:
       #          storage: 5Gi
     schedule:
-      - name: "weekly-backup"
-        schedule: "0 0 * * 6"
-        keep: 3
-        storageName: backup-s3
-      - name: "daily-backup"
+      - name: "hourly-backup-do"
+        schedule: "0 2-22/2 * * *"
+        keep: 6
+        storageName: do-sfo2
+      - name: "daily-backup-do"
         schedule: "0 0 * * *"
         keep: 5
-        storageName: backup-s3
+        storageName: do-sfo2

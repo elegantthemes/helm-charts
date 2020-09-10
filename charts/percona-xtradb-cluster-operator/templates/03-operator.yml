@@ -18,7 +18,7 @@ spec:
       serviceAccountName: percona-xtradb-cluster-operator
       containers:
         - name: percona-xtradb-cluster-operator
-          image: percona/percona-xtradb-cluster-operator:1.4.0
+          image: percona/percona-xtradb-cluster-operator:1.5.0
           ports:
             - containerPort: 60000
               name: metrics
@@ -30,5 +30,9 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.namespace
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
             - name: OPERATOR_NAME
               value: "percona-xtradb-cluster-operator"
