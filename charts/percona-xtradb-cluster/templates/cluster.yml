@@ -9,9 +9,9 @@ metadata:
     - delete-pxc-pods-in-order
 #   - delete-proxysql-pvc
 #   - delete-pxc-pvc
-#  annotations:
-#    kubectl.kubernetes.io/last-applied-configuration: |
-#      {"apiVersion":"pxc.percona.com/v1-5-0","kind":"PerconaXtraDBCluster"}
+  annotations:
+    kubectl.kubernetes.io/last-applied-configuration: |
+      {"apiVersion":"pxc.percona.com/v1-5-0","kind":"PerconaXtraDBCluster"}
 spec:
   secretsName: {{ .Values.secrets_name }}
   sslSecretName: {{ .Values.ssl_secrets_name }}
