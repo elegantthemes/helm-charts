@@ -41,7 +41,18 @@ spec:
                       - ingress-nginx
               namespaces:
                 - ingress-nginx
-              topologyKey: region
+              topologyKey: kubernetes.io/hostname
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                    - key: app
+                      operator: In
+                      values:
+                        - cloud-server
+                topologyKey: kubernetes.io/hostname
       containers:
         - name: cloud-server
           env:
