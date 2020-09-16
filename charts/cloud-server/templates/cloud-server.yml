@@ -30,6 +30,18 @@ spec:
       labels:
         app: cloud-server
     spec:
+      affinity:
+        podAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchExpressions:
+                  - key: app
+                    operator: In
+                    values:
+                      - ingress-nginx
+              namespaces:
+                - ingress-nginx
+              topologyKey: region
       containers:
         - name: cloud-server
           env:
