@@ -68,6 +68,42 @@ spec:
               value: '{{ .Values.CLOUD_SERVER_REPO_URL }}'
             - name: IMAGE_VERSION
               value: '{{ .Chart.AppVersion }}'
+
+            - name: S3_BUCKET_CLOUD_ITEMS
+              value: '{{ .Values.S3_BUCKET_CLOUD_ITEMS }}'
+            - name: S3_BUCKET_CLOUD_ITEMS_BACKUP_1
+              value: '{{ .Values.S3_BUCKET_CLOUD_ITEMS_BACKUP_1 }}'
+            - name: S3_BUCKET_CLOUD_ITEMS_BACKUP_2
+              value: '{{ .Values.S3_BUCKET_CLOUD_ITEMS_BACKUP_2 }}'
+
+            - name: S3_ENDPOINT_CLOUD_ITEMS
+              value: '{{ .Values.S3_ENDPOINT_CLOUD_ITEMS }}'
+            - name: S3_ENDPOINT_CLOUD_ITEMS_BACKUP_1
+              value: '{{ .Values.S3_ENDPOINT_CLOUD_ITEMS_BACKUP_1 }}'
+            - name: S3_ENDPOINT_CLOUD_ITEMS_BACKUP_2
+              value: '{{ .Values.S3_ENDPOINT_CLOUD_ITEMS_BACKUP_2 }}'
+
+            - name: S3_KEY_CLOUD_ITEMS
+              value: '{{ .Values.S3_KEY_CLOUD_ITEMS }}'
+            - name: S3_KEY_CLOUD_ITEMS_BACKUP_1
+              value: '{{ .Values.S3_KEY_CLOUD_ITEMS_BACKUP_1 }}'
+            - name: S3_KEY_CLOUD_ITEMS_BACKUP_2
+              value: '{{ .Values.S3_KEY_CLOUD_ITEMS_BACKUP_2 }}'
+
+            - name: S3_REGION_CLOUD_ITEMS
+              value: '{{ .Values.S3_REGION_CLOUD_ITEMS }}'
+            - name: S3_REGION_CLOUD_ITEMS_BACKUP_1
+              value: '{{ .Values.S3_REGION_CLOUD_ITEMS_BACKUP_1 }}'
+            - name: S3_REGION_CLOUD_ITEMS_BACKUP_2
+              value: '{{ .Values.S3_REGION_CLOUD_ITEMS_BACKUP_2 }}'
+
+            - name: S3_SECRET_CLOUD_ITEMS
+              value: '{{ .Values.S3_SECRET_CLOUD_ITEMS }}'
+            - name: S3_SECRET_CLOUD_ITEMS_BACKUP_1
+              value: '{{ .Values.S3_SECRET_CLOUD_ITEMS_BACKUP_1 }}'
+            - name: S3_SECRET_CLOUD_ITEMS_BACKUP_2
+              value: '{{ .Values.S3_SECRET_CLOUD_ITEMS_BACKUP_2 }}'
+
           image: '{{ .Values.CLOUD_SERVER_IMAGE }}'
           livenessProbe:
             exec:
