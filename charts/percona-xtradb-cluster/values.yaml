@@ -2,15 +2,23 @@
 # This is a YAML-formatted file.
 # Declare variables to be passed into your templates.
 
-s3_bucket_name:
-s3_credentials_secret_name:
-s3_endpoint:
-s3_region:
 cluster_name:
-secrets_name:
-ssl_secrets_name:
-ssl_internal_secrets_name:
-storage_class_name:
-vault_secrets_name:
 label_name:
 label_value:
+s3_bucket_name_backup_2:
+s3_bucket_name_backup_3:
+s3_bucket_name_backup_4:
+s3_endpoint_backup_2:
+s3_endpoint_backup_3:
+s3_endpoint_backup_4:
+s3_region_backup_2:
+s3_region_backup_3:
+s3_region_backup_4:
+s3_secret_name_backup_2:
+s3_secret_name_backup_3:
+s3_secret_name_backup_4:
+secrets_name:
+ssl_internal_secrets_name:
+ssl_secrets_name:
+storage_class_name:
+vault_secrets_name:
