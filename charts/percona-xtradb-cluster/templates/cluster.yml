@@ -27,7 +27,6 @@ spec:
   pxc:
     size: 3
     image: percona/percona-xtradb-cluster:8.0.19-10.1
-#    schedulerName: mycustom-scheduler
 #    readinessDelaySec: 15
 #    livenessDelaySec: 300
 #    forceUnsafeBootstrap: false
@@ -61,24 +60,8 @@ spec:
     #   disktype: ssd
     affinity:
       antiAffinityTopologyKey: "kubernetes.io/hostname"
-    #      advanced:
-    #        nodeAffinity:
-    #          requiredDuringSchedulingIgnoredDuringExecution:
-    #            nodeSelectorTerms:
-    #            - matchExpressions:
-    #              - key: kubernetes.io/e2e-az-name
-    #                operator: In
-    #                values:
-    #                - e2e-az1
-    #                - e2e-az2
-    #    tolerations:
-    #    - key: "node.alpha.kubernetes.io/unreachable"
-    #      operator: "Exists"
-    #      effect: "NoExecute"
-    #      tolerationSeconds: 6000
     podDisruptionBudget:
       maxUnavailable: 1
-    #      minAvailable: 0
     volumeSpec:
       hostPath:
         path: /data
