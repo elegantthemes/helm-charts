@@ -119,7 +119,7 @@ spec:
     image: percona/percona-xtradb-cluster-operator:1.5.0-pxc8.0-backup
     serviceAccountName: percona-xtradb-cluster-operator
     storages:
-      backup_1:
+      backup-1:
         type: filesystem
         labels:
           {{ .Values.label_name }}: {{ .Values.label_value }}
@@ -132,7 +132,7 @@ spec:
               requests:
                 storage: 60Gi
 
-      backup_2:
+      backup-2:
         type: s3
         labels:
           {{ .Values.label_name }}: {{ .Values.label_value }}
@@ -143,7 +143,7 @@ spec:
           endpointUrl: {{ .Values.s3_endpoint_backup_2 }}
         region: {{ .Values.s3_region_backup_2 }}
 
-      backup_3:
+      backup-3:
         type: s3
         labels:
           {{ .Values.label_name }}: {{ .Values.label_value }}
@@ -154,7 +154,7 @@ spec:
           endpointUrl: {{ .Values.s3_endpoint_backup_3 }}
         region: {{ .Values.s3_region_backup_3 }}
 
-      backup_4:
+      backup-4:
         type: s3
         labels:
           {{ .Values.label_name }}: {{ .Values.label_value }}
@@ -166,23 +166,23 @@ spec:
         region: {{ .Values.s3_region_backup_4 }}
 
     schedule:
-      - name: backup_1
+      - name: backup-1
         schedule: '0 * * * *'
         keep: 6
-        storageName: backup_1
+        storageName: backup-1
 
-      - name: backup_2
+      - name: backup-2
         schedule: "5 * * * *"
         keep: 12
-        storageName: backup_2
+        storageName: backup-2
 
-      - name: backup_3
+      - name: backup-3
         schedule: "10 * * * *"
         keep: 12
-        storageName: backup_3
+        storageName: backup-3
 
-      - name: backup_4
+      - name: backup-4
         schedule: "15 * * * *"
         keep: 12
-        storageName: backup_3
+        storageName: backup-4
 
