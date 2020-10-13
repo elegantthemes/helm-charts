@@ -1,4 +1,4 @@
-apiVersion: pxc.percona.com/v1-5-0
+apiVersion: pxc.percona.com/v1-6-0
 kind: PerconaXtraDBCluster
 metadata:
   name: {{ .Values.cluster_name }}
@@ -13,6 +13,7 @@ metadata:
     kubectl.kubernetes.io/last-applied-configuration: |
       {"apiVersion":"pxc.percona.com/v1-5-0","kind":"PerconaXtraDBCluster"}
 spec:
+  crVersion: 1.6.0
   secretsName: {{ .Values.secrets_name }}
   sslSecretName: {{ .Values.ssl_secrets_name }}
   sslInternalSecretName: {{ .Values.ssl_internal_secrets_name }}
@@ -21,12 +22,12 @@ spec:
   #  pause: false
   updateStrategy: SmartUpdate
   upgradeOptions:
-    versionServiceEndpoint: https://check.percona.com/versions
+    versionServiceEndpoint: https://check.percona.com
     apply: recommended
     schedule: "0 4 * * *"
   pxc:
     size: 3
-    image: percona/percona-xtradb-cluster:8.0.19-10.1
+    image: percona/percona-xtradb-cluster:8.0.20-11.1
 #    readinessDelaySec: 15
 #    livenessDelaySec: 300
 #    forceUnsafeBootstrap: false
@@ -76,7 +77,7 @@ spec:
   proxysql:
     enabled: true
     size: 3
-    image: percona/percona-xtradb-cluster-operator:1.5.0-proxysql
+    image: percona/percona-xtradb-cluster-operator:1.6.0-proxysql
     labels:
       {{ .Values.label_name }}: {{ .Values.label_value }}
       release: {{ .Values.label_value }}
@@ -105,7 +106,7 @@ spec:
     gracePeriod: 30
   pmm:
     enabled: true
-    image: percona/percona-xtradb-cluster-operator:1.5.0-pmm
+    image: percona/percona-xtradb-cluster-operator:1.6.0-pmm
     serverHost: percona-monitoring-server-service
     serverUser: admin
     resources:
@@ -116,7 +117,7 @@ spec:
         memory: 750M
         cpu: 500m
   backup:
-    image: percona/percona-xtradb-cluster-operator:1.5.0-pxc8.0-backup
+    image: percona/percona-xtradb-cluster-operator:1.6.0-pxc8.0-backup
     serviceAccountName: percona-xtradb-cluster-operator
     storages:
       #backup-1:
