@@ -119,18 +119,18 @@ spec:
     image: percona/percona-xtradb-cluster-operator:1.5.0-pxc8.0-backup
     serviceAccountName: percona-xtradb-cluster-operator
     storages:
-      backup-1:
-        type: filesystem
-        labels:
-          {{ .Values.label_name }}: {{ .Values.label_value }}
-          release: {{ .Values.label_value }}
-        volume:
-          persistentVolumeClaim:
-            storageClassName: {{ .Values.storage_class_name }}
-            accessModes: [ "ReadWriteOnce" ]
-            resources:
-              requests:
-                storage: 60Gi
+      #backup-1:
+      #  type: filesystem
+      #  labels:
+      #    {{ .Values.label_name }}: {{ .Values.label_value }}
+      #    release: {{ .Values.label_value }}
+      #  volume:
+      #    persistentVolumeClaim:
+      #      storageClassName: {{ .Values.storage_class_name }}
+      #      accessModes: [ "ReadWriteOnce" ]
+      #      resources:
+      #        requests:
+      #          storage: 60Gi
 
       backup-2:
         type: s3
@@ -166,10 +166,10 @@ spec:
         region: {{ .Values.s3_region_backup_4 }}
 
     schedule:
-      - name: backup-1
-        schedule: '0 * * * *'
-        keep: 6
-        storageName: backup-1
+      #- name: backup-1
+      #  schedule: '0 * * * *'
+      #  keep: 6
+      #  storageName: backup-1
 
       - name: backup-2
         schedule: "5 * * * *"
