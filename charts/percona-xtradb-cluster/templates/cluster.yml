@@ -23,7 +23,7 @@ spec:
   updateStrategy: SmartUpdate
   upgradeOptions:
     versionServiceEndpoint: https://check.percona.com/versions
-    apply: Recommended
+    apply: Disabled
     schedule: "0 4 * * *"
   pxc:
     size: 3
@@ -36,7 +36,7 @@ spec:
       #gtid_mode = ON
       #enforce_gtid_consistency = ON
       #session_track_gtids = OWN_GTID
-      wsrep_sync_wait = 1
+      wsrep_sync_wait = 7
       [sst]
       xbstream-opts = --decompress
       [xtrabackup]
@@ -82,7 +82,8 @@ spec:
   proxysql:
     enabled: true
     size: 3
-    image: percona/percona-xtradb-cluster-operator:1.6.0-proxysql
+    # Applied patch from https://github.com/sysown/proxysql/pull/2956
+    image: elegantthemes/percona-xtradb-cluster-operator:1.6.0_1-proxysql
     #configuration: |
     #  datadir="/var/lib/proxysql"
     #
