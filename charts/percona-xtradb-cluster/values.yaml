@@ -6,6 +6,7 @@ cluster_name:
 label_name:
 label_value:
 proxysql_admin_password:
+proxysql_monitor_password:
 s3_bucket_name_backup_2:
 s3_bucket_name_backup_3:
 s3_bucket_name_backup_4:
