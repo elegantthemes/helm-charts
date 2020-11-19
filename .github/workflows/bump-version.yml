@@ -1,0 +1,58 @@
+name: Bump Version
+
+on:
+  repository_dispatch:
+    types:
+      - bump-version
+
+env:
+  ACTIONS_ALLOW_UNSECURE_COMMANDS: true
+
+jobs:
+  BumpVersion:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+        with:
+          token: ${{ secrets.ETSTAGING_TOKEN }}
+
+      - name: Configure Git
+        run: |
+          git config user.name "${GITHUB_ACTOR}"
+          git config user.email "${GITHUB_ACTOR}@users.noreply.github.com"
+
+      - name: Generate chart version
+        id: gen-chart-version
+        uses: HardNorth/github-version-generate@v1.0.1
+        with:
+          version-source: file
+          version-file: charts/${{ github.event.client_payload.chart_name }}/Chart.yaml
+          version-file-extraction-pattern: 'version: ([^ ]+)'
+
+      - name: Update chart version
+        env:
+          CURRENT_VERSION: ${{ steps.gen-chart-version.outputs.CURRENT_VERSION }}
+          NEXT_VERSION: ${{ steps.gen-chart-version.outputs.NEXT_VERSION }}
+          VERSION_FILE: charts/${{ github.event.client_payload.chart_name }}/Chart.yaml
+        run: sed -i "s|${CURRENT_VERSION}|${NEXT_VERSION}|"
+
+      - name: Generate app version
+        id: gen-app-version
+        uses: HardNorth/github-version-generate@v1.0.1
+        with:
+          version-source: variable
+          version-file: charts/${{ github.event.client_payload.chart }}/Chart.yaml
+          version-file-extraction-pattern: 'appVersion: ([^ ]+)'
+
+      - name: Update app version
+        env:
+          CURRENT_VERSION: ${{ steps.gen-app-version.outputs.CURRENT_VERSION }}
+          NEXT_VERSION: ${{ steps.gen-app-version.outputs.NEXT_VERSION }}
+          VERSION_FILE: charts/${{ github.event.client_payload.chart_name }}/Chart.yaml
+        run: sed -i "s|${CURRENT_VERSION}|${NEXT_VERSION}|"
+
+      - name: Commit & Push
+        env:
+          CHART: ${{ github.event.client_payload.chart_name }}
+        run: git commit -m "bump version for ${CHART}" && git push
