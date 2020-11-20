@@ -28,7 +28,7 @@ jobs:
         with:
           version-source: file
           version-file: charts/${{ github.event.client_payload.chart_name }}/Chart.yaml
-          version-file-extraction-pattern: 'version: ([^ ]+)$'
+          version-file-extraction-pattern: 'version: ([0-9.]+)'
 
       - name: Update chart version
         env:
