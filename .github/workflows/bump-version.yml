@@ -10,7 +10,7 @@ env:
 
 jobs:
   BumpVersion:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     steps:
       - name: Checkout
         uses: actions/checkout@v2
@@ -28,7 +28,7 @@ jobs:
         with:
           version-source: file
           version-file: charts/${{ github.event.client_payload.chart_name }}/Chart.yaml
-          version-file-extraction-pattern: 'version: ([^ ]+)'
+          version-file-extraction-pattern: 'version: ([^ ]+)$'
 
       - name: Update chart version
         env:
