@@ -27,24 +27,25 @@ jobs:
         uses: HardNorth/github-version-generate@v1.0.1
         with:
           version-source: file
-          version-file: charts/${{ github.event.client_payload[0] }}/Chart.yaml
+          version-file: charts/${{ github.event.client_payload.chart_name }}/Chart.yaml
           version-file-extraction-pattern: 'version: ([^ ]+)'
 
       - name: Update chart version
         env:
           CURRENT_VERSION: ${{ steps.gen-chart-version.outputs.CURRENT_VERSION }}
           NEXT_VERSION: ${{ steps.gen-chart-version.outputs.NEXT_VERSION }}
-          VERSION_FILE: charts/${{ github.event.client_payload[0] }}/Chart.yaml
+          VERSION_FILE: charts/${{ github.event.client_payload.chart_name }}/Chart.yaml
         run: sed -i "s|${CURRENT_VERSION}|${NEXT_VERSION}|" "${VERSION_FILE}"
 
       - name: Update app version
         env:
-          CURRENT_VERSION: ${{ github.event.client_payload[1] }}
-          NEXT_VERSION: ${{ github.event.client_payload[2] }}
-          VERSION_FILE: charts/${{ github.event.client_payload[0] }}/Chart.yaml
+          CURRENT_VERSION: ${{ github.event.client_payload.current_version }}
+          NEXT_VERSION: ${{ github.event.client_payload.next_version }}
+          VERSION_FILE: charts/${{ github.event.client_payload.chart_name }}/Chart.yaml
         run: sed -i "s|${CURRENT_VERSION}|${NEXT_VERSION}|" "${VERSION_FILE}"
 
       - name: Commit & Push
         env:
           CHART: ${{ github.event.client_payload.chart_name }}
-        run: git commit -m "bump version for ${CHART}" && git push
+          VERSION: ${{ github.event.client_payload.next_version }}
+        run: git commit -m "bump version for ${CHART} to ${VERSION}" && git push
