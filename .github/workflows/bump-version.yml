@@ -48,4 +48,7 @@ jobs:
         env:
           CHART: ${{ github.event.client_payload.chart_name }}
           VERSION: ${{ github.event.client_payload.next_version }}
-        run: git commit -m "bump version for ${CHART} to ${VERSION}" && git push
+        run: |
+          git add charts
+            && git commit -m "bump version for ${CHART} to ${VERSION}"
+            && git push
