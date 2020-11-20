@@ -50,5 +50,5 @@ jobs:
           VERSION: ${{ github.event.client_payload.next_version }}
         run: |
           git add charts
-            && git commit -m "bump version for ${CHART} to ${VERSION}"
-            && git push
+          git commit -m "bump version for ${CHART} to ${VERSION}"
+          git push
