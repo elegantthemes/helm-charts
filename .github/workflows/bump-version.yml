@@ -52,3 +52,15 @@ jobs:
           git add charts
           git commit -m "bump version for ${CHART} to ${VERSION}"
           git push
+
+      - name: Repository Dispatch
+        uses: peter-evans/repository-dispatch@v1
+        with:
+          token: ${{ secrets.ETSTAGING_TOKEN }}
+          repository: elegantthemes/meta
+          event-type: dc-release-stage
+          client-payload: |
+            {
+              "current_version": "${{ steps.gen-chart-version.outputs.CURRENT_VERSION }}",
+              "next_version": "${{ steps.gen-chart-version.outputs.NEXT_VERSION }}"
+            }
