@@ -2,6 +2,18 @@ apiVersion: v1
 entries:
   cloud-server:
   - apiVersion: v1
+    created: "2020-11-25T01:43:29.676707382Z"
+    description: Elegant Themes Cloud Server
+    digest: 464240daa1ec65e95b08f121f45462267d4477d5e3253755899c2ac92f77b4f5
+    icon: https://bitnami.com/assets/stacks/wordpress/img/wordpress-stack-220x234.png
+    maintainers:
+    - email: dustin@elegantthemes.com
+      name: Elegant Themes
+    name: cloud-server
+    urls:
+    - https://github.com/elegantthemes/helm-charts/releases/download/cloud-server-0.6.6/cloud-server-0.6.6.tgz
+    version: 0.6.6
+  - apiVersion: v1
     appVersion: 0.3.4
     created: "2020-11-20T22:37:42.319367745Z"
     description: Elegant Themes Cloud Server
@@ -821,6 +833,16 @@ entries:
     - https://github.com/elegantthemes/helm-charts/releases/download/cloud-server-0.0.2/cloud-server-0.0.2.tgz
     version: 0.0.2
   percona-xtradb-cluster:
+  - apiVersion: v2
+    appVersion: 1.6.0
+    created: "2020-11-25T01:43:29.771747104Z"
+    description: Percona XtraDB Cluster managed by PXC K8s Operator
+    digest: 8e701a721f68e48c63dab94c6d2758371c299e4b0fc92b5250713a4385a41bf6
+    name: percona-xtradb-cluster
+    type: application
+    urls:
+    - https://github.com/elegantthemes/helm-charts/releases/download/percona-xtradb-cluster-1.6.8/percona-xtradb-cluster-1.6.8.tgz
+    version: 1.6.8
   - apiVersion: v2
     appVersion: 1.6.0
     created: "2020-11-13T04:53:12.300463578Z"
