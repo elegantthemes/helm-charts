@@ -36,25 +36,11 @@ spec:
       #gtid_mode = ON
       #enforce_gtid_consistency = ON
       #session_track_gtids = OWN_GTID
-      wsrep_sync_wait = 7
+      wsrep_sync_wait = 1
       [sst]
       xbstream-opts = --decompress
       [xtrabackup]
       compress = lz4
-#    imagePullSecrets:
-#      - name: private-registry-credentials
-#    priorityClassName: high-priority
-#    annotations:
-#      iam.amazonaws.com/role: role-arn
-#    labels:
-#      rack: rack-22
-#    containerSecurityContext:
-#      privileged: false
-#    podSecurityContext:
-#      runAsUser: 1001
-#      runAsGroup: 1001
-#      supplementalGroups: [1001]
-#    serviceAccountName: percona-xtradb-cluster-operator-workload
     resources:
       requests:
         memory: 2G
@@ -79,8 +65,86 @@ spec:
       #    requests:
       #      storage: 6Gi
     gracePeriod: 600
+  haproxy:
+    enabled: false
+    size: 3
+    image: percona/percona-xtradb-cluster-operator:1.6.0-haproxy
+#    configuration: |
+#      global
+#        maxconn 2048
+#        external-check
+#        stats socket /var/run/haproxy.sock mode 600 expose-fd listeners level user
+#
+#      defaults
+#        log global
+#        mode tcp
+#        retries 10
+#        timeout client 28800s
+#        timeout connect 100500
+#        timeout server 28800s
+#
+#      frontend galera-in
+#        bind *:3309 accept-proxy
+#        bind *:3306 accept-proxy
+#        mode tcp
+#        option clitcpka
+#        default_backend galera-nodes
+#
+#      frontend galera-replica-in
+#        bind *:3307
+#        mode tcp
+#        option clitcpka
+#        default_backend galera-replica-nodes
+#    serviceType: ClusterIP
+#    externalTrafficPolicy: Cluster
+#    replicasServiceType: ClusterIP
+#    replicasExternalTrafficPolicy: Cluster
+#    schedulerName: "default"
+    resources:
+      requests:
+        memory: 1G
+        cpu: 600m
+#      limits:
+#        memory: 1G
+#        cpu: 700m
+#    priorityClassName: high-priority
+#    nodeSelector:
+#      disktype: ssd
+#    sidecarResources:
+#      requests:
+#        memory: 1G
+#        cpu: 500m
+#      limits:
+#        memory: 2G
+#        cpu: 600m
+#    serviceAccountName: percona-xtradb-cluster-operator-workload
+    affinity:
+      antiAffinityTopologyKey: "kubernetes.io/hostname"
+#      advanced:
+#        nodeAffinity:
+#          requiredDuringSchedulingIgnoredDuringExecution:
+#            nodeSelectorTerms:
+#            - matchExpressions:
+#              - key: kubernetes.io/e2e-az-name
+#                operator: In
+#                values:
+#                - e2e-az1
+#                - e2e-az2
+#    tolerations:
+#    - key: "node.alpha.kubernetes.io/unreachable"
+#      operator: "Exists"
+#      effect: "NoExecute"
+#      tolerationSeconds: 6000
+    podDisruptionBudget:
+      maxUnavailable: 1
+#      minAvailable: 0
+    gracePeriod: 30
+#   loadBalancerSourceRanges:
+#     - 10.0.0.0/8
+#   serviceAnnotations:
+#     service.beta.kubernetes.io/aws-load-balancer-backend-protocol: http
   proxysql:
-    enabled: true
+    enabled: false
     size: 3
     # Applied patch from https://github.com/sysown/proxysql/pull/2956
     image: elegantthemes/percona-xtradb-cluster-operator:1.6.0_3-proxysql
