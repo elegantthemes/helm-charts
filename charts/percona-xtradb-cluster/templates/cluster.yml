@@ -20,7 +20,7 @@ spec:
   vaultSecretName: {{ .Values.vault_secrets_name }}
   allowUnsafeConfigurations: false
   #  pause: false
-  updateStrategy: SmartUpdate
+  updateStrategy: OnDelete
   upgradeOptions:
     versionServiceEndpoint: https://check.percona.com/versions
     apply: Disabled
