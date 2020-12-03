@@ -60,6 +60,14 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: spec.nodeName
+            - name: CLOUD_SERVER_PATH
+              value: '{{ .Values.INSTALL_PATH }}'
+            - name: VIRTUAL_HOST
+              value: '{{ .Values.VIRTUAL_HOST }}'
+            - name: CLOUD_SERVER_REPO_URL
+              value: '{{ .Values.CLOUD_SERVER_REPO_URL }}'
+            - name: IMAGE_VERSION
+              value: '{{ .Chart.AppVersion }}'
 
           image: '{{ .Values.CLOUD_SERVER_IMAGE }}'
           livenessProbe:
