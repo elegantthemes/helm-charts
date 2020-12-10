@@ -67,7 +67,7 @@ spec:
             - name: CLOUD_SERVER_REPO_URL
               value: '{{ .Values.CLOUD_SERVER_REPO_URL }}'
             - name: IMAGE_VERSION
-              value: '{{ .Chart.AppVersion }}'
+              value: '{{ .Values.CLOUD_SERVER_VERSION }}'
 
           image: '{{ .Values.CLOUD_SERVER_IMAGE }}'
           livenessProbe:

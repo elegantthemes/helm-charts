@@ -36,7 +36,7 @@ spec:
       #gtid_mode = ON
       #enforce_gtid_consistency = ON
       #session_track_gtids = OWN_GTID
-      wsrep_sync_wait = 1
+      wsrep_sync_wait = 7
       [sst]
       xbstream-opts = --decompress
       [xtrabackup]
