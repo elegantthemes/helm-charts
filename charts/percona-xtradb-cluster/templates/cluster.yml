@@ -1,4 +1,4 @@
-apiVersion: pxc.percona.com/v1-6-0
+apiVersion: pxc.percona.com/v1-7-0
 kind: PerconaXtraDBCluster
 metadata:
   name: {{ .Values.cluster_name }}
@@ -10,26 +10,30 @@ metadata:
 #   - delete-proxysql-pvc
 #   - delete-pxc-pvc
   annotations:
+    percona.com/issue-vault-token: "true"
     kubectl.kubernetes.io/last-applied-configuration: |
       {"apiVersion":"pxc.percona.com/v1-6-0","kind":"PerconaXtraDBCluster"}
 spec:
-  crVersion: 1.6.0
+  crVersion: 1.7.0
   secretsName: {{ .Values.secrets_name }}
   sslSecretName: {{ .Values.ssl_secrets_name }}
   sslInternalSecretName: {{ .Values.ssl_internal_secrets_name }}
   vaultSecretName: {{ .Values.vault_secrets_name }}
+  logCollectorSecretName: {{ .Values.secrets_name }}-log-collector
   allowUnsafeConfigurations: false
   #  pause: false
-  updateStrategy: OnDelete
+  updateStrategy: SmartUpdate
   upgradeOptions:
-    versionServiceEndpoint: https://check.percona.com/versions
-    apply: Disabled
+    versionServiceEndpoint: https://check.percona.com
+    apply: recommended
     schedule: "0 4 * * *"
   pxc:
     size: 3
-    image: percona/percona-xtradb-cluster:8.0.20-11.1
+    image: percona/percona-xtradb-cluster:8.0.21-12.1
+    autoRecovery: true
+#    schedulerName: mycustom-scheduler
 #    readinessDelaySec: 15
-#    livenessDelaySec: 300
+#    livenessDelaySec: 600
 #    forceUnsafeBootstrap: false
     configuration: |
       [mysqld]
@@ -45,11 +49,12 @@ spec:
       requests:
         memory: 2G
         cpu: 2000m
-      limits:
-    #   memory: 1G
-    #   cpu: "1"
-    # nodeSelector:
-    #   disktype: ssd
+#      limits:
+#        memory: 1G
+#        cpu: "1"
+#        ephemeral-storage: 1Gi
+#    nodeSelector:
+#      disktype: ssd
     affinity:
       antiAffinityTopologyKey: "kubernetes.io/hostname"
     podDisruptionBudget:
@@ -68,7 +73,9 @@ spec:
   haproxy:
     enabled: false
     size: 3
-    image: percona/percona-xtradb-cluster-operator:1.6.0-haproxy
+    image: percona/percona-xtradb-cluster-operator:1.7.0-haproxy
+#    imagePullPolicy: Always
+#    schedulerName: mycustom-scheduler
 #    configuration: |
 #      global
 #        maxconn 2048
@@ -95,6 +102,12 @@ spec:
 #        mode tcp
 #        option clitcpka
 #        default_backend galera-replica-nodes
+#    imagePullSecrets:
+#      - name: private-registry-credentials
+#    annotations:
+#      iam.amazonaws.com/role: role-arn
+#    labels:
+#      rack: rack-22
 #    serviceType: ClusterIP
 #    externalTrafficPolicy: Cluster
 #    replicasServiceType: ClusterIP
@@ -146,8 +159,8 @@ spec:
   proxysql:
     enabled: false
     size: 3
-    # Applied patch from https://github.com/sysown/proxysql/pull/2956
-    image: elegantthemes/percona-xtradb-cluster-operator:1.6.0_3-proxysql
+    image: percona/percona-xtradb-cluster-operator:1.7.0-proxysql
+#    imagePullPolicy: Always
     configuration: |
       datadir="/var/lib/proxysql"
       errorlog="/var/lib/proxysql/proxysql.log"
@@ -211,6 +224,21 @@ spec:
         cpu: 2000m
     affinity:
       antiAffinityTopologyKey: "kubernetes.io/hostname"
+#      advanced:
+#        nodeAffinity:
+#          requiredDuringSchedulingIgnoredDuringExecution:
+#            nodeSelectorTerms:
+#            - matchExpressions:
+#              - key: kubernetes.io/e2e-az-name
+#                operator: In
+#                values:
+#                - e2e-az1
+#                - e2e-az2
+#    tolerations:
+#    - key: "node.alpha.kubernetes.io/unreachable"
+#      operator: "Exists"
+#      effect: "NoExecute"
+#      tolerationSeconds: 6000
     volumeSpec:
       #      emptyDir: {}
       #      hostPath:
@@ -225,11 +253,32 @@ spec:
       maxUnavailable: 1
     #      minAvailable: 0
     gracePeriod: 30
+#   loadBalancerSourceRanges:
+#     - 10.0.0.0/8
+#   serviceAnnotations:
+#     service.beta.kubernetes.io/aws-load-balancer-backend-protocol: http
+  logcollector:
+    enabled: true
+    image: percona/percona-xtradb-cluster-operator:1.7.0-logcollector
+#    configuration: |
+#      [OUTPUT]
+#           Name  es
+#           Match *
+#           Host  192.168.2.3
+#           Port  9200
+#           Index my_index
+#           Type  my_type
+#    resources:
+#      requests:
+#        memory: 200M
+#        cpu: 500m
   pmm:
     enabled: true
-    image: percona/percona-xtradb-cluster-operator:1.6.0-pmm
+    image: percona/pmm-client:2.12.0
     serverHost: percona-monitoring-server-service
-    serverUser: admin
+    serverUser: pmm
+#    pxcParams: "--disable-tablestats-limit=2000"
+#    proxysqlParams: "--custom-labels=CUSTOM-LABELS"
     resources:
       requests:
         memory: 500M
@@ -238,9 +287,14 @@ spec:
         memory: 750M
         cpu: 500m
   backup:
-    # There is a breaking bug in the 1.6.0 image for backup agent
-    image: percona/percona-xtradb-cluster-operator:1.5.0-pxc8.0-backup
-    serviceAccountName: percona-xtradb-cluster-operator
+    image: percona/percona-xtradb-cluster-operator:1.7.0-pxc8.0-backup
+#    serviceAccountName: percona-xtradb-cluster-operator
+#    imagePullSecrets:
+#      - name: private-registry-credentials
+    pitr:
+      enabled: false
+      storageName: STORAGE-NAME-HERE
+      timeBetweenUploads: 60
     storages:
       #backup-1:
       #  type: filesystem

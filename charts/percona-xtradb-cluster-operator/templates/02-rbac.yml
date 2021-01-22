@@ -25,6 +25,7 @@ rules:
     resources:
       - pods
       - pods/exec
+      - pods/log
       - configmaps
       - services
       - persistentvolumeclaims
@@ -77,6 +78,7 @@ rules:
       - patch
       - delete
   - apiGroups:
+      - certmanager.k8s.io
       - cert-manager.io
     resources:
       - issuers
@@ -96,13 +98,8 @@ kind: ServiceAccount
 metadata:
   name: percona-xtradb-cluster-operator
 ---
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: percona-xtradb-cluster-operator-workload
----
-apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
 metadata:
   name: service-account-percona-xtradb-cluster-operator
 subjects:
