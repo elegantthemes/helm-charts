@@ -1,4 +1,4 @@
-apiVersion: pxc.percona.com/v1-7-0
+apiVersion: pxc.percona.com/v1-9-0
 kind: PerconaXtraDBCluster
 metadata:
   name: {{ .Values.cluster_name }}
@@ -10,11 +10,11 @@ metadata:
 #   - delete-proxysql-pvc
 #   - delete-pxc-pvc
   annotations:
-    percona.com/issue-vault-token: "true"
+    # percona.com/issue-vault-token: "true"
     kubectl.kubernetes.io/last-applied-configuration: |
-      {"apiVersion":"pxc.percona.com/v1-6-0","kind":"PerconaXtraDBCluster"}
+      {"apiVersion":"pxc.percona.com/v1-9-0","kind":"PerconaXtraDBCluster"}
 spec:
-  crVersion: 1.7.0
+  crVersion: 1.9.0
   secretsName: {{ .Values.secrets_name }}
   sslSecretName: {{ .Values.ssl_secrets_name }}
   sslInternalSecretName: {{ .Values.ssl_internal_secrets_name }}
@@ -25,11 +25,11 @@ spec:
   updateStrategy: SmartUpdate
   upgradeOptions:
     versionServiceEndpoint: https://check.percona.com
-    apply: recommended
+    apply: Never
     schedule: "0 4 * * *"
   pxc:
     size: 3
-    image: percona/percona-xtradb-cluster:8.0.21-12.1
+    image: percona/percona-xtradb-cluster:8.0.23-14.1
     autoRecovery: true
 #    schedulerName: mycustom-scheduler
 #    readinessDelaySec: 15
@@ -52,7 +52,7 @@ spec:
 #      limits:
 #        memory: 1G
 #        cpu: "1"
-#        ephemeral-storage: 1Gi
+#        ephemeral-storage: 1G
 #    nodeSelector:
 #      disktype: ssd
     affinity:
@@ -73,13 +73,14 @@ spec:
   haproxy:
     enabled: false
     size: 3
-    image: percona/percona-xtradb-cluster-operator:1.7.0-haproxy
+    image: percona/percona-xtradb-cluster-operator:1.9.0-haproxy
 #    imagePullPolicy: Always
 #    schedulerName: mycustom-scheduler
 #    configuration: |
 #      global
 #        maxconn 2048
 #        external-check
+#        insecure-fork-wanted
 #        stats socket /var/run/haproxy.sock mode 600 expose-fd listeners level user
 #
 #      defaults
@@ -92,7 +93,7 @@ spec:
 #
 #      frontend galera-in
 #        bind *:3309 accept-proxy
-#        bind *:3306 accept-proxy
+#        bind *:3306
 #        mode tcp
 #        option clitcpka
 #        default_backend galera-nodes
@@ -108,11 +109,29 @@ spec:
 #      iam.amazonaws.com/role: role-arn
 #    labels:
 #      rack: rack-22
+#    readinessProbes:
+#      initialDelaySeconds: 15
+#      timeoutSeconds: 1
+#      periodSeconds: 5
+#      successThreshold: 1
+#      failureThreshold: 3
+#    livenessProbes:
+#      initialDelaySeconds: 60
+#      timeoutSeconds: 5
+#      periodSeconds: 30
+#      successThreshold: 1
+#      failureThreshold: 4
 #    serviceType: ClusterIP
 #    externalTrafficPolicy: Cluster
 #    replicasServiceType: ClusterIP
 #    replicasExternalTrafficPolicy: Cluster
-#    schedulerName: "default"
+#    runtimeClassName: image-rc
+#    sidecars:
+#    - image: busybox
+#      command: ["/bin/sh"]
+#      args: ["-c", "while true; do trap 'exit 0' SIGINT SIGTERM SIGQUIT SIGKILL; done;"]
+#      name: my-sidecar-1
+#    envVarsSecret: my-env-var-secrets
     resources:
       requests:
         memory: 1G
@@ -159,7 +178,7 @@ spec:
   proxysql:
     enabled: false
     size: 3
-    image: percona/percona-xtradb-cluster-operator:1.7.0-proxysql
+    image: percona/percona-xtradb-cluster-operator:1.9.0-proxysql
 #    imagePullPolicy: Always
     configuration: |
       datadir="/var/lib/proxysql"
@@ -259,7 +278,7 @@ spec:
 #     service.beta.kubernetes.io/aws-load-balancer-backend-protocol: http
   logcollector:
     enabled: true
-    image: percona/percona-xtradb-cluster-operator:1.7.0-logcollector
+    image: percona/percona-xtradb-cluster-operator:1.9.0-logcollector
 #    configuration: |
 #      [OUTPUT]
 #           Name  es
@@ -274,7 +293,7 @@ spec:
 #        cpu: 500m
   pmm:
     enabled: true
-    image: percona/pmm-client:2.12.0
+    image: percona/pmm-client:2.18.0
     serverHost: percona-monitoring-server-service
     serverUser: pmm
 #    pxcParams: "--disable-tablestats-limit=2000"
@@ -287,7 +306,7 @@ spec:
         memory: 750M
         cpu: 500m
   backup:
-    image: percona/percona-xtradb-cluster-operator:1.7.0-pxc8.0-backup
+    image: percona/percona-xtradb-cluster-operator:1.9.0-pxc8.0-backup
 #    serviceAccountName: percona-xtradb-cluster-operator
 #    imagePullSecrets:
 #      - name: private-registry-credentials
