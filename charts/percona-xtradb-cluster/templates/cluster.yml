@@ -23,7 +23,7 @@ spec:
   logCollectorSecretName: {{ .Values.secrets_name }}-log-collector
   allowUnsafeConfigurations: false
   #  pause: false
-  updateStrategy: SmartUpdate
+  updateStrategy: RollingUpdate
   upgradeOptions:
     versionServiceEndpoint: https://check.percona.com
     apply: Disabled
