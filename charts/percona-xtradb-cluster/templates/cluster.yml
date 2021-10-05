@@ -23,7 +23,7 @@ spec:
   logCollectorSecretName: {{ .Values.secrets_name }}-log-collector
   allowUnsafeConfigurations: false
   #  pause: false
-  updateStrategy: RollingUpdate
+  updateStrategy: SmartUpdate
   upgradeOptions:
     versionServiceEndpoint: https://check.percona.com
     apply: Disabled
@@ -41,6 +41,7 @@ spec:
       #gtid_mode = ON
       #enforce_gtid_consistency = ON
       #session_track_gtids = OWN_GTID
+      gcache.recover = yes
       wsrep_sync_wait = 7
       [sst]
       xbstream-opts = --decompress
@@ -71,9 +72,12 @@ spec:
       #    requests:
       #      storage: 6Gi
     gracePeriod: 600
+    containerSecurityContext:
+      privileged: true
   haproxy:
-    enabled: false
-    size: 3
+    # We don't use a proxy but in order to workaround bug in operator we must enable one for now.
+    enabled: true
+    size: 0 # <--- This works for now until bug is fixed
     image: percona/percona-xtradb-cluster-operator:1.9.0-haproxy
 #    imagePullPolicy: Always
 #    schedulerName: mycustom-scheduler
@@ -169,7 +173,7 @@ spec:
 #      effect: "NoExecute"
 #      tolerationSeconds: 6000
     podDisruptionBudget:
-      maxUnavailable: 1
+      maxUnavailable: 3
 #      minAvailable: 0
     gracePeriod: 30
 #   loadBalancerSourceRanges:
@@ -295,8 +299,8 @@ spec:
   pmm:
     enabled: true
     image: percona/pmm-client:2.18.0
-    serverHost: percona-monitoring-server-service
-    serverUser: pmm
+    serverHost: percona-monitoring-server
+    serverUser: admin
 #    pxcParams: "--disable-tablestats-limit=2000"
 #    proxysqlParams: "--custom-labels=CUSTOM-LABELS"
     resources:
