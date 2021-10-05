@@ -15,27 +15,26 @@ metadata:
       {"apiVersion":"pxc.percona.com/v1-9-0","kind":"PerconaXtraDBCluster"}
 spec:
   crVersion: 1.9.0
-  enableCRValidationWebhook: false
   secretsName: {{ .Values.secrets_name }}
   sslSecretName: {{ .Values.ssl_secrets_name }}
   sslInternalSecretName: {{ .Values.ssl_internal_secrets_name }}
   vaultSecretName: {{ .Values.vault_secrets_name }}
   logCollectorSecretName: {{ .Values.secrets_name }}-log-collector
-  allowUnsafeConfigurations: true
+  allowUnsafeConfigurations: false
   #  pause: false
-  updateStrategy: SmartUpdate
+  updateStrategy: RollingUpdate
   upgradeOptions:
-    versionServiceEndpoint: https://check.percona.com
-    apply: Disabled
-    schedule: "0 4 * * *"
+  # versionServiceEndpoint: https://check.percona.com
+    apply: Never
+  # schedule: "0 4 * * *"
   pxc:
     size: 3
     image: percona/percona-xtradb-cluster:8.0.23-14.1
     autoRecovery: true
-#    schedulerName: mycustom-scheduler
-#    readinessDelaySec: 15
-#    livenessDelaySec: 600
-#    forceUnsafeBootstrap: false
+#   schedulerName: mycustom-scheduler
+#   readinessDelaySec: 15
+#   livenessDelaySec: 600
+#   forceUnsafeBootstrap: false
     configuration: |
       [mysqld]
       #gtid_mode = ON
@@ -75,9 +74,8 @@ spec:
     containerSecurityContext:
       privileged: true
   haproxy:
-    # We don't use a proxy but in order to workaround bug in operator we must enable one for now.
-    enabled: true
-    size: 0 # <--- This works for now until bug is fixed
+    enabled: false
+    size: 3
     image: percona/percona-xtradb-cluster-operator:1.9.0-haproxy
 #    imagePullPolicy: Always
 #    schedulerName: mycustom-scheduler
@@ -173,7 +171,7 @@ spec:
 #      effect: "NoExecute"
 #      tolerationSeconds: 6000
     podDisruptionBudget:
-      maxUnavailable: 3
+      maxUnavailable: 1
 #      minAvailable: 0
     gracePeriod: 30
 #   loadBalancerSourceRanges:
@@ -298,7 +296,7 @@ spec:
 #        cpu: 500m
   pmm:
     enabled: true
-    image: percona/pmm-client:2.18.0
+    image: percona/pmm-client:2.21.0
     serverHost: percona-monitoring-server
     serverUser: admin
 #    pxcParams: "--disable-tablestats-limit=2000"
