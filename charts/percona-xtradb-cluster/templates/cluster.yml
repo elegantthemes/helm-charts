@@ -21,7 +21,7 @@ spec:
   sslInternalSecretName: {{ .Values.ssl_internal_secrets_name }}
   vaultSecretName: {{ .Values.vault_secrets_name }}
   logCollectorSecretName: {{ .Values.secrets_name }}-log-collector
-  allowUnsafeConfigurations: false
+  allowUnsafeConfigurations: true
   #  pause: false
   updateStrategy: SmartUpdate
   upgradeOptions:
