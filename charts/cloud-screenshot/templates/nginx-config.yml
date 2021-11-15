@@ -5,7 +5,6 @@ metadata:
   namespace: dc-screenshot
 data:
   nginx.conf: |
-    user etdev users;
     worker_processes auto;
     daemon off;
 
