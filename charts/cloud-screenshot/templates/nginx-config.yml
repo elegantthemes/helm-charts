@@ -73,5 +73,10 @@ data:
                 fastcgi_read_timeout 60;
                 fastcgi_pass php;
             }
+
+            location /healthz {
+                access_log off;
+                return 200;
+            }
         }
     }
