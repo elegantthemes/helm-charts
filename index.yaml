@@ -1342,6 +1342,16 @@ entries:
   percona-xtradb-cluster-operator:
   - apiVersion: v2
     appVersion: 1.10.0
+    created: "2021-11-30T21:03:02.378429398Z"
+    description: A Helm chart for percona-xtradb-cluster-operator
+    digest: bec3052d0a1366c54fb6073e2b8b5337d4225212638d11bde8ca6f87869d45e7
+    name: percona-xtradb-cluster-operator
+    type: application
+    urls:
+    - https://github.com/elegantthemes/helm-charts/releases/download/percona-xtradb-cluster-operator-1.10.1/percona-xtradb-cluster-operator-1.10.1.tgz
+    version: 1.10.1
+  - apiVersion: v2
+    appVersion: 1.10.0
     created: "2021-11-30T20:48:40.985065461Z"
     description: A Helm chart for percona-xtradb-cluster-operator
     digest: b71e6b0676497d07db86309774ae763e9eb7698479a26fe28883d00164308ee4
