@@ -1,4 +1,4 @@
-apiVersion: pxc.percona.com/v1-9-0
+apiVersion: pxc.percona.com/v1-10-0
 kind: PerconaXtraDBCluster
 metadata:
   name: {{ .Values.cluster_name }}
@@ -9,12 +9,12 @@ metadata:
     - delete-pxc-pods-in-order
 #   - delete-proxysql-pvc
 #   - delete-pxc-pvc
-  annotations:
+#  annotations:
     # percona.com/issue-vault-token: "true"
-    kubectl.kubernetes.io/last-applied-configuration: |
-      {"apiVersion":"pxc.percona.com/v1-9-0","kind":"PerconaXtraDBCluster"}
+    # kubectl.kubernetes.io/last-applied-configuration: |
+    #   {"apiVersion":"pxc.percona.com/v1-9-0","kind":"PerconaXtraDBCluster"}
 spec:
-  crVersion: 1.9.0
+  crVersion: 1.10.0
   secretsName: {{ .Values.secrets_name }}
   sslSecretName: {{ .Values.ssl_secrets_name }}
   sslInternalSecretName: {{ .Values.ssl_internal_secrets_name }}
@@ -40,7 +40,7 @@ spec:
       #gtid_mode = ON
       #enforce_gtid_consistency = ON
       #session_track_gtids = OWN_GTID
-      gcache.recover = yes
+      wsrep_provider_options = "gcache.size=1G; gcache.recover=yes"
       wsrep_sync_wait = 7
       [sst]
       xbstream-opts = --decompress
@@ -76,17 +76,22 @@ spec:
   haproxy:
     enabled: false
     size: 3
-    image: percona/percona-xtradb-cluster-operator:1.9.0-haproxy
+    image: percona/percona-xtradb-cluster-operator:1.10.0-haproxy
+#    replicasServiceEnabled: false
 #    imagePullPolicy: Always
 #    schedulerName: mycustom-scheduler
 #    configuration: |
+#
+#    the actual default configuration file can be found here https://github.com/percona/percona-docker/blob/main/haproxy/dockerdir/etc/haproxy/haproxy-global.cfg
+#
 #      global
 #        maxconn 2048
 #        external-check
 #        insecure-fork-wanted
-#        stats socket /var/run/haproxy.sock mode 600 expose-fd listeners level user
+#        stats socket /etc/haproxy/pxc/haproxy.sock mode 600 expose-fd listeners level admin
 #
 #      defaults
+#        default-server init-addr last,libc,none
 #        log global
 #        mode tcp
 #        retries 10
@@ -101,11 +106,29 @@ spec:
 #        option clitcpka
 #        default_backend galera-nodes
 #
+#      frontend galera-admin-in
+#        bind *:33062
+#        mode tcp
+#        option clitcpka
+#        default_backend galera-admin-nodes
+#
 #      frontend galera-replica-in
 #        bind *:3307
 #        mode tcp
 #        option clitcpka
 #        default_backend galera-replica-nodes
+#
+#      frontend galera-mysqlx-in
+#        bind *:33060
+#        mode tcp
+#        option clitcpka
+#        default_backend galera-mysqlx-nodes
+#
+#      frontend stats
+#        bind *:8404
+#        mode http
+#        option http-use-htx
+#        http-request use-service prometheus-exporter if { path /metrics }
 #    imagePullSecrets:
 #      - name: private-registry-credentials
 #    annotations:
@@ -181,7 +204,7 @@ spec:
   proxysql:
     enabled: false
     size: 3
-    image: percona/percona-xtradb-cluster-operator:1.9.0-proxysql
+    image: percona/percona-xtradb-cluster-operator:1.10.0-proxysql
 #    imagePullPolicy: Always
     configuration: |
       datadir="/var/lib/proxysql"
@@ -270,7 +293,7 @@ spec:
         storageClassName: {{ .Values.storage_class_name }}
         resources:
           requests:
-            storage: 2Gi
+            storage: 2G
     podDisruptionBudget:
       maxUnavailable: 1
     #      minAvailable: 0
@@ -281,7 +304,7 @@ spec:
 #     service.beta.kubernetes.io/aws-load-balancer-backend-protocol: http
   logcollector:
     enabled: true
-    image: percona/percona-xtradb-cluster-operator:1.9.0-logcollector
+    image: percona/percona-xtradb-cluster-operator:1.10.0-logcollector
 #    configuration: |
 #      [OUTPUT]
 #           Name  es
@@ -292,24 +315,24 @@ spec:
 #           Type  my_type
     resources:
       requests:
-        memory: 200M
-        cpu: 500m
+        memory: 100M
+        cpu: 200m
   pmm:
     enabled: false
-    image: percona/pmm-client:2.21.0
+    image: percona/pmm-client:2.23.0
     serverHost: percona-monitoring-server-service
     serverUser: admin
 #    pxcParams: "--disable-tablestats-limit=2000"
 #    proxysqlParams: "--custom-labels=CUSTOM-LABELS"
     resources:
       requests:
-        memory: 500M
-        cpu: 200m
+        memory: 150M
+        cpu: 300m
       limits:
         memory: 750M
         cpu: 500m
   backup:
-    image: percona/percona-xtradb-cluster-operator:1.9.0-pxc8.0-backup
+    image: percona/percona-xtradb-cluster-operator:1.10.0-pxc8.0-backup
 #    serviceAccountName: percona-xtradb-cluster-operator
 #    imagePullSecrets:
 #      - name: private-registry-credentials
