@@ -393,18 +393,32 @@ spec:
       #  keep: 6
       #  storageName: backup-1
 
-      - name: backup-2
+      - name: hourly-backup-2
         schedule: "0 * * * *"
-        keep: 12
+        keep: 24
         storageName: backup-2
 
-      - name: backup-3
+      - name: hourly-backup-3
         schedule: "15 * * * *"
-        keep: 12
+        keep: 24
         storageName: backup-3
 
-      - name: backup-4
+      - name: hourly-backup-4
         schedule: "30 * * * *"
-        keep: 12
+        keep: 24
         storageName: backup-4
 
+      - name: daily-backup-2
+        schedule: "37 0 * * *"
+        keep: 7
+        storageName: backup-2
+
+      - name: weekly-backup-3
+        schedule: "44 0 * * 0"
+        keep: 4
+        storageName: backup-3
+
+      - name: monthly-backup-4
+        schedule: "51 0 1 * *"
+        keep: 6
+        storageName: backup-4
