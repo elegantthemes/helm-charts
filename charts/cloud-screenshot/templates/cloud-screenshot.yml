@@ -29,8 +29,40 @@ spec:
       labels:
         app: cloud-screenshot
     spec:
+      initContainers:
+        - name: cloud-screenshot-init
+          env:
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+            - name: CLOUD_SCREENSHOT_PATH
+              value: '{{ .Values.INSTALL_PATH }}'
+            - name: VIRTUAL_HOST
+              value: '{{ .Values.VIRTUAL_HOST }}'
+            - name: CLOUD_SCREENSHOT_REPO_URL
+              value: '{{ .Values.CLOUD_SCREENSHOT_REPO_URL }}'
+            - name: IMAGE_VERSION
+              value: '{{ .Values.CLOUD_SCREENSHOT_VERSION }}'
+            - name: CLOUD_SCREENSHOT_INIT
+              value: '1'
+          image: '{{ .Values.CLOUD_SCREENSHOT_IMAGE }}'
+          command: ['/etc/cont-init.d/init']
+          resources:
+            requests:
+              cpu: 100m
+              memory: 100Mi
+            limits:
+              cpu: '2'
+              memory: 1G
+          volumeMounts:
+            - name: wordpress
+              mountPath: /srv
+            - name: config
+              mountPath: /config
+              readOnly: true
       containers:
-        - name: cloud-screenshot
+        - name: app
           env:
             - name: NODE_NAME
               valueFrom:
@@ -81,7 +113,7 @@ spec:
               memory: 100Mi
             limits:
               cpu: '2'
-              memory: 1G
+              memory: 500Mi
           startupProbe:
             exec:
               command:
@@ -120,6 +152,11 @@ spec:
               mountPath: /etc/nginx/nginx.conf
               readOnly: true
               subPath: nginx.conf
+
+{{ range $index, $_ := until 1 }}
+{{ include "screenshot.container.worker" dict("Values" .Values "index" $index) }}
+{{ end }}
+
       volumes:
         - name: wordpress
           hostPath:
