@@ -30,7 +30,7 @@ spec:
         app: cloud-screenshot
     spec:
       initContainers:
-        - name: cloud-screenshot-init
+        - name: init
           env:
             - name: NODE_NAME
               valueFrom:
@@ -46,6 +46,8 @@ spec:
               value: '{{ .Values.CLOUD_SCREENSHOT_VERSION }}'
             - name: CLOUD_SCREENSHOT_INIT
               value: '1'
+            - name: DIVI_VERSION
+              value: '{{ .Values.DIVI_VERSION }}'
           image: '{{ .Values.CLOUD_SCREENSHOT_IMAGE }}'
           command: ['/etc/cont-init.d/init']
           resources:
