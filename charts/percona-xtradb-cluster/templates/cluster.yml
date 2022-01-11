@@ -393,32 +393,38 @@ spec:
       #  keep: 6
       #  storageName: backup-1
 
+      # At minute 0 past every 3rd hour from 1 through 23.
       - name: hourly-backup-2
-        schedule: "0 * * * *"
-        keep: 24
+        schedule: "2 1-23/3 * * *"
+        keep: 8
         storageName: backup-2
 
+      # At minute 0 past every 3rd hour from 2 through 23.
       - name: hourly-backup-3
-        schedule: "15 * * * *"
-        keep: 24
+        schedule: "3 2-23/3 * * *"
+        keep: 8
         storageName: backup-3
 
+      # At minute 0 past every 3rd hour from 3 through 23.
       - name: hourly-backup-4
-        schedule: "30 * * * *"
-        keep: 24
+        schedule: "4 3-23/3 * * *"
+        keep: 7
         storageName: backup-4
 
+      # At 00:01 on every day of month from 2 through 31 and on every day of week from Tuesday through Sunday.
       - name: daily-backup-2
-        schedule: "37 0 * * *"
-        keep: 7
+        schedule: "1 0 2-31 * 2-7"
+        keep: 6
         storageName: backup-2
 
+      # At 00:01 on every day of month from 2 through 31 and on Monday.
       - name: weekly-backup-3
-        schedule: "44 0 * * 0"
+        schedule: "1 0 2-31 * 1"
         keep: 4
         storageName: backup-3
 
+      # At 00:01 on day of month 1.
       - name: monthly-backup-4
-        schedule: "51 0 1 * *"
+        schedule: "1 0 1 * *"
         keep: 6
         storageName: backup-4
