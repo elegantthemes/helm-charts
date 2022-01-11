@@ -156,7 +156,7 @@ spec:
               subPath: nginx.conf
 
 {{ range $index, $_ := until 1 }}
-{{ include "screenshot.container.worker" dict "Values" .Values "index" $index }}
+{{ include "screenshot.container.worker" (dict "Values" $.Values "index" $index) }}
 {{ end }}
 
       volumes:
