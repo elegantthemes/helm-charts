@@ -28,6 +28,7 @@ spec:
     metadata:
       labels:
         app: cloud-screenshot
+        redis-cluster-client: 'true'
     spec:
       initContainers:
         - name: init
