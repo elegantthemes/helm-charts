@@ -416,6 +416,6 @@ spec:
 
       # At 16:01 on every day-of-month from 2 through 31.
       - name: daily-backup-4
-        schedule: "1 0 2-31 * *"
+        schedule: "1 16 2-31 * *"
         keep: 30
         storageName: backup-4
