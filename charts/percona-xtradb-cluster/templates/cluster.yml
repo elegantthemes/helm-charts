@@ -337,9 +337,9 @@ spec:
 #    imagePullSecrets:
 #      - name: private-registry-credentials
     pitr:
-      enabled: false
-      storageName: STORAGE-NAME-HERE
-      timeBetweenUploads: 60
+      enabled: true
+      storageName: backup-pitr-1 
+      timeBetweenUploads: 120
     storages:
       #backup-1:
       #  type: filesystem
