@@ -42,6 +42,7 @@ spec:
       #session_track_gtids = OWN_GTID
       wsrep_provider_options = "gcache.size=1G; gcache.recover=yes"
       wsrep_sync_wait = 7
+      binlog_expire_logs_seconds=259200
       [sst]
       xbstream-opts = --decompress
       [xtrabackup]
