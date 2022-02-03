@@ -2,6 +2,18 @@ apiVersion: v1
 entries:
   cloud-screenshot:
   - apiVersion: v1
+    created: "2022-02-03T21:53:44.87411889Z"
+    description: Elegant Themes Cloud Screenshot Generator
+    digest: 24853e35f7f7ad1d2948b29fdd49d6f3a5675257224e15d57bcf0d8bf79f5e09
+    icon: https://bitnami.com/assets/stacks/wordpress/img/wordpress-stack-220x234.png
+    maintainers:
+    - email: dustin@elegantthemes.com
+      name: Elegant Themes
+    name: cloud-screenshot
+    urls:
+    - https://github.com/elegantthemes/helm-charts/releases/download/cloud-screenshot-0.9.9/cloud-screenshot-0.9.9.tgz
+    version: 0.9.9
+  - apiVersion: v1
     created: "2022-01-27T22:17:34.2785194Z"
     description: Elegant Themes Cloud Screenshot Generator
     digest: b8c38a2098bcfcd4df2d99413716edae9ef214f88c33ce6a4dc0818a993026f5
@@ -170,6 +182,18 @@ entries:
     - https://github.com/elegantthemes/helm-charts/releases/download/cloud-screenshot-0.5.0/cloud-screenshot-0.5.0.tgz
     version: 0.5.0
   cloud-server:
+  - apiVersion: v1
+    created: "2022-02-03T21:53:44.970910076Z"
+    description: Elegant Themes Cloud Server
+    digest: 5965c613cdf9a259e7c6f2ccacb300b5fc5482eee0bdfa95b643eef3fb9e2bcb
+    icon: https://bitnami.com/assets/stacks/wordpress/img/wordpress-stack-220x234.png
+    maintainers:
+    - email: dustin@elegantthemes.com
+      name: Elegant Themes
+    name: cloud-server
+    urls:
+    - https://github.com/elegantthemes/helm-charts/releases/download/cloud-server-0.9.2/cloud-server-0.9.2.tgz
+    version: 0.9.2
   - apiVersion: v1
     created: "2022-01-05T02:42:14.09793147Z"
     description: Elegant Themes Cloud Server
