@@ -156,7 +156,7 @@ spec:
               readOnly: true
               subPath: nginx.conf
 
-{{ range $_, $index := seq 5 }}
+{{ range $_, $index := untilStep 1 5 1 }}
 {{ include "screenshot.container.worker" (dict "Values" $.Values "index" $index) }}
 {{ end }}
 
