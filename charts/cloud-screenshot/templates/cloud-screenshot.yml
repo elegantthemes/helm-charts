@@ -20,7 +20,11 @@ metadata:
   labels:
     app: cloud-screenshot
 spec:
-  replicas: 1
+  replicas: {{ .Values.REPLICAS }}
+  strategy:
+    rollingUpdate:
+      maxSurge: 0
+      maxUnavailable: 1
   selector:
     matchLabels:
       app: cloud-screenshot
