@@ -34,6 +34,16 @@ spec:
         app: cloud-screenshot
         redis-cluster-client: 'true'
     spec:
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchExpressions:
+                    - key: app
+                      operator: In
+                      values:
+                        - cloud-screenshot
+              topologyKey: kubernetes.io/hostname
       initContainers:
         - name: init
           env:
