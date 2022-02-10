@@ -2,6 +2,18 @@ apiVersion: v1
 entries:
   cloud-screenshot:
   - apiVersion: v1
+    created: "2022-02-10T20:24:03.6281673Z"
+    description: Elegant Themes Cloud Screenshot Generator
+    digest: aa1dcfec5f9369f9f380a3850687d4295c5e5b6dab03ac4de8cf792da4e5a51e
+    icon: https://bitnami.com/assets/stacks/wordpress/img/wordpress-stack-220x234.png
+    maintainers:
+    - email: dustin@elegantthemes.com
+      name: Elegant Themes
+    name: cloud-screenshot
+    urls:
+    - https://github.com/elegantthemes/helm-charts/releases/download/cloud-screenshot-0.9.15/cloud-screenshot-0.9.15.tgz
+    version: 0.9.15
+  - apiVersion: v1
     created: "2022-02-08T22:59:54.820077013Z"
     description: Elegant Themes Cloud Screenshot Generator
     digest: f1b713785959e23364292e3967df41d36737f3a0a7375af2b50c50dc0c35f066
