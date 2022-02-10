@@ -44,6 +44,10 @@ spec:
                       values:
                         - cloud-screenshot
               topologyKey: kubernetes.io/hostname
+      hostAliases:
+        - ip: '127.0.0.1'
+          hostnames:
+            - 'cloud-screenshot.dc-screenshot.svc.cluster.local'
       initContainers:
         - name: init
           env:
