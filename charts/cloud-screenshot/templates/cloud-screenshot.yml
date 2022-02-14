@@ -20,7 +20,11 @@ metadata:
   labels:
     app: cloud-screenshot
 spec:
-  replicas: 1
+  replicas: {{ .Values.REPLICAS }}
+  strategy:
+    rollingUpdate:
+      maxSurge: 0
+      maxUnavailable: 1
   selector:
     matchLabels:
       app: cloud-screenshot
@@ -30,6 +34,20 @@ spec:
         app: cloud-screenshot
         redis-cluster-client: 'true'
     spec:
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchExpressions:
+                    - key: app
+                      operator: In
+                      values:
+                        - cloud-screenshot
+              topologyKey: kubernetes.io/hostname
+      hostAliases:
+        - ip: '127.0.0.1'
+          hostnames:
+            - 'cloud-screenshot.dc-screenshot.svc.cluster.local'
       initContainers:
         - name: init
           env:
@@ -156,7 +174,7 @@ spec:
               readOnly: true
               subPath: nginx.conf
 
-{{ range $index, $_ := until 10 }}
+{{ range $_, $index := untilStep 1 (int .Values.CLOUD_SCREENSHOT_WORKERS) 1 }}
 {{ include "screenshot.container.worker" (dict "Values" $.Values "index" $index) }}
 {{ end }}
 
