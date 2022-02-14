@@ -420,3 +420,21 @@ spec:
         schedule: "1 16 2-31 * *"
         keep: 30
         storageName: backup-4
+
+      # At 00:01 on day-of-month 1.
+      - name: monthly-backup-2
+        schedule: "1 0 1 * *"
+        keep: 6
+        storageName: backup-2
+
+      # At 08:01 on day-of-month 1.
+      - name: monthly-backup-3
+        schedule: "1 8 1 * *"
+        keep: 6
+        storageName: backup-3
+
+      # At 16:01 on day-of-month 1.
+      - name: monthly-backup-4
+        schedule: "1 16 1 * *"
+        keep: 6
+        storageName: backup-4
