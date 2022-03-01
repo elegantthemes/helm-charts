@@ -63,15 +63,19 @@ spec:
                 fieldRef:
                   fieldPath: spec.nodeName
             - name: CLOUD_SERVER_PATH
-              value: '{{ .Values.INSTALL_PATH }}'
+              value: {{ .Values.INSTALL_PATH | squote }}
             - name: VIRTUAL_HOST
-              value: '{{ .Values.VIRTUAL_HOST }}'
+              value: {{ .Values.VIRTUAL_HOST | squote }}
             - name: CLOUD_SERVER_REPO_URL
-              value: '{{ .Values.CLOUD_SERVER_REPO_URL }}'
+              value: {{ .Values.CLOUD_SERVER_REPO_URL | squote }}
             - name: IMAGE_VERSION
-              value: '{{ .Values.CLOUD_SERVER_VERSION }}'
+              value: {{ .Values.CLOUD_SERVER_VERSION | squote }}
+            - name: PHP_OPCACHE_FILE_CACHE
+              value: {{ ternary "/var/cache/php" "" (eq "production" .Values.WP_ENV) | squote }}
+            - name: PHP_OPCACHE_VALIDATE_TIMESTAMPS
+              value: {{ ternary "false" "true" (eq "production" .Values.WP_ENV) | squote }}
 
-          image: '{{ .Values.CLOUD_SERVER_IMAGE }}'
+          image: {{ .Values.CLOUD_SERVER_IMAGE | squote }}
           livenessProbe:
             exec:
               command:
