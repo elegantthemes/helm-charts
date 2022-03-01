@@ -56,18 +56,22 @@ spec:
                 fieldRef:
                   fieldPath: spec.nodeName
             - name: CLOUD_SCREENSHOT_PATH
-              value: '{{ .Values.INSTALL_PATH }}'
+              value: {{ .Values.INSTALL_PATH | squote }}
             - name: VIRTUAL_HOST
-              value: '{{ .Values.VIRTUAL_HOST }}'
+              value: {{ .Values.VIRTUAL_HOST | squote }}
             - name: CLOUD_SCREENSHOT_REPO_URL
-              value: '{{ .Values.CLOUD_SCREENSHOT_REPO_URL }}'
+              value: {{ .Values.CLOUD_SCREENSHOT_REPO_URL | squote }}
             - name: IMAGE_VERSION
-              value: '{{ .Values.CLOUD_SCREENSHOT_VERSION }}'
+              value: {{ .Values.CLOUD_SCREENSHOT_VERSION | squote }}
             - name: CLOUD_SCREENSHOT_INIT
               value: '1'
             - name: DIVI_VERSION
-              value: '{{ .Values.DIVI_VERSION }}'
-          image: '{{ .Values.CLOUD_SCREENSHOT_IMAGE }}'
+              value: {{ .Values.DIVI_VERSION | squote }}
+            - name: PHP_OPCACHE_FILE_CACHE
+              value: {{ ternary "/var/cache/php" "" (eq "production" .Values.WP_ENV) | squote }}
+            - name: PHP_OPCACHE_VALIDATE_TIMESTAMPS
+              value: {{ ternary "false" "true" (eq "production" .Values.WP_ENV) | squote }}
+          image: {{ .Values.CLOUD_SCREENSHOT_IMAGE | squote }}
           command: ['/etc/cont-init.d/init']
           resources:
             requests:
@@ -90,15 +94,19 @@ spec:
                 fieldRef:
                   fieldPath: spec.nodeName
             - name: CLOUD_SCREENSHOT_PATH
-              value: '{{ .Values.INSTALL_PATH }}'
+              value: {{ .Values.INSTALL_PATH | squote }}
             - name: VIRTUAL_HOST
-              value: '{{ .Values.VIRTUAL_HOST }}'
+              value: {{ .Values.VIRTUAL_HOST | squote }}
             - name: CLOUD_SCREENSHOT_REPO_URL
-              value: '{{ .Values.CLOUD_SCREENSHOT_REPO_URL }}'
+              value: {{ .Values.CLOUD_SCREENSHOT_REPO_URL | squote }}
             - name: IMAGE_VERSION
-              value: '{{ .Values.CLOUD_SCREENSHOT_VERSION }}'
+              value: {{ .Values.CLOUD_SCREENSHOT_VERSION | squote }}
+            - name: PHP_OPCACHE_FILE_CACHE
+              value: {{ ternary "/var/cache/php" "" (eq "production" .Values.WP_ENV) | squote }}
+            - name: PHP_OPCACHE_VALIDATE_TIMESTAMPS
+              value: {{ ternary "false" "true" (eq "production" .Values.WP_ENV) | squote }}
 
-          image: '{{ .Values.CLOUD_SCREENSHOT_IMAGE }}'
+          image: {{ .Values.CLOUD_SCREENSHOT_IMAGE | squote }}
           livenessProbe:
             exec:
               command:
