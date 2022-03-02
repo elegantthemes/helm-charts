@@ -319,8 +319,8 @@ spec:
         memory: 100M
         cpu: 200m
   pmm:
-    enabled: false
-    image: percona/pmm-client:2.23.0
+    enabled: true
+    image: percona/pmm-client:2.26.0
     serverHost: percona-monitoring-server-service
     serverUser: admin
 #    pxcParams: "--disable-tablestats-limit=2000"
