@@ -33,6 +33,7 @@ spec:
     metadata:
       labels:
         app: cloud-server
+        redis-cluster-client: 'true'
     spec:
       affinity:
         podAffinity:
