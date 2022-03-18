@@ -62,9 +62,16 @@ spec:
     podDisruptionBudget:
       maxUnavailable: 1
     volumeSpec:
-      hostPath:
-        path: /data
-        type: DirectoryOrCreate
+      persistentVolumeClaim:
+        accessModes:
+        - ReadWriteOnce
+        resources:
+          requests:
+            storage: 200Gi
+        storageClassName: openebs-hostpath
+      # hostPath:
+      #   path: /data
+      #   type: DirectoryOrCreate
       #persistentVolumeClaim:
       #  storageClassName: {{ .Values.storage_class_name }}
       #  accessModes: [ "ReadWriteOnce" ]
