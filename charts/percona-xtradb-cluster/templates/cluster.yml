@@ -314,7 +314,7 @@ spec:
 #     service.beta.kubernetes.io/aws-load-balancer-backend-protocol: http
   logcollector:
     enabled: true
-    image: bitfade/percona-xtradb-cluster-operator:1.10.0-logcollector-fb-1.8.11-1
+    image: bitfade/percona-xtradb-cluster-operator:1.10.0-logcollector-fb-1.8.11
 #    configuration: |
 #      [OUTPUT]
 #           Name  es
@@ -342,7 +342,7 @@ spec:
         memory: 750M
         cpu: 500m
   backup:
-    image: bitfade/percona-xtradb-cluster-operator:1.10.0-pxc8.0-backup
+    image: bitfade/percona-xtradb-cluster-operator:1.10.0-pxc8.0-backup-1
 #    serviceAccountName: percona-xtradb-cluster-operator
 #    imagePullSecrets:
 #      - name: private-registry-credentials
