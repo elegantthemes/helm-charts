@@ -1220,6 +1220,16 @@ entries:
   percona-xtradb-cluster:
   - apiVersion: v2
     appVersion: 1.10.0
+    created: "2022-03-22T08:50:34.535675373Z"
+    description: Percona XtraDB Cluster managed by PXC K8s Operator
+    digest: 435856a990886b5dd160c21f8944a6161fb1138578d7832d2fa605d43ce0b2b5
+    name: percona-xtradb-cluster
+    type: application
+    urls:
+    - https://github.com/elegantthemes/helm-charts/releases/download/percona-xtradb-cluster-1.10.15/percona-xtradb-cluster-1.10.15.tgz
+    version: 1.10.15
+  - apiVersion: v2
+    appVersion: 1.10.0
     created: "2022-03-21T10:56:23.69127383Z"
     description: Percona XtraDB Cluster managed by PXC K8s Operator
     digest: c0f5ba43784e079b1b50741a3bcc3f633425244f2efdd1eda58f3267b1ca9faf
