@@ -43,6 +43,8 @@ spec:
                       operator: In
                       values:
                         - cloud-screenshot
+              namespaces:
+                - dc-screenshot
               topologyKey: kubernetes.io/hostname
             - labelSelector:
                 matchExpressions:
@@ -50,6 +52,8 @@ spec:
                       operator: In
                       values:
                         - cloud-server
+              namespaces:
+                - dc-app
               topologyKey: kubernetes.io/hostname
       hostAliases:
         - ip: '127.0.0.1'

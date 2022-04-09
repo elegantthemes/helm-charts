@@ -55,6 +55,17 @@ spec:
                       operator: In
                       values:
                         - cloud-server
+              namespaces:
+                - dc-app
+              topologyKey: kubernetes.io/hostname
+            - labelSelector:
+                matchExpressions:
+                    - key: app
+                      operator: In
+                      values:
+                        - cloud-screenshot
+              namespaces:
+                - dc-screenshot
               topologyKey: kubernetes.io/hostname
       containers:
         - name: cloud-server
