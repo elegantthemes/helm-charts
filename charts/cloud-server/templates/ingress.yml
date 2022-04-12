@@ -23,6 +23,7 @@ metadata:
     nginx.ingress.kubernetes.io/limit-rpm: "300"
     nginx.ingress.kubernetes.io/limit-rps: "5"
     nginx.ingress.kubernetes.io/limit-burst-multiplier: "1"
+    nginx.ingress.kubernetes.io/limit-req-status-code: "429"
     nginx.ingress.kubernetes.io/use-regex: "false"
     nginx.ingress.kubernetes.io/enable-rewrite-log: "false"
 spec:
