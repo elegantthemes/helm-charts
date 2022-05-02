@@ -374,6 +374,8 @@ spec:
       #          storage: 60Gi
 
       backup-2:
+        nodeSelector:
+          database-node: "true"
         type: s3
         labels:
           {{ .Values.label_name }}: {{ .Values.label_value }}
@@ -385,6 +387,8 @@ spec:
         region: {{ .Values.s3_region_backup_2 }}
 
       backup-3:
+        nodeSelector:
+          database-node: "true"
         type: s3
         labels:
           {{ .Values.label_name }}: {{ .Values.label_value }}
@@ -396,6 +400,8 @@ spec:
         region: {{ .Values.s3_region_backup_3 }}
 
       backup-4:
+        nodeSelector:
+          database-node: "true"
         type: s3
         labels:
           {{ .Values.label_name }}: {{ .Values.label_value }}
@@ -407,6 +413,8 @@ spec:
         region: {{ .Values.s3_region_backup_4 }}
 
       backup-pitr-1:
+        nodeSelector:
+          database-node: "true"
         type: s3
         labels:
           {{ .Values.label_name }}: {{ .Values.label_value }}
@@ -417,6 +425,8 @@ spec:
         region: {{ .Values.s3_region_backup_pitr_1 }}
 
       backup-local:
+        nodeSelector:
+          database-node: "true"
         type: filesystem
         volume:
           persistentVolumeClaim:
