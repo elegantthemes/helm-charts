@@ -328,7 +328,7 @@ spec:
         memory: 100M
         cpu: 200m
   pmm:
-    enabled: true
+    enabled: false
     image: percona/pmm-client:2.26.0
     serverHost: percona-monitoring-server-service
     serverUser: admin
@@ -342,7 +342,16 @@ spec:
         memory: 750M
         cpu: 500m
   backup:
-    image: bitfade/percona-xtradb-cluster-operator:1.10.0-pxc8.0-backup-1
+    image: percona/percona-xtradb-cluster-operator:1.10.0-pxc8.0.25-backup
+    # Default backup image uses 10 concurrent S3 connections, since the value is hardcoded, it can only be changed
+    # using a custom image: last number in the name specifies the max number of concurrent connections.
+    # image: bitfade/percona-xtradb-cluster-operator:1.10.0-pxc8.0.25-backup-1
+    # image: bitfade/percona-xtradb-cluster-operator:1.10.0-pxc8.0.25-backup-2
+    # image: bitfade/percona-xtradb-cluster-operator:1.10.0-pxc8.0.25-backup-4
+    # image: bitfade/percona-xtradb-cluster-operator:1.10.0-pxc8.0.25-backup-5
+    # image: bitfade/percona-xtradb-cluster-operator:1.10.0-pxc8.0.25-backup-6
+    # image: bitfade/percona-xtradb-cluster-operator:1.10.0-pxc8.0.25-backup-15
+    # image: bitfade/percona-xtradb-cluster-operator:1.10.0-pxc8.0.25-backup-20
 #    serviceAccountName: percona-xtradb-cluster-operator
 #    imagePullSecrets:
 #      - name: private-registry-credentials
@@ -406,6 +415,18 @@ spec:
           bucket: {{ .Values.s3_bucket_name_backup_pitr_1 }}
           credentialsSecret: {{ .Values.s3_secret_name_backup_pitr_1 }}
         region: {{ .Values.s3_region_backup_pitr_1 }}
+
+      backup-local:
+        type: filesystem
+        volume:
+          persistentVolumeClaim:
+            accessModes:
+            - ReadWriteOnce
+            resources:
+              requests:
+                storage: 8Gi
+            storageClassName: {{ .Values.storage_class_name }}
+
     schedule:
       #- name: backup-1
       #  schedule: '0 * * * *'
@@ -413,37 +434,37 @@ spec:
       #  storageName: backup-1
 
       # At 00:01 on every day-of-month from 2 through 31.
-      - name: daily-backup-2
-        schedule: "1 0 2-31 * *"
-        keep: 30
-        storageName: backup-2
+      # - name: daily-backup-2
+      #   schedule: "1 0 2-31 * *"
+      #   keep: 30
+      #   storageName: backup-2
 
       # At 08:01 on every day-of-month from 2 through 31.
-      - name: daily-backup-3
-        schedule: "1 8 2-31 * *"
-        keep: 30
-        storageName: backup-3
+      # - name: daily-backup-3
+      #   schedule: "1 8 2-31 * *"
+      #   keep: 30
+      #   storageName: backup-3
 
       # At 16:01 on every day-of-month from 2 through 31.
-      - name: daily-backup-4
-        schedule: "1 16 2-31 * *"
-        keep: 30
-        storageName: backup-4
+      # - name: daily-backup-4
+      #   schedule: "1 16 2-31 * *"
+      #   keep: 30
+      #   storageName: backup-4
 
       # At 00:01 on day-of-month 1.
-      - name: monthly-backup-2
-        schedule: "1 0 1 * *"
-        keep: 6
-        storageName: backup-2
+      # - name: monthly-backup-2
+      #   schedule: "1 0 1 * *"
+      #   keep: 6
+      #   storageName: backup-2
 
       # At 08:01 on day-of-month 1.
-      - name: monthly-backup-3
-        schedule: "1 8 1 * *"
-        keep: 6
-        storageName: backup-3
+      # - name: monthly-backup-3
+      #   schedule: "1 8 1 * *"
+      #   keep: 6
+      #   storageName: backup-3
 
       # At 16:01 on day-of-month 1.
-      - name: monthly-backup-4
-        schedule: "1 16 1 * *"
-        keep: 6
-        storageName: backup-4
+      # - name: monthly-backup-4
+      #   schedule: "1 16 1 * *"
+      #   keep: 6
+      #   storageName: backup-4
