@@ -373,6 +373,18 @@ spec:
       #        requests:
       #          storage: 60Gi
 
+      backup-aws-1:
+        nodeSelector:
+          database-node: "true"
+        type: s3
+        labels:
+          {{ .Values.label_name }}: {{ .Values.label_value }}
+          release: {{ .Values.label_value }}
+        s3:
+          bucket: {{ .Values.s3_bucket_name_backup_aws_1 }}
+          credentialsSecret: {{ .Values.s3_secret_name_backup_aws_1 }}
+        region: {{ .Values.s3_region_backup_aws_1 }}
+
       backup-2:
         nodeSelector:
           database-node: "true"
