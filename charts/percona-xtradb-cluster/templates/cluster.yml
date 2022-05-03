@@ -450,43 +450,14 @@ spec:
             storageClassName: {{ .Values.storage_class_name }}
 
     schedule:
-      #- name: backup-1
-      #  schedule: '0 * * * *'
-      #  keep: 6
-      #  storageName: backup-1
+      # At minute 1 past every 12th hour.
+      - name: local
+        schedule: '1 */12 * * *'
+        keep: 14
+        storageName: backup-local
 
-      # At 00:01 on every day-of-month from 2 through 31.
-      # - name: daily-backup-2
-      #   schedule: "1 0 2-31 * *"
-      #   keep: 30
-      #   storageName: backup-2
-
-      # At 08:01 on every day-of-month from 2 through 31.
-      # - name: daily-backup-3
-      #   schedule: "1 8 2-31 * *"
-      #   keep: 30
-      #   storageName: backup-3
-
-      # At 16:01 on every day-of-month from 2 through 31.
-      # - name: daily-backup-4
-      #   schedule: "1 16 2-31 * *"
-      #   keep: 30
-      #   storageName: backup-4
-
-      # At 00:01 on day-of-month 1.
-      # - name: monthly-backup-2
-      #   schedule: "1 0 1 * *"
-      #   keep: 6
-      #   storageName: backup-2
-
-      # At 08:01 on day-of-month 1.
-      # - name: monthly-backup-3
-      #   schedule: "1 8 1 * *"
-      #   keep: 6
-      #   storageName: backup-3
-
-      # At 16:01 on day-of-month 1.
-      # - name: monthly-backup-4
-      #   schedule: "1 16 1 * *"
-      #   keep: 6
-      #   storageName: backup-4
+      # At minute 1 past every 12th hour from 6 through 23.
+      - name: aws
+        schedule: "1 6/12 * * *"
+        keep: 60
+        storageName: backup-aws-1
