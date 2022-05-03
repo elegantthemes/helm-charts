@@ -383,7 +383,7 @@ spec:
         s3:
           bucket: {{ .Values.s3_bucket_name_backup_aws_1 }}
           credentialsSecret: {{ .Values.s3_secret_name_backup_aws_1 }}
-        region: {{ .Values.s3_region_backup_aws_1 }}
+          region: {{ .Values.s3_region_backup_aws_1 }}
 
       backup-2:
         nodeSelector:
@@ -396,7 +396,7 @@ spec:
           bucket: {{ .Values.s3_bucket_name_backup_2 }}
           credentialsSecret: {{ .Values.s3_secret_name_backup_2 }}
           endpointUrl: {{ .Values.s3_endpoint_backup_2 }}
-        region: {{ .Values.s3_region_backup_2 }}
+          region: {{ .Values.s3_region_backup_2 }}
 
       backup-3:
         nodeSelector:
@@ -409,7 +409,7 @@ spec:
           bucket: {{ .Values.s3_bucket_name_backup_3 }}
           credentialsSecret: {{ .Values.s3_secret_name_backup_3 }}
           endpointUrl: {{ .Values.s3_endpoint_backup_3 }}
-        region: {{ .Values.s3_region_backup_3 }}
+          region: {{ .Values.s3_region_backup_3 }}
 
       backup-4:
         nodeSelector:
@@ -422,7 +422,7 @@ spec:
           bucket: {{ .Values.s3_bucket_name_backup_4 }}
           credentialsSecret: {{ .Values.s3_secret_name_backup_4 }}
           endpointUrl: {{ .Values.s3_endpoint_backup_4 }}
-        region: {{ .Values.s3_region_backup_4 }}
+          region: {{ .Values.s3_region_backup_4 }}
 
       backup-pitr-1:
         nodeSelector:
@@ -434,7 +434,7 @@ spec:
         s3:
           bucket: {{ .Values.s3_bucket_name_backup_pitr_1 }}
           credentialsSecret: {{ .Values.s3_secret_name_backup_pitr_1 }}
-        region: {{ .Values.s3_region_backup_pitr_1 }}
+          region: {{ .Values.s3_region_backup_pitr_1 }}
 
       backup-local:
         nodeSelector:
