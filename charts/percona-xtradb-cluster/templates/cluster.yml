@@ -31,7 +31,8 @@ spec:
   # schedule: "0 4 * * *"
   pxc:
     size: 3
-    image: percona/percona-xtradb-cluster:8.0.23-14.1
+    # original image has bugged socat that prevents backup from completing.
+    image: bitfade/percona-xtradb-cluster:8.0.25-15.1-socat 
     autoRecovery: true
 #   schedulerName: mycustom-scheduler
 #   readinessDelaySec: 15
