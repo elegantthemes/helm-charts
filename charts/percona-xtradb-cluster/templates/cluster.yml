@@ -32,8 +32,8 @@ spec:
   pxc:
     size: 3
     # original image has bugged socat that prevents backup from completing.
-    # also we need to set wsrep_sync_wait=0 during backups or else they can fail silently.
-    image: bitfade/percona-xtradb-cluster:8.0.25-15.1-wsw-zero
+    # also we need to set et_backup_running WP option during backups so the cloud server can disable activations.
+    image: bitfade/percona-xtradb-cluster:8.0.25-15.1-wp-option
     autoRecovery: true
 #   schedulerName: mycustom-scheduler
 #   readinessDelaySec: 15
