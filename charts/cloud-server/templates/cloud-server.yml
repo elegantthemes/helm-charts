@@ -82,6 +82,8 @@ spec:
               value: {{ .Values.CLOUD_SERVER_REPO_URL | squote }}
             - name: IMAGE_VERSION
               value: {{ .Values.CLOUD_SERVER_VERSION | squote }}
+            - name: PHP_MEMORY_LIMIT
+              value: {{ .Values.PHP_MEMORY_LIMIT | squote }}
             - name: PHP_OPCACHE_FILE_CACHE
               value: {{ ternary "/var/cache/php" "" (eq "production" .Values.WP_ENV) | squote }}
             - name: PHP_OPCACHE_VALIDATE_TIMESTAMPS
@@ -123,7 +125,7 @@ spec:
               memory: 100Mi
             limits:
               cpu: 4000m
-              memory: 1024Mi
+              memory: 3G
           startupProbe:
             exec:
               command:
