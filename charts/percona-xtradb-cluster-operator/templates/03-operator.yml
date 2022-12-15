@@ -63,3 +63,10 @@ spec:
               name: metrics
               protocol: TCP
       serviceAccountName: percona-xtradb-cluster-operator
+      tolerations:
+        - key: node.kubernetes.io/disk-pressure
+          operator: Exists
+        - key: node.kubernetes.io/memory-pressure
+          operator: Exists
+        - key: node.kubernetes.io/pid-pressure
+          operator: Exists

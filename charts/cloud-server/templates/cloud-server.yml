@@ -139,6 +139,13 @@ spec:
             - name: config
               mountPath: /config
               readOnly: true
+      tolerations:
+        - key: node.kubernetes.io/disk-pressure
+          operator: Exists
+        - key: node.kubernetes.io/memory-pressure
+          operator: Exists
+        - key: node.kubernetes.io/pid-pressure
+          operator: Exists
       volumes:
         - name: wordpress
           hostPath:
