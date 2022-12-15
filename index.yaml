@@ -291,6 +291,18 @@ entries:
     version: 0.5.0
   cloud-server:
   - apiVersion: v1
+    created: "2022-12-15T00:48:21.981655744Z"
+    description: Elegant Themes Cloud Server
+    digest: 7c9dfac25569110b49dce44a2769aa61ce31fccb7b50ab63e4651e0bdd10af6f
+    icon: https://bitnami.com/assets/stacks/wordpress/img/wordpress-stack-220x234.png
+    maintainers:
+    - email: dustin@elegantthemes.com
+      name: Elegant Themes
+    name: cloud-server
+    urls:
+    - https://github.com/elegantthemes/helm-charts/releases/download/cloud-server-1.0.7/cloud-server-1.0.7.tgz
+    version: 1.0.7
+  - apiVersion: v1
     created: "2022-08-10T02:13:09.013932963Z"
     description: Elegant Themes Cloud Server
     digest: e0d4e81948f56d7242a470e8abd733401041accd0ac66aaeb84ccf2b5ab64349
@@ -1964,6 +1976,16 @@ entries:
     - https://github.com/elegantthemes/helm-charts/releases/download/percona-xtradb-cluster-1.0.2/percona-xtradb-cluster-1.0.2.tgz
     version: 1.0.2
   percona-xtradb-cluster-operator:
+  - apiVersion: v2
+    appVersion: 1.10.0
+    created: "2022-12-15T00:48:22.10896699Z"
+    description: A Helm chart for percona-xtradb-cluster-operator
+    digest: 2ac9779b6107b2faa2b84c3c4230b564ba76f13a12327705457df75acf5c8690
+    name: percona-xtradb-cluster-operator
+    type: application
+    urls:
+    - https://github.com/elegantthemes/helm-charts/releases/download/percona-xtradb-cluster-operator-1.10.3/percona-xtradb-cluster-operator-1.10.3.tgz
+    version: 1.10.3
   - apiVersion: v2
     appVersion: 1.10.0
     created: "2021-11-30T21:15:46.012034822Z"
