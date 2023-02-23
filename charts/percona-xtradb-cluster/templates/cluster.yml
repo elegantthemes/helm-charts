@@ -1,4 +1,4 @@
-apiVersion: pxc.percona.com/v1-10-0
+apiVersion: pxc.percona.com/v1-11-0
 kind: PerconaXtraDBCluster
 metadata:
   name: {{ .Values.cluster_name }}
@@ -7,23 +7,20 @@ metadata:
     release: {{ .Values.label_value }}
   finalizers:
     - delete-pxc-pods-in-order
-#   - delete-proxysql-pvc
-#   - delete-pxc-pvc
+#    - delete-proxysql-pvc
+#    - delete-pxc-pvc
 #  annotations:
-    # percona.com/issue-vault-token: "true"
-    # kubectl.kubernetes.io/last-applied-configuration: |
-    #   {"apiVersion":"pxc.percona.com/v1-9-0","kind":"PerconaXtraDBCluster"}
+#    percona.com/issue-vault-token: "true"
 spec:
   # Set to true to pause the cluster.
   pause: false
-  crVersion: 1.10.0
+  crVersion: 1.11.0
   secretsName: {{ .Values.secrets_name }}
   sslSecretName: {{ .Values.ssl_secrets_name }}
   sslInternalSecretName: {{ .Values.ssl_internal_secrets_name }}
   vaultSecretName: {{ .Values.vault_secrets_name }}
   logCollectorSecretName: {{ .Values.secrets_name }}-log-collector
   allowUnsafeConfigurations: false
-  #  pause: false
   updateStrategy: RollingUpdate
   upgradeOptions:
   # versionServiceEndpoint: https://check.percona.com
@@ -33,7 +30,7 @@ spec:
     size: 3
     # original image has bugged socat that prevents backup from completing.
     # also we need to set et_backup_running WP option during backups so the cloud server can disable activations.
-    image: bitfade/percona-xtradb-cluster:8.0.25-15.1-wp-option
+    image: elegantthemes/percona-xtradb-cluster:8.0.27-18.1-wp-option
     autoRecovery: true
 #   schedulerName: mycustom-scheduler
 #   readinessDelaySec: 15
@@ -324,7 +321,7 @@ spec:
 #     service.beta.kubernetes.io/aws-load-balancer-backend-protocol: http
   logcollector:
     enabled: true
-    image: percona/percona-xtradb-cluster-operator:1.10.0-logcollector-8.0.25 
+    image: percona/percona-xtradb-cluster-operator:1.11.0-logcollector
 #    configuration: |
 #      [OUTPUT]
 #           Name  es
@@ -339,7 +336,7 @@ spec:
         cpu: 200m
   pmm:
     enabled: false
-    image: percona/pmm-client:2.26.0
+    image: percona/pmm-client:2.28.0
     serverHost: percona-monitoring-server-service
     serverUser: admin
 #    pxcParams: "--disable-tablestats-limit=2000"
