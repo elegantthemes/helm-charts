@@ -321,7 +321,7 @@ spec:
 #     service.beta.kubernetes.io/aws-load-balancer-backend-protocol: http
   logcollector:
     enabled: true
-    image: percona/percona-xtradb-cluster-operator:1.11.0-logcollector
+    image: percona/percona-xtradb-cluster-operator:1.12.0-logcollector
 #    configuration: |
 #      [OUTPUT]
 #           Name  es
@@ -349,7 +349,7 @@ spec:
         memory: 750M
         cpu: 500m
   backup:
-    image: percona/percona-xtradb-cluster-operator:1.10.0-pxc8.0.25-backup
+    image: percona/percona-xtradb-cluster-operator:1.12.0-pxc8.0-backup
     # Default backup image uses 10 concurrent S3 connections, since the value is hardcoded, it can only be changed
     # using a custom image: last number in the name specifies the max number of concurrent connections.
     # image: bitfade/percona-xtradb-cluster-operator:1.10.0-pxc8.0.25-backup-1
