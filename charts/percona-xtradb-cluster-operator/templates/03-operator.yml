@@ -30,6 +30,10 @@ spec:
         - command:
             - percona-xtradb-cluster-operator
           env:
+            - name: LOG_STRUCTURED
+              value: 'false'
+            - name: LOG_LEVEL
+              value: INFO
             - name: WATCH_NAMESPACE
               valueFrom:
                 fieldRef:
@@ -42,7 +46,9 @@ spec:
                   fieldPath: metadata.name
             - name: OPERATOR_NAME
               value: percona-xtradb-cluster-operator
-          image: percona/percona-xtradb-cluster-operator:1.11.0
+            - name: DISABLE_TELEMETRY
+              value: "false"
+          image: percona/percona-xtradb-cluster-operator:1.12.0
           imagePullPolicy: Always
           livenessProbe:
             failureThreshold: 3
