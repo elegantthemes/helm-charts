@@ -26,7 +26,7 @@
               memory: 100Mi
             limits:
               cpu: '2'
-              memory: 1G
+              memory: 2G
           volumeMounts:
             - name: wordpress
               mountPath: /srv

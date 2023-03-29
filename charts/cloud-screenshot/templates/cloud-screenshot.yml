@@ -55,6 +55,8 @@ spec:
               namespaces:
                 - dc-app
               topologyKey: kubernetes.io/hostname
+      nodeSelector:
+        screenshot-node: 'true'
       hostAliases:
         - ip: '127.0.0.1'
           hostnames:
@@ -89,8 +91,8 @@ spec:
               cpu: 100m
               memory: 100Mi
             limits:
-              cpu: '2'
-              memory: 1G
+              cpu: '4'
+              memory: 2G
           volumeMounts:
             - name: wordpress
               mountPath: /srv
@@ -149,11 +151,11 @@ spec:
             periodSeconds: 10
           resources:
             requests:
-              cpu: 100m
-              memory: 100Mi
+              cpu: 1500m
+              memory: 800Mi
             limits:
-              cpu: '2'
-              memory: 1G
+              cpu: '3'
+              memory: 2G
           startupProbe:
             exec:
               command:
@@ -169,7 +171,7 @@ spec:
               readOnly: true
 
         - name: nginx
-          image: 'nginx:1.21.4'
+          image: 'nginx:1.23.4'
           livenessProbe:
             httpGet:
               path: /healthz
@@ -180,10 +182,10 @@ spec:
               containerPort: 80
           resources:
             requests:
-              cpu: 100m
-              memory: 100Mi
+              cpu: '1'
+              memory: 256Mi
             limits:
-              cpu: 1000m
+              cpu: '2'
               memory: 600Mi
           volumeMounts:
             - name: wordpress
