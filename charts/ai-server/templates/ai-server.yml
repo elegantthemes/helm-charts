@@ -1,0 +1,136 @@
+# Cloud Server Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: ai-server
+  namespace: dai-app
+spec:
+  selector:
+    app: ai-server
+  ports:
+    - port: 9999
+      targetPort: 9999
+      name: nodejs
+---
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ai-server
+  namespace: dai-app
+  labels:
+    app: ai-server
+spec:
+  replicas: 3
+  strategy:
+    rollingUpdate:
+      maxSurge: 0
+      maxUnavailable: 1
+  selector:
+    matchLabels:
+      app: ai-server
+  template:
+    metadata:
+      labels:
+        app: ai-server
+        redis-client: 'true'
+    spec:
+      affinity:
+        podAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchExpressions:
+                  - key: app.kubernetes.io/name
+                    operator: In
+                    values:
+                      - ingress-nginx
+              namespaces:
+                - ingress-nginx
+              topologyKey: kubernetes.io/hostname
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchExpressions:
+                    - key: app
+                      operator: In
+                      values:
+                        - ai-server
+              namespaces:
+                - dai-app
+              topologyKey: kubernetes.io/hostname
+            - labelSelector:
+                matchExpressions:
+                    - key: app
+                      operator: In
+                      values:
+                        - cloud-screenshot
+              namespaces:
+                - dc-screenshot
+              topologyKey: kubernetes.io/hostname
+      containers:
+        - name: ai-server
+          env:
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+            - name: AI_SERVER_PATH
+              value: {{ .Values.INSTALL_PATH | squote }}
+            - name: VIRTUAL_HOST
+              value: {{ .Values.VIRTUAL_HOST | squote }}
+            - name: AI_SERVER_REPO_URL
+              value: {{ .Values.AI_SERVER_REPO_URL | squote }}
+            - name: IMAGE_VERSION
+              value: {{ .Values.AI_SERVER_VERSION | squote }}
+
+          image: {{ .Values.AI_SERVER_IMAGE | squote }}
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 9999
+              scheme: HTTP
+            periodSeconds: 30
+          ports:
+            - name: nodejs
+              containerPort: 9999
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 9999
+              scheme: HTTP
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 100m
+              memory: 100Mi
+            limits:
+              cpu: 1000m
+              memory: 500Mi
+          startupProbe:
+            exec:
+              command:
+                - cat
+                - {{ .Values.INSTALL_PATH }}/build/healthz
+            failureThreshold: 30
+            periodSeconds: 10
+          volumeMounts:
+            - name: wordpress
+              mountPath: /srv
+            - name: config
+              mountPath: /config
+              readOnly: true
+      tolerations:
+        - key: node.kubernetes.io/disk-pressure
+          operator: Exists
+        - key: node.kubernetes.io/memory-pressure
+          operator: Exists
+        - key: node.kubernetes.io/pid-pressure
+          operator: Exists
+      volumes:
+        - name: wordpress
+          hostPath:
+            path: /srv
+            type: DirectoryOrCreate
+        - name: config
+          secret:
+            secretName: secrets

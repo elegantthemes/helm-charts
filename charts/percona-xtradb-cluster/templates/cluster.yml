@@ -453,7 +453,7 @@ spec:
             - ReadWriteOnce
             resources:
               requests:
-                storage: 8Gi
+                storage: 10Gi
             storageClassName: {{ .Values.storage_class_name }}
 
     schedule:
