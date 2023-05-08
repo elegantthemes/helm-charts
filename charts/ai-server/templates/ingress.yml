@@ -1,4 +1,4 @@
-apiVersion: networking.k8s.io/v1beta1
+apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: ai-server
@@ -13,9 +13,8 @@ metadata:
     nginx.ingress.kubernetes.io/limit-burst-multiplier: "3"
     nginx.ingress.kubernetes.io/limit-req-status-code: "429"
     nginx.ingress.kubernetes.io/limit-conn-status-code: "429"
-    nginx.ingress.kubernetes.io/use-regex: "false"
+    nginx.ingress.kubernetes.io/use-regex: "true"
     nginx.ingress.kubernetes.io/enable-rewrite-log: "false"
-    nginx.ingress.kubernetes.io/use-forwarded-headers: "true"
 spec:
   tls:
     - hosts:
@@ -25,7 +24,8 @@ spec:
     - host: {{ .Values.VIRTUAL_HOST }}
       http:
         paths:
-          - path: /
+          - path: "/.*"
+            pathType: Prefix
             backend:
               serviceName: ai-server
               servicePort: 9999

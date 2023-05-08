@@ -21,7 +21,7 @@ metadata:
   labels:
     app: ai-server
 spec:
-  replicas: 3
+  replicas: 1
   strategy:
     rollingUpdate:
       maxSurge: 0
