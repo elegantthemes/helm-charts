@@ -27,5 +27,7 @@ spec:
           - path: "/.*"
             pathType: Prefix
             backend:
-              serviceName: ai-server
-              servicePort: 9999
+              service:
+                name: ai-server
+                port:
+                  number: 9999
