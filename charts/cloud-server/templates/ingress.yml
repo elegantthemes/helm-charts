@@ -39,5 +39,7 @@ spec:
           - path: /
             pathType: ImplementationSpecific
             backend:
-              serviceName: cloud-server
-              servicePort: fastcgi
+              service:
+                name: cloud-server
+                port:
+                  number: fastcgi
