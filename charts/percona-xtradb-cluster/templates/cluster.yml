@@ -48,13 +48,12 @@ spec:
       xbstream-opts = --decompress
       [xtrabackup]
       compress = lz4
-      use-memory = 16G
     resources:
       requests:
         memory: 2G
         cpu: 1000m
       limits:
-        memory: 32G
+        memory: 16G
         cpu: 6000m
 #        ephemeral-storage: 1G
 #    nodeSelector:
