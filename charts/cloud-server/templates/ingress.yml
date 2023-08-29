@@ -42,4 +42,4 @@ spec:
               service:
                 name: cloud-server
                 port:
-                  number: fastcgi
+                  name: fastcgi
