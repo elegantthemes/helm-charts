@@ -1,12 +1,11 @@
-# Cloud Server Service
 apiVersion: v1
 kind: Service
 metadata:
-  name: ai-server
-  namespace: dai-app
+  name: {{ .Release.Name }}
+  namespace: {{ .Release.Namespace }}
 spec:
   selector:
-    app: ai-server
+    app: {{ .Release.Name }}
   ports:
     - port: 9999
       targetPort: 9999
@@ -16,10 +15,10 @@ spec:
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: ai-server
-  namespace: dai-app
+  name: {{ .Release.Name }}
+  namespace: {{ .Release.Namespace }}
   labels:
-    app: ai-server
+    app: {{ .Release.Name }}
 spec:
   replicas: {{ .Values.REPLICAS }}
   strategy:
@@ -28,11 +27,11 @@ spec:
       maxUnavailable: 1
   selector:
     matchLabels:
-      app: ai-server
+      app: {{ .Release.Name }}
   template:
     metadata:
       labels:
-        app: ai-server
+        app: {{ .Release.Name }}
         redis-client: 'true'
     spec:
       affinity:
@@ -54,9 +53,9 @@ spec:
                     - key: app
                       operator: In
                       values:
-                        - ai-server
+                        - {{ .Release.Name }}
               namespaces:
-                - dai-app
+                - {{ .Release.Namespace }}
               topologyKey: kubernetes.io/hostname
             - labelSelector:
                 matchExpressions:
@@ -68,7 +67,7 @@ spec:
                 - dc-screenshot
               topologyKey: kubernetes.io/hostname
       containers:
-        - name: ai-server
+        - name: {{ .Release.Name }}
           env:
             - name: NODE_NAME
               valueFrom:
@@ -82,6 +81,8 @@ spec:
               value: {{ .Values.AI_SERVER_REPO_URL | squote }}
             - name: IMAGE_VERSION
               value: {{ .Values.AI_SERVER_VERSION | squote }}
+            - name: GIT_REF
+              value: {{ .Values.GIT_REF | squote }}
 
           image: {{ .Values.AI_SERVER_IMAGE | squote }}
           livenessProbe:

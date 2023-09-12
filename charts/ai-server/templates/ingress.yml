@@ -1,8 +1,8 @@
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: ai-server
-  namespace: dai-app
+  name: {{ .Release.Name }}
+  namespace: {{ .Release.Name }}
   annotations:
     cert-manager.io/cluster-issuer: letsencrypt
     kubernetes.io/ingress.class: nginx
@@ -20,7 +20,7 @@ spec:
   tls:
     - hosts:
         - {{ .Values.VIRTUAL_HOST }}
-      secretName: ai-server-tls
+      secretName: {{ .Release.Name }}-tls
   rules:
     - host: {{ .Values.VIRTUAL_HOST }}
       http:
@@ -29,6 +29,6 @@ spec:
             pathType: Prefix
             backend:
               service:
-                name: ai-server
+                name: {{ .Release.Name }}
                 port:
                   number: 9999
