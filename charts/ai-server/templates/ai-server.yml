@@ -106,7 +106,7 @@ spec:
               memory: 100Mi
             limits:
               cpu: 1000m
-              memory: 500Mi
+              memory: {{ .Values.MEMORY_LIMIT | squote }}
           startupProbe:
             exec:
               command:
