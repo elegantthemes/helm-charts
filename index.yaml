@@ -1686,6 +1686,19 @@ entries:
     urls:
     - https://github.com/elegantthemes/helm-charts/releases/download/cloud-server-0.0.2/cloud-server-0.0.2.tgz
     version: 0.0.2
+  ds-server:
+  - apiVersion: v1
+    created: "2023-11-08T08:48:04.789244597Z"
+    description: Divi DS Server
+    digest: 0cd0ce2841da0c48f7b50cb58beda1860c278609ec7608d63f602e0b34bca5be
+    icon: https://raw.githubusercontent.com/nodejs/nodejs.org/main/public/static/images/logo-hexagon.svg
+    maintainers:
+    - email: dustin@elegantthemes.com
+      name: Elegant Themes
+    name: ds-server
+    urls:
+    - https://github.com/elegantthemes/helm-charts/releases/download/ds-server-1.0.0/ds-server-1.0.0.tgz
+    version: 1.0.0
   percona-xtradb-cluster:
   - apiVersion: v2
     appVersion: 1.12.0
