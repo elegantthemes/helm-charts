@@ -7,8 +7,8 @@ spec:
   selector:
     app: {{ .Release.Name }}
   ports:
-    - port: {{ .Values.DS_SERVER_PORT | squote }}
-      targetPort: {{ .Values.DS_SERVER_PORT | squote }}
+    - port: {{ .Values.DS_SERVER_PORT }}
+      targetPort: {{ .Values.DS_SERVER_PORT }}
       name: nodejs
 ---
 
@@ -86,16 +86,16 @@ spec:
           livenessProbe:
             httpGet:
               path: /healthz
-              port: {{ .Values.DS_SERVER_PORT | squote }}
+              port: {{ .Values.DS_SERVER_PORT }}
               scheme: HTTP
             periodSeconds: 30
           ports:
             - name: nodejs
-              containerPort: {{ .Values.DS_SERVER_PORT | squote }}
+              containerPort: {{ .Values.DS_SERVER_PORT }}
           readinessProbe:
             httpGet:
               path: /healthz
-              port: {{ .Values.DS_SERVER_PORT | squote }}
+              port: {{ .Values.DS_SERVER_PORT }}
               scheme: HTTP
             periodSeconds: 10
           resources:

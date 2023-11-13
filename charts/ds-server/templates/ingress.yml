@@ -31,4 +31,4 @@ spec:
               service:
                 name: {{ .Release.Name }}
                 port:
-                  number: {{ .Values.DS_SERVER_PORT | squote }}
+                  number: {{ .Values.DS_SERVER_PORT }}
