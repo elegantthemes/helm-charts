@@ -16,6 +16,7 @@ metadata:
     nginx.ingress.kubernetes.io/use-regex: "true"
     nginx.ingress.kubernetes.io/enable-rewrite-log: "false"
     nginx.ingress.kubernetes.io/ssl-redirect: "false"
+    {{ if not (eq .Values.AI_SERVER_ENV "production") }}nginx.ingress.kubernetes.io/proxy-read-timeout: "120"{{ end }}
 spec:
   tls:
     - hosts:
