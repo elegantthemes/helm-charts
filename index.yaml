@@ -1759,6 +1759,19 @@ entries:
     urls:
     - https://github.com/elegantthemes/helm-charts/releases/download/ds-server-1.0.0/ds-server-1.0.0.tgz
     version: 1.0.0
+  et-dot-com-server:
+  - apiVersion: v1
+    created: "2024-01-08T21:27:29.538653391Z"
+    description: Elegant Themes Website
+    digest: b07d6c51efc8a56283477dbefc3474b5e987eebc1ad013cc5db3327ee8c08d0e
+    icon: https://www.elegantthemes.com/images/logo.svg
+    maintainers:
+    - email: dustin@elegantthemes.com
+      name: Elegant Themes
+    name: et-dot-com-server
+    urls:
+    - https://github.com/elegantthemes/helm-charts/releases/download/et-dot-com-server-1.0.0/et-dot-com-server-1.0.0.tgz
+    version: 1.0.0
   percona-xtradb-cluster:
   - apiVersion: v2
     appVersion: 1.12.0
