@@ -132,9 +132,6 @@ spec:
           volumeMounts:
             - name: wordpress
               mountPath: /srv
-            - name: config
-              mountPath: /config
-              readOnly: true
       tolerations:
         - key: node.kubernetes.io/disk-pressure
           operator: Exists
@@ -147,6 +144,3 @@ spec:
           hostPath:
             path: /srv
             type: DirectoryOrCreate
-        - name: config
-          secret:
-            secretName: secrets
