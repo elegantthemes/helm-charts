@@ -1773,6 +1773,18 @@ entries:
     version: 1.0.0
   et-dot-com-server:
   - apiVersion: v1
+    created: "2024-02-12T20:42:27.234336964Z"
+    description: Elegant Themes Website
+    digest: 4216f77f3826cc081ac747496f76feb45f2a91696fbc73a431dae0a61ddc521c
+    icon: https://www.elegantthemes.com/images/logo.svg
+    maintainers:
+    - email: dustin@elegantthemes.com
+      name: Elegant Themes
+    name: et-dot-com-server
+    urls:
+    - https://github.com/elegantthemes/helm-charts/releases/download/et-dot-com-server-1.0.2/et-dot-com-server-1.0.2.tgz
+    version: 1.0.2
+  - apiVersion: v1
     created: "2024-01-10T20:31:30.119819886Z"
     description: Elegant Themes Website
     digest: db6fcbede9efdd803f3d4fdda3da252d89d3a0c8bd55a8adade1d8133549e882
