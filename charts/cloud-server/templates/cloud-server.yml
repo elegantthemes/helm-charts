@@ -142,10 +142,13 @@ spec:
       tolerations:
         - key: node.kubernetes.io/disk-pressure
           operator: Exists
+          effect: NoSchedule
         - key: node.kubernetes.io/memory-pressure
           operator: Exists
+          effect: NoSchedule
         - key: node.kubernetes.io/pid-pressure
           operator: Exists
+          effect: NoSchedule
       volumes:
         - name: wordpress
           hostPath:
