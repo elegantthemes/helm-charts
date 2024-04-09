@@ -92,6 +92,10 @@ spec:
           volumeMounts:
             - name: wordpress
               mountPath: /srv
+            - name: demo-mysql
+              mountPath: /var/lib/mysql
+            - name: demo-redis
+              mountPath: /var/lib/redis
             - name: config
               mountPath: /config
               readOnly: true
@@ -227,6 +231,8 @@ spec:
           volumeMounts:
             - name: wordpress
               mountPath: /srv
+            - name: demo-mysql
+              mountPath: /var/lib/mysql
             - name: config
               mountPath: /config
               readOnly: true
@@ -288,6 +294,8 @@ spec:
           volumeMounts:
             - name: wordpress
               mountPath: /srv
+            - name: demo-redis
+              mountPath: /var/lib/redis
             - name: config
               mountPath: /config
               readOnly: true
@@ -296,6 +304,14 @@ spec:
         - name: wordpress
           hostPath:
             path: /srv
+            type: DirectoryOrCreate
+        - name: demo-mysql
+          hostPath:
+            path: /var/lib/demo-mysql
+            type: DirectoryOrCreate
+        - name: demo-redis
+          hostPath:
+            path: /var/lib/demo-redis
             type: DirectoryOrCreate
         - name: config
           secret:
