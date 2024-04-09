@@ -1736,6 +1736,18 @@ entries:
     version: 0.0.2
   d5-demo-server:
   - apiVersion: v1
+    created: "2024-04-09T17:58:41.468995714Z"
+    description: Divi Demo Server
+    digest: 3df357b3da8f10f0d774be6bb7124fae05950e27a68d22c33ddeba7e15906b46
+    icon: https://bitnami.com/assets/stacks/wordpress/img/wordpress-stack-220x234.png
+    maintainers:
+    - email: dustin@elegantthemes.com
+      name: Elegant Themes
+    name: d5-demo-server
+    urls:
+    - https://github.com/elegantthemes/helm-charts/releases/download/d5-demo-server-1.0.1/d5-demo-server-1.0.1.tgz
+    version: 1.0.1
+  - apiVersion: v1
     created: "2024-04-04T21:19:57.701412371Z"
     description: Divi Demo Server
     digest: dc9ab067799b927eb972faa07b62fa83f81f70d663dfb973b872a492f41b51f8
