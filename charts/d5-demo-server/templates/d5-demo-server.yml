@@ -76,6 +76,10 @@ spec:
               value: '1'
             - name: DIVI_VERSION
               value: {{ .Values.DIVI_VERSION | squote }}
+            - name: ET_API_KEY
+              value: {{ .Values.ET_API_KEY | squote }}
+            - name: ET_API_USER
+              value: {{ .Values.ET_API_USER | squote }}
             - name: PHP_OPCACHE_FILE_CACHE
               value: {{ ternary "/var/cache/php" "" (eq "production" .Values.WP_ENV) | squote }}
             - name: PHP_OPCACHE_VALIDATE_TIMESTAMPS
