@@ -1905,6 +1905,19 @@ entries:
     urls:
     - https://github.com/elegantthemes/helm-charts/releases/download/et-dot-com-server-1.0.0/et-dot-com-server-1.0.0.tgz
     version: 1.0.0
+  hub-server:
+  - apiVersion: v1
+    created: "2024-05-13T21:23:13.833271584Z"
+    description: Divi Hub Server
+    digest: d2f46fa55693b876f4610d8268a7f28a7febb6a451f668d03afa4ce04bc98bc9
+    icon: https://bitnami.com/assets/stacks/wordpress/img/wordpress-stack-220x234.png
+    maintainers:
+    - email: dustin@elegantthemes.com
+      name: Elegant Themes
+    name: hub-server
+    urls:
+    - https://github.com/elegantthemes/helm-charts/releases/download/hub-server-1.0.0/hub-server-1.0.0.tgz
+    version: 1.0.0
   percona-xtradb-cluster:
   - apiVersion: v2
     appVersion: 1.12.0
