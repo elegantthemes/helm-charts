@@ -1,0 +1,34 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: hub-server
+  namespace: dh-app
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt
+    kubernetes.io/ingress.class: nginx
+    nginx.ingress.kubernetes.io/backend-protocol: FCGI
+    nginx.ingress.kubernetes.io/enable-cors: "true"
+    nginx.ingress.kubernetes.io/fastcgi-index: index.php
+    nginx.ingress.kubernetes.io/use-regex: "false"
+    nginx.ingress.kubernetes.io/enable-rewrite-log: "false"
+    nginx.ingress.kubernetes.io/use-forwarded-headers: "true"
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      more_set_headers 'Content-Type: text/plain';
+      more_set_headers 'X-Robots-Tag: noindex, nofollow';
+      return 200 {{ .Values.PUBLIC_KEY | squote }};
+spec:
+  tls:
+    - hosts:
+        - {{ .Values.VIRTUAL_HOST }}
+      secretName: hub-server-tls
+  rules:
+    - host: {{ .Values.VIRTUAL_HOST }}
+      http:
+        paths:
+          - path: /public-key
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: hub-server
+                port:
+                  name: fastcgi
