@@ -32,3 +32,10 @@ spec:
                 name: hub-server
                 port:
                   name: fastcgi
+          - path: /time
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: hub-server
+                port:
+                  name: fastcgi
