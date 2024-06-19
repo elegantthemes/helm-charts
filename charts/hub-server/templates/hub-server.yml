@@ -69,6 +69,7 @@ spec:
               topologyKey: kubernetes.io/hostname
       containers:
         - name: {{ .Release.Name }}
+          image: {{ .Values.HUB_SERVER_IMAGE | squote }}
           env:
             - name: NODE_NAME
               valueFrom:
