@@ -81,6 +81,8 @@ spec:
               value: {{ .Values.DS_SERVER_REPO_URL | squote }}
             - name: IMAGE_VERSION
               value: {{ .Values.DS_SERVER_VERSION | squote }}
+            - name: GIT_REF
+              value: {{ .Values.GIT_REF | squote }}
 
           image: {{ .Values.DS_SERVER_IMAGE | squote }}
           livenessProbe:
