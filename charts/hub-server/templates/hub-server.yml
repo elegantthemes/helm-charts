@@ -86,7 +86,7 @@ spec:
             - name: PHP_OPCACHE_VALIDATE_TIMESTAMPS
               value: "1"
 
-          image: {{ .Values.ET_IMAGE | squote }}
+          image: {{ .Values.HUB_SERVER_IMAGE | squote }}
           livenessProbe:
             exec:
               command:
