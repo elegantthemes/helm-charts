@@ -187,3 +187,6 @@ spec:
           hostPath:
             path: /srv
             type: DirectoryOrCreate
+        - name: config
+          secret:
+            secretName: secrets
