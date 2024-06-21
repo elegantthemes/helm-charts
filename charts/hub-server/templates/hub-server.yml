@@ -170,6 +170,9 @@ spec:
           volumeMounts:
             - name: wordpress
               mountPath: /srv
+            - name: config
+              mountPath: /config
+              readOnly: true
 
 {{ range $_, $index := untilStep 1 (int .Values.HUB_SERVER_WORKERS) 1 }}
 {{ include "hub.container.worker" (dict "Values" $.Values "index" $index) }}
