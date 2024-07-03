@@ -1809,6 +1809,18 @@ entries:
     version: 1.0.0
   ds-server:
   - apiVersion: v1
+    created: "2024-07-03T08:37:03.631639091Z"
+    description: Divi DS Server
+    digest: 1b1ca3ff8759dfa9833098e1fc8b5f4fec7d3bdbea39feae8bbf3ebfafcd34f3
+    icon: https://raw.githubusercontent.com/nodejs/nodejs.org/main/public/static/images/logo-hexagon.svg
+    maintainers:
+    - email: dustin@elegantthemes.com
+      name: Elegant Themes
+    name: ds-server
+    urls:
+    - https://github.com/elegantthemes/helm-charts/releases/download/ds-server-1.0.6/ds-server-1.0.6.tgz
+    version: 1.0.6
+  - apiVersion: v1
     created: "2024-06-19T07:29:31.865010092Z"
     description: Divi DS Server
     digest: 809fd265738de416507c3fca60ad1b20312b7d9c968844ce78cc9745449029dd
