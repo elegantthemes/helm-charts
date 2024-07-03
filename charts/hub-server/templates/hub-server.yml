@@ -21,7 +21,7 @@ metadata:
   labels:
     app: {{ .Release.Name }}
 spec:
-  replicas: {{ .Values.REPLICAS }}
+  replicas: 3
   strategy:
     rollingUpdate:
       maxSurge: 0
@@ -67,15 +67,53 @@ spec:
               namespaces:
                 - dc-screenshot
               topologyKey: kubernetes.io/hostname
-      containers:
-        - name: {{ .Release.Name }}
+      initContainers:
+        - name: init
           env:
             - name: NODE_NAME
               valueFrom:
                 fieldRef:
                   fieldPath: spec.nodeName
-            - name: INSTALL_PATH
-              value: {{ .Values.INSTALL_PATH | squote }}
+            - name: HUB_SERVER_PATH
+              value: {{ .Values.HUB_SERVER_PATH | squote }}
+            - name: VIRTUAL_HOST
+              value: {{ .Values.VIRTUAL_HOST | squote }}
+            - name: HUB_SERVER_REPO_URL
+              value: {{ .Values.HUB_SERVER_REPO_URL | squote }}
+            - name: IMAGE_VERSION
+              value: {{ .Values.HUB_SERVER_VERSION | squote }}
+            - name: HUB_SERVER_INIT
+              value: '1'
+            - name: PHP_OPCACHE_FILE_CACHE
+              value: {{ ternary "/var/cache/php" "" (eq "production" .Values.WP_ENV) | squote }}
+            - name: PHP_OPCACHE_VALIDATE_TIMESTAMPS
+              value: {{ ternary "false" "true" (eq "production" .Values.WP_ENV) | squote }}
+          image: {{ .Values.HUB_SERVER_IMAGE | squote }}
+          command: [ '/etc/cont-init.d/init' ]
+          resources:
+            requests:
+              cpu: 100m
+              memory: 100Mi
+            limits:
+              cpu: '4'
+              memory: 2G
+          volumeMounts:
+            - name: wordpress
+              mountPath: /srv
+            - name: config
+              mountPath: /config
+              readOnly: true
+
+      containers:
+        - name: app
+          image: {{ .Values.HUB_SERVER_IMAGE | squote }}
+          env:
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+            - name: HUB_SERVER_PATH
+              value: {{ .Values.HUB_SERVER_PATH | squote }}
             - name: VIRTUAL_HOST
               value: {{ .Values.VIRTUAL_HOST | squote }}
             - name: PHP_MEMORY_LIMIT
@@ -85,14 +123,14 @@ spec:
             - name: PHP_OPCACHE_VALIDATE_TIMESTAMPS
               value: "1"
 
-          image: {{ .Values.ET_IMAGE | squote }}
+          image: {{ .Values.HUB_SERVER_IMAGE | squote }}
           livenessProbe:
             exec:
               command:
                 - 'bash'
                 - '-c'
                 - 'SCRIPT_NAME=/healthz'
-                - 'SCRIPT_FILENAME={{ .Values.INSTALL_PATH }}/public/healthz.php'
+                - 'SCRIPT_FILENAME={{ .Values.HUB_SERVER_PATH }}/public/healthz.php'
                 - 'REQUEST_METHOD=GET'
                 - 'cgi-fcgi'
                 - '-bind'
@@ -108,7 +146,7 @@ spec:
                 - 'bash'
                 - '-c'
                 - 'SCRIPT_NAME=/healthz'
-                - 'SCRIPT_FILENAME={{ .Values.INSTALL_PATH }}/public/healthz.php'
+                - 'SCRIPT_FILENAME={{ .Values.HUB_SERVER_PATH }}/public/healthz.php'
                 - 'REQUEST_METHOD=GET'
                 - 'cgi-fcgi'
                 - '-bind'
@@ -121,17 +159,25 @@ spec:
               memory: 100Mi
             limits:
               cpu: 5000m
-              memory: 3G
+              memory: 2G
           startupProbe:
             exec:
               command:
                 - cat
-                - {{ .Values.INSTALL_PATH }}/public/healthz.php
+                - {{ .Values.HUB_SERVER_PATH }}/public/healthz.php
             failureThreshold: 30
             periodSeconds: 10
           volumeMounts:
             - name: wordpress
               mountPath: /srv
+            - name: config
+              mountPath: /config
+              readOnly: true
+
+{{ range $_, $index := untilStep 1 (int .Values.HUB_SERVER_WORKERS) 1 }}
+{{ include "hub.container.worker" (dict "Values" $.Values "index" $index) }}
+{{ end }}
+
       tolerations:
         - key: node.kubernetes.io/disk-pressure
           operator: Exists
@@ -144,3 +190,6 @@ spec:
           hostPath:
             path: /srv
             type: DirectoryOrCreate
+        - name: config
+          secret:
+            secretName: secrets
