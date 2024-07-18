@@ -2,6 +2,18 @@ apiVersion: v1
 entries:
   ai-server:
   - apiVersion: v1
+    created: "2024-07-18T19:14:26.890275375Z"
+    description: Divi AI Server
+    digest: bf5843228b6d90b28337d8dfd0cc80bc57d2def630f9018e6c40bb00419f007b
+    icon: https://raw.githubusercontent.com/nodejs/nodejs.org/main/public/static/images/logo-hexagon.svg
+    maintainers:
+    - email: dustin@elegantthemes.com
+      name: Elegant Themes
+    name: ai-server
+    urls:
+    - https://github.com/elegantthemes/helm-charts/releases/download/ai-server-1.2.8/ai-server-1.2.8.tgz
+    version: 1.2.8
+  - apiVersion: v1
     created: "2024-06-12T15:19:46.321317888Z"
     description: Divi AI Server
     digest: 155517675b84cc062a4693a3774be6084be009dc92df05c2881cc02a67b8bc60
