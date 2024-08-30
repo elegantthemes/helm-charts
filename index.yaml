@@ -289,6 +289,19 @@ entries:
     urls:
     - https://github.com/elegantthemes/helm-charts/releases/download/ai-server-1.0.1/ai-server-1.0.1.tgz
     version: 1.0.1
+  auth-server:
+  - apiVersion: v1
+    created: "2024-08-30T18:03:31.731197111Z"
+    description: Elegant Themes Auth Server
+    digest: 0b723967c3ab14e647b78ae11af993e98bbb8a3e1159f5b82839ffca26502c89
+    icon: https://raw.githubusercontent.com/nodejs/nodejs.org/main/public/static/images/logo-hexagon.svg
+    maintainers:
+    - email: dustin@elegantthemes.com
+      name: Elegant Themes
+    name: auth-server
+    urls:
+    - https://github.com/elegantthemes/helm-charts/releases/download/auth-server-1.0.0/auth-server-1.0.0.tgz
+    version: 1.0.0
   cloud-screenshot:
   - apiVersion: v1
     created: "2023-03-29T20:59:44.722491546Z"
