@@ -1,0 +1,137 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}
+  namespace: {{ .Release.Namespace }}
+spec:
+  selector:
+    app: {{ .Release.Name }}
+  ports:
+    - port: {{ .Values.AUTH_SERVER_PORT }}
+      targetPort: {{ .Values.AUTH_SERVER_PORT }}
+      name: nodejs
+---
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: {{ .Release.Name }}
+spec:
+  replicas: {{ .Values.REPLICAS }}
+  strategy:
+    rollingUpdate:
+      maxSurge: 0
+      maxUnavailable: 1
+  selector:
+    matchLabels:
+      app: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Release.Name }}
+        redis-client: 'true'
+    spec:
+      affinity:
+        podAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchExpressions:
+                  - key: app.kubernetes.io/name
+                    operator: In
+                    values:
+                      - ingress-nginx
+              namespaces:
+                - ingress-nginx
+              topologyKey: kubernetes.io/hostname
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchExpressions:
+                    - key: app
+                      operator: In
+                      values:
+                        - {{ .Release.Name }}
+              namespaces:
+                - {{ .Release.Namespace }}
+              topologyKey: kubernetes.io/hostname
+            - labelSelector:
+                matchExpressions:
+                    - key: app
+                      operator: In
+                      values:
+                        - cloud-screenshot
+              namespaces:
+                - dc-screenshot
+              topologyKey: kubernetes.io/hostname
+      containers:
+        - name: {{ .Release.Name }}
+          env:
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+            - name: AUTH_SERVER_PATH
+              value: {{ .Values.INSTALL_PATH | squote }}
+            - name: VIRTUAL_HOST
+              value: {{ .Values.VIRTUAL_HOST | squote }}
+            - name: AUTH_SERVER_REPO_URL
+              value: {{ .Values.AUTH_SERVER_REPO_URL | squote }}
+            - name: IMAGE_VERSION
+              value: {{ .Values.AUTH_SERVER_VERSION | squote }}
+            - name: GIT_REF
+              value: {{ .Values.GIT_REF | squote }}
+
+          image: {{ .Values.AUTH_SERVER_IMAGE | squote }}
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: {{ .Values.AUTH_SERVER_PORT }}
+              scheme: HTTP
+            periodSeconds: 30
+          ports:
+            - name: nodejs
+              containerPort: {{ .Values.AUTH_SERVER_PORT }}
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: {{ .Values.AUTH_SERVER_PORT }}
+              scheme: HTTP
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 100m
+              memory: 100Mi
+            limits:
+              cpu: 1000m
+              memory: {{ .Values.MEMORY_LIMIT | squote }}
+          startupProbe:
+            exec:
+              command:
+                - cat
+                - {{ .Values.INSTALL_PATH }}/dist/healthz
+            failureThreshold: 30
+            periodSeconds: 10
+          volumeMounts:
+            - name: wordpress
+              mountPath: /srv
+            - name: config
+              mountPath: /config
+              readOnly: true
+      tolerations:
+        - key: node.kubernetes.io/disk-pressure
+          operator: Exists
+        - key: node.kubernetes.io/memory-pressure
+          operator: Exists
+        - key: node.kubernetes.io/pid-pressure
+          operator: Exists
+      volumes:
+        - name: wordpress
+          hostPath:
+            path: /srv
+            type: DirectoryOrCreate
+        - name: config
+          secret:
+            secretName: secrets
