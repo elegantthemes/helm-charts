@@ -3,6 +3,8 @@ kind: Service
 metadata:
   name: {{ .Release.Name }}
   namespace: {{ .Release.Namespace }}
+  labels:
+    app: {{ .Release.Name }}
 spec:
   selector:
     app: {{ .Release.Name }}
@@ -10,6 +12,19 @@ spec:
     - port: {{ .Values.DS_SERVER_PORT }}
       targetPort: {{ .Values.DS_SERVER_PORT }}
       name: nodejs
+---
+
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: ds-server
+  namespace: ds-app
+spec:
+  selector:
+    matchLabels:
+      app: ds-server
+  endpoints:
+  - port: nodejs
 ---
 
 apiVersion: apps/v1
