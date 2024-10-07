@@ -17,7 +17,7 @@ metadata:
     nginx.ingress.kubernetes.io/enable-rewrite-log: "false"
     nginx.ingress.kubernetes.io/ssl-redirect: "false"
     nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
-    nginx.ingress.kubernetes.io/limit-whitelist: {{ include "addCIDRToIPs" .Values.ETDC_IP_ADDRESSES }}
+    nginx.ingress.kubernetes.io/limit-whitelist: {{ include "addCIDRToIPs" .Values.ALLOWED_IPS }}
 spec:
   tls:
     - hosts:
