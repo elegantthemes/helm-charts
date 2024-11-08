@@ -93,7 +93,7 @@ spec:
         operator: Exists
         effect: NoSchedule
   haproxy:
-    enabled: false
+    enabled: true
     size: 3
     image: percona/percona-xtradb-cluster-operator:1.10.0-haproxy
 #    replicasServiceEnabled: false
