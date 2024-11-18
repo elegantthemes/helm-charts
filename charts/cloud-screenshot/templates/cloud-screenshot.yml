@@ -12,6 +12,21 @@ spec:
       name: http
 ---
 
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: cloud-screenshot
+  namespace: dc-screenshot
+spec:
+  selector:
+    matchLabels:
+      app: cloud-screenshot
+  endpoints:
+    - path: /wp-json/screenshot/v1/metrics
+      port: http
+
+---
+
 apiVersion: apps/v1
 kind: Deployment
 metadata:
