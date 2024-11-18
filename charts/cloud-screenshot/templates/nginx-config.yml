@@ -32,6 +32,14 @@ data:
             server 127.0.0.1:9000;
         }
 
+        # Redirect IP requests to the domain
+        server {
+            listen 80;
+            server_name _;
+
+            return 301 http://cloud-screenshot.dc-screenshot.svc.cluster.local$request_uri;
+        }
+
         server {
             listen 80;
             server_name cloud-screenshot.dc-screenshot.svc.cluster.local;
