@@ -4,6 +4,8 @@ kind: Service
 metadata:
   name: cloud-screenshot
   namespace: dc-screenshot
+  labels:
+    app: cloud-screenshot
 spec:
   selector:
     app: cloud-screenshot
