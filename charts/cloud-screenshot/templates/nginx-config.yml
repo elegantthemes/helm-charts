@@ -34,35 +34,26 @@ data:
             server 127.0.0.1:9000;
         }
 
-        # Redirect IP requests to the domain
         server {
-            listen 80;
-            server_name _;
-
-            # Redirect all requests to the domain
-            location / {
-                return 301 http://cloud-screenshot.dc-screenshot.svc.cluster.local$request_uri;
-            }
-
-            # Handle liveness probe
-            location /healthz {
-                access_log off;
-                return 200;
-            }
-        }
-
-        server {
-            listen 80;
-            server_name cloud-screenshot.dc-screenshot.svc.cluster.local;
+            listen 80 default_server;
+            server_name cloud-screenshot.dc-screenshot.svc.cluster.local _;
 
             root /srv/cloud-screenshot/web;
             index index.html index.htm index.php;
 
-            location ~ ([^/]*)sitemap(.*)\.x(m|s)l$ {
-                ## this redirects sitemap.xml to /sitemap_index.xml
-                rewrite ^/sitemap\.xml$ /sitemap_index.xml permanent;
+            # Handle requests to both domain and IP
+            set $host_to_use $host;
+            if ($host ~* "^\d+\.\d+\.\d+\.\d+$") {
+                set $host_to_use cloud-screenshot.dc-screenshot.svc.cluster.local;
+            }
 
-                ## this makes the XML sitemaps work
+            location / {
+                proxy_set_header Host $host_to_use;
+                try_files $uri $uri/ /index.php?$args;
+            }
+
+            location ~ ([^/]*)sitemap(.*)\.x(m|s)l$ {
+                rewrite ^/sitemap\.xml$ /sitemap_index.xml permanent;
                 rewrite ^/([a-z]+)?-?sitemap\.xsl$ /index.php?xsl=$1 last;
                 rewrite ^/sitemap_index\.xml$ /index.php?sitemap=1 last;
                 rewrite ^/([^/]+?)-sitemap([0-9]+)?\.xml$ /index.php?sitemap=$1&sitemap_n=$2 last;
@@ -74,10 +65,6 @@ data:
                 rewrite ^(/[^/]+)?(/.*\.php) $2 last;
             }
 
-            location / {
-                try_files $uri $uri/ /index.php?$args;
-            }
-
             location ~* ^.+\.(ogg|ogv|svg|svgz|eot|otf|woff|mp4|ttf|rss|atom|jpg|jpeg|gif|png|ico|zip|tgz|gz|rar|bz2|doc|xls|exe|ppt|tar|mid|midi|wav|bmp|rtf)$ {
                 access_log off; log_not_found off; expires 1d;
             }
@@ -87,6 +74,10 @@ data:
                 try_files $uri =404;
                 fastcgi_split_path_info ^(.+\.php)(/.+)$;
                 fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+
+                # Always use the domain in the Host header for PHP processing
+                fastcgi_param HTTP_HOST $host_to_use;
+
                 include fastcgi_params;
                 fastcgi_read_timeout 60;
                 fastcgi_pass php;
