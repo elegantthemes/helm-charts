@@ -17,6 +17,8 @@ kind: ServiceMonitor
 metadata:
   name: cloud-screenshot
   namespace: dc-screenshot
+  labels:
+    app: cloud-screenshot
 spec:
   selector:
     matchLabels:

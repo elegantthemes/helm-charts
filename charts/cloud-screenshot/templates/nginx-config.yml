@@ -39,7 +39,16 @@ data:
             listen 80;
             server_name _;
 
-            return 301 http://cloud-screenshot.dc-screenshot.svc.cluster.local$request_uri;
+            # Redirect all requests to the domain
+            location / {
+                return 301 http://cloud-screenshot.dc-screenshot.svc.cluster.local$request_uri;
+            }
+
+            # Handle liveness probe
+            location /healthz {
+                access_log off;
+                return 200;
+            }
         }
 
         server {
