@@ -109,9 +109,6 @@ spec:
             requests:
               cpu: 100m
               memory: 100Mi
-            limits:
-              cpu: '4'
-              memory: 2G
           volumeMounts:
             - name: wordpress
               mountPath: /srv
@@ -170,10 +167,10 @@ spec:
             periodSeconds: 10
           resources:
             requests:
-              cpu: 1500m
-              memory: 800Mi
+              cpu: 100m
+              memory: 128Mi
             limits:
-              cpu: '3'
+              cpu: 250m
               memory: 2G
           startupProbe:
             exec:
@@ -201,10 +198,10 @@ spec:
               containerPort: 80
           resources:
             requests:
-              cpu: '1'
+              cpu: 100m
               memory: 256Mi
             limits:
-              cpu: '2'
+              cpu: 250m
               memory: 600Mi
           volumeMounts:
             - name: wordpress

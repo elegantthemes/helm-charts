@@ -25,7 +25,7 @@
               cpu: 100m
               memory: 100Mi
             limits:
-              cpu: '2'
+              cpu: 1000m
               memory: 2G
           volumeMounts:
             - name: wordpress
