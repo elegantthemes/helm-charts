@@ -1988,6 +1988,19 @@ entries:
     urls:
     - https://github.com/elegantthemes/helm-charts/releases/download/d5-demo-server-1.0.0/d5-demo-server-1.0.0.tgz
     version: 1.0.0
+  deephive:
+  - apiVersion: v1
+    created: "2025-01-20T19:31:32.217073321Z"
+    description: DeepHive
+    digest: 726dba376d78487d3b2a16dde1d2f9806ad7feb9bedef2a310019a36cf723eaf
+    icon: https://raw.githubusercontent.com/nodejs/nodejs.org/main/public/static/images/logo-hexagon.svg
+    maintainers:
+    - email: dustin@elegantthemes.com
+      name: Elegant Themes
+    name: deephive
+    urls:
+    - https://github.com/elegantthemes/helm-charts/releases/download/deephive-1.0.0/deephive-1.0.0.tgz
+    version: 1.0.0
   ds-server:
   - apiVersion: v1
     created: "2024-10-03T18:40:52.293421791Z"
