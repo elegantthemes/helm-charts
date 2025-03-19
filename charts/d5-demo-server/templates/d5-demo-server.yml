@@ -126,6 +126,10 @@ spec:
               value: {{ .Values.DIVI_VERSION | squote }}
             - name: DEMO_SERVER_PHP
               value: '1'
+            - name: ET_API_KEY
+              value: {{ .Values.ET_API_KEY | squote }}
+            - name: ET_API_USER
+              value: {{ .Values.ET_API_USER | squote }}
 
           image: {{ .Values.DEMO_SERVER_IMAGE | squote }}
           livenessProbe:
