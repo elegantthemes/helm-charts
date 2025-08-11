@@ -7859,3 +7859,4 @@ spec:
       storage: true
       subresources:
         status: {}
+  preserveUnknownFields: false
