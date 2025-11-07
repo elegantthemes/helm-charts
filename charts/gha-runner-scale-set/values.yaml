@@ -115,7 +115,7 @@ githubConfigSecret:
 ## If any customization is required for dind or kubernetes mode, containerMode should remain
 ## empty, and configuration should be applied to the template.
 # containerMode:
-#   type: "dind"  ## type can be set to dind or kubernetes
+#   type: "dind"  ## type can be set to "dind", "kubernetes", or "kubernetes-novolume"
 #   ## the following is required when containerMode.type=kubernetes
 #   kubernetesModeWorkVolumeClaim:
 #     accessModes: ["ReadWriteOnce"]
@@ -154,7 +154,7 @@ githubConfigSecret:
 #   counters:
 #     gha_started_jobs_total:
 #       labels:
-#         ["repository", "organization", "enterprise", "job_name", "event_name", "job_workflow_ref"]
+#         ["repository", "organization", "enterprise", "job_name", "event_name", "job_workflow_ref", "job_workflow_name", "job_workflow_target"]
 #     gha_completed_jobs_total:
 #       labels:
 #         [
@@ -165,6 +165,8 @@ githubConfigSecret:
 #           "event_name",
 #           "job_result",
 #           "job_workflow_ref",
+#           "job_workflow_name",
+#           "job_workflow_target",
 #         ]
 #   gauges:
 #     gha_assigned_jobs:
@@ -186,7 +188,7 @@ githubConfigSecret:
 #   histograms:
 #     gha_job_startup_duration_seconds:
 #       labels:
-#         ["repository", "organization", "enterprise", "job_name", "event_name","job_workflow_ref"]
+#         ["repository", "organization", "enterprise", "job_name", "event_name","job_workflow_ref", "job_workflow_name", "job_workflow_target"]
 #       buckets:
 #         [
 #           0.01,
@@ -244,7 +246,9 @@ githubConfigSecret:
 #           "job_name",
 #           "event_name",
 #           "job_result",
-#           "job_workflow_ref"
+#           "job_workflow_ref",
+#           "job_workflow_name",
+#           "job_workflow_target"
 #         ]
 #       buckets:
 #         [
@@ -387,6 +391,25 @@ template:
   ##               resources:
   ##                 requests:
   ##                   storage: 1Gi
+  ######################################################################################################
+  ## with containerMode.type=kubernetes-novolume, we will populate the template.spec with following pod spec
+  ## template:
+  ##   spec:
+  ##     containers:
+  ##     - name: runner
+  ##       image: ghcr.io/actions/actions-runner:latest
+  ##       command: ["/home/runner/run.sh"]
+  ##       env:
+  ##         - name: ACTIONS_RUNNER_CONTAINER_HOOKS
+  ##           value: /home/runner/k8s-novolume/index.js
+  ##         - name: ACTIONS_RUNNER_POD_NAME
+  ##           valueFrom:
+  ##             fieldRef:
+  ##               fieldPath: metadata.name
+  ##         - name: ACTIONS_RUNNER_IMAGE
+  ##           value: ghcr.io/actions/actions-runner:latest # should match the runnerimage
+  ##         - name: ACTIONS_RUNNER_REQUIRE_JOB_CONTAINER
+  ##           value: "true"
   spec:
     containers:
       - name: runner
