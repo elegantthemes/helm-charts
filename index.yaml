@@ -2245,6 +2245,22 @@ entries:
     version: 1.0.0
   gha-runner-scale-set:
   - apiVersion: v2
+    appVersion: 0.13.0
+    created: "2025-11-07T21:08:16.922851888Z"
+    description: A Helm chart for deploying an AutoScalingRunnerSet
+    digest: 7f196fe94a93eca30b720bb59aeec33b64d6924f48c75adedbfc48f6af12f6b1
+    home: https://github.com/actions/actions-runner-controller
+    maintainers:
+    - name: actions
+      url: https://github.com/actions
+    name: gha-runner-scale-set
+    sources:
+    - https://github.com/actions/actions-runner-controller
+    type: application
+    urls:
+    - https://github.com/elegantthemes/helm-charts/releases/download/gha-runner-scale-set-0.13.0/gha-runner-scale-set-0.13.0.tgz
+    version: 0.13.0
+  - apiVersion: v2
     appVersion: 0.12.1
     created: "2025-07-29T16:14:23.932063385Z"
     description: A Helm chart for deploying an AutoScalingRunnerSet
@@ -2261,6 +2277,22 @@ entries:
     - https://github.com/elegantthemes/helm-charts/releases/download/gha-runner-scale-set-0.12.1/gha-runner-scale-set-0.12.1.tgz
     version: 0.12.1
   gha-runner-scale-set-controller:
+  - apiVersion: v2
+    appVersion: 0.13.0
+    created: "2025-11-07T21:08:17.065298737Z"
+    description: A Helm chart for install actions-runner-controller CRD
+    digest: 789d0518ec681c359ef5a153b82ddcd467deb6fb274faeada5e87e66cf16d629
+    home: https://github.com/actions/actions-runner-controller
+    maintainers:
+    - name: actions
+      url: https://github.com/actions
+    name: gha-runner-scale-set-controller
+    sources:
+    - https://github.com/actions/actions-runner-controller
+    type: application
+    urls:
+    - https://github.com/elegantthemes/helm-charts/releases/download/gha-runner-scale-set-controller-0.13.0/gha-runner-scale-set-controller-0.13.0.tgz
+    version: 0.13.0
   - apiVersion: v2
     appVersion: 0.12.1
     created: "2025-07-29T16:14:24.110417315Z"
