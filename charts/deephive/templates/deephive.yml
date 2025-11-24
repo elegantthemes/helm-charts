@@ -112,8 +112,10 @@ spec:
               command:
                 - cat
                 - {{ .Values.INSTALL_PATH }}/dist/healthz
-            failureThreshold: 30
-            periodSeconds: 10
+            initialDelaySeconds: 60
+            failureThreshold: 60
+            periodSeconds: 5
+            timeoutSeconds: 3
           volumeMounts:
             - name: wordpress
               mountPath: /srv
