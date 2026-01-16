@@ -12,6 +12,20 @@ spec:
       name: nodejs
 ---
 
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ .Release.Name }}-workspace
+  namespace: {{ .Release.Namespace }}
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 50Gi
+  storageClassName: do-block-storage
+---
+
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -119,6 +133,8 @@ spec:
           volumeMounts:
             - name: wordpress
               mountPath: /srv
+            - name: workspace
+              mountPath: {{ .Values.WORKSPACE_ROOT | squote }}
             - name: config
               mountPath: /config
               readOnly: true
@@ -137,6 +153,9 @@ spec:
           hostPath:
             path: /srv
             type: DirectoryOrCreate
+        - name: workspace
+          persistentVolumeClaim:
+            claimName: {{ .Release.Name }}-workspace
         - name: config
           secret:
             secretName: secrets
