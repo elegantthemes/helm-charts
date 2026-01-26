@@ -55,3 +55,20 @@ WORKSPACE_ROOT:
 
 ZENHUB_GRAPHQL_TOKEN:
 ZENHUB_REST_TOKEN:
+
+# Optional MySQL sidecar (ephemeral) for running PHP tests that require MySQL.
+# When enabled, a mysql container runs in the same Pod as deephive and stores data on an emptyDir volume.
+MYSQL_ENABLED: false
+MYSQL_IMAGE: mysql:8.0
+MYSQL_PORT: 3306
+MYSQL_DATABASE: deephive
+MYSQL_USER: deephive
+MYSQL_PASSWORD:
+MYSQL_ROOT_PASSWORD:
+
+# App-facing DB connection settings (defaults assume MYSQL_ENABLED sidecar).
+DB_HOST: 127.0.0.1
+DB_PORT: "3306"
+DB_DATABASE: deephive
+DB_USERNAME: deephive
+DB_PASSWORD:

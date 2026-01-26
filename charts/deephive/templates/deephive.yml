@@ -138,6 +138,35 @@ spec:
             - name: config
               mountPath: /config
               readOnly: true
+{{- if .Values.MYSQL_ENABLED }}
+        - name: mysql
+          image: {{ .Values.MYSQL_IMAGE | squote }}
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: MYSQL_DATABASE
+              value: {{ .Values.MYSQL_DATABASE | squote }}
+            - name: MYSQL_USER
+              value: {{ .Values.MYSQL_USER | squote }}
+            - name: MYSQL_PASSWORD
+              value: {{ .Values.MYSQL_PASSWORD | squote }}
+            - name: MYSQL_ROOT_PASSWORD
+              value: {{ .Values.MYSQL_ROOT_PASSWORD | squote }}
+          ports:
+            - name: mysql
+              containerPort: {{ .Values.MYSQL_PORT }}
+          # Give MySQL a bit of room but keep it bounded.
+          resources:
+            requests:
+              cpu: 50m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 1Gi
+          volumeMounts:
+            - name: mysql-data
+              mountPath: /var/lib/mysql
+{{- end }}
+
       tolerations:
         - key: node.kubernetes.io/disk-pressure
           operator: Exists
@@ -159,3 +188,7 @@ spec:
         - name: config
           secret:
             secretName: secrets
+{{- if .Values.MYSQL_ENABLED }}
+        - name: mysql-data
+          emptyDir: {}
+{{- end }}
