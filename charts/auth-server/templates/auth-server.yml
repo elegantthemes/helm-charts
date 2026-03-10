@@ -87,7 +87,7 @@ spec:
           image: {{ .Values.AUTH_SERVER_IMAGE | squote }}
           livenessProbe:
             httpGet:
-              path: /healthz
+              path: /livez
               port: {{ .Values.AUTH_SERVER_PORT }}
               scheme: HTTP
             periodSeconds: 30
@@ -99,6 +99,9 @@ spec:
               path: /healthz
               port: {{ .Values.AUTH_SERVER_PORT }}
               scheme: HTTP
+              httpHeaders:
+                - name: X-Uptime-Token
+                  value: {{ .Values.UPTIME_MONITOR_TOKEN | squote }}
             periodSeconds: 10
           resources:
             requests:
