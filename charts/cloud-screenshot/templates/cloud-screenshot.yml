@@ -209,6 +209,34 @@ spec:
               readOnly: true
               subPath: nginx.conf
 
+{{- if eq "pod" .Values.DB_MODE }}
+        - name: mysql
+          image: 'mysql:8.0'
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: MYSQL_DATABASE
+              value: {{ .Values.DB_NAME | squote }}
+            - name: MYSQL_USER
+              value: {{ .Values.DB_USER | squote }}
+            - name: MYSQL_PASSWORD
+              value: {{ .Values.DB_PASSWORD | squote }}
+            - name: MYSQL_ROOT_PASSWORD
+              value: {{ .Values.DB_PASSWORD | squote }}
+          ports:
+            - name: mysql
+              containerPort: 3306
+          resources:
+            requests:
+              cpu: 50m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 1Gi
+          volumeMounts:
+            - name: mysql-data
+              mountPath: /var/lib/mysql
+{{- end }}
+
 {{ range $_, $index := untilStep 1 (int .Values.CLOUD_SCREENSHOT_WORKERS) 1 }}
 {{ include "screenshot.container.worker" (dict "Values" $.Values "index" $index) }}
 {{ end }}
@@ -227,3 +255,7 @@ spec:
             items:
               - key: nginx.conf
                 path: nginx.conf
+{{- if eq "pod" .Values.DB_MODE }}
+        - name: mysql-data
+          emptyDir: {}
+{{- end }}
