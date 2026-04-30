@@ -14,13 +14,13 @@ metadata:
 spec:
   # Set to true to pause the cluster.
   pause: false
-  crVersion: 1.17.0
+  crVersion: 1.18.0
   secretsName: {{ .Values.secrets_name }}
   sslSecretName: {{ .Values.ssl_secrets_name }}
   sslInternalSecretName: {{ .Values.ssl_internal_secrets_name }}
   vaultSecretName: {{ .Values.vault_secrets_name }}
   logCollectorSecretName: {{ .Values.secrets_name }}-log-collector
-  initImage: percona/percona-xtradb-cluster-operator:1.17.0
+  initImage: percona/percona-xtradb-cluster-operator:1.18.0
   allowUnsafeConfigurations: false
   updateStrategy: RollingUpdate
   upgradeOptions:
@@ -29,7 +29,7 @@ spec:
   # schedule: "0 4 * * *"
   pxc:
     size: 3
-    image: percona/percona-xtradb-cluster:8.0.41-32.1
+    image: percona/percona-xtradb-cluster:8.0.42-33.1
     autoRecovery: true
 #   schedulerName: mycustom-scheduler
 #   readinessDelaySec: 15
@@ -94,7 +94,7 @@ spec:
   haproxy:
     enabled: true
     size: 3
-    image: percona/haproxy:2.8.14
+    image: percona/haproxy:2.8.15
 #    replicasServiceEnabled: false
 #    imagePullPolicy: Always
 #    schedulerName: mycustom-scheduler
@@ -222,7 +222,7 @@ spec:
   proxysql:
     enabled: false
     size: 3
-    image: percona/proxysql2:2.7.1
+    image: percona/proxysql2:2.7.3
 #    imagePullPolicy: Always
     configuration: |
       datadir="/var/lib/proxysql"
@@ -322,7 +322,7 @@ spec:
 #     service.beta.kubernetes.io/aws-load-balancer-backend-protocol: http
   logcollector:
     enabled: true
-    image: percona/percona-xtradb-cluster-operator:1.17.0-logcollector-fluentbit4.0.0
+    image: percona/fluentbit:4.0.1
 #    configuration: |
 #      [OUTPUT]
 #           Name  es
@@ -337,7 +337,7 @@ spec:
         cpu: 200m
   pmm:
     enabled: false
-    image: percona/pmm-client:2.44.0
+    image: percona/pmm-client:3.3.1
     serverHost: percona-monitoring-server-service
     serverUser: admin
 #    pxcParams: "--disable-tablestats-limit=2000"
@@ -350,7 +350,7 @@ spec:
         memory: 750M
         cpu: 500m
   backup:
-    image: percona/percona-xtradb-cluster-operator:1.17.0-pxc8.0-backup-pxb8.0.35
+    image: percona/percona-xtrabackup:8.0.35-34.1
     # Default backup image uses 10 concurrent S3 connections, since the value is hardcoded, it can only be changed
     # using a custom image: last number in the name specifies the max number of concurrent connections.
     # image: bitfade/percona-xtradb-cluster-operator:1.10.0-pxc8.0.25-backup-1
