@@ -2697,6 +2697,16 @@ entries:
     version: 1.0.0
   percona-xtradb-cluster:
   - apiVersion: v2
+    appVersion: 1.14.1
+    created: "2026-04-30T19:03:07.626613966Z"
+    description: Percona XtraDB Cluster managed by PXC K8s Operator
+    digest: cecb0724bc7a1a1b2ce8a0d5f86f6bc479c9ffe9779d80f594560ff6fda59a32
+    name: percona-xtradb-cluster
+    type: application
+    urls:
+    - https://github.com/elegantthemes/helm-charts/releases/download/percona-xtradb-cluster-1.14.1/percona-xtradb-cluster-1.14.1.tgz
+    version: 1.14.1
+  - apiVersion: v2
     appVersion: 1.13.0
     created: "2026-04-30T18:44:57.117214101Z"
     description: Percona XtraDB Cluster managed by PXC K8s Operator
@@ -3432,6 +3442,16 @@ entries:
     - https://github.com/elegantthemes/helm-charts/releases/download/percona-xtradb-cluster-1.0.2/percona-xtradb-cluster-1.0.2.tgz
     version: 1.0.2
   percona-xtradb-cluster-operator:
+  - apiVersion: v2
+    appVersion: 1.14.1
+    created: "2026-04-30T19:03:07.850379273Z"
+    description: A Helm chart for percona-xtradb-cluster-operator
+    digest: e415c12c3084b1f54795072b018a35293dbdcdbb620efb080874d8d4eee346c1
+    name: percona-xtradb-cluster-operator
+    type: application
+    urls:
+    - https://github.com/elegantthemes/helm-charts/releases/download/percona-xtradb-cluster-operator-1.14.1/percona-xtradb-cluster-operator-1.14.1.tgz
+    version: 1.14.1
   - apiVersion: v2
     appVersion: 1.13.0
     created: "2026-04-30T18:44:57.272479342Z"
