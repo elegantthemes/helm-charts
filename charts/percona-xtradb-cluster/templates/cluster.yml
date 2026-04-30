@@ -20,6 +20,7 @@ spec:
   sslInternalSecretName: {{ .Values.ssl_internal_secrets_name }}
   vaultSecretName: {{ .Values.vault_secrets_name }}
   logCollectorSecretName: {{ .Values.secrets_name }}-log-collector
+  initImage: percona/percona-xtradb-cluster-operator:1.16.1
   allowUnsafeConfigurations: false
   updateStrategy: RollingUpdate
   upgradeOptions:
