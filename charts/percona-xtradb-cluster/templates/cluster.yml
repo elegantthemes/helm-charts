@@ -376,19 +376,6 @@ spec:
       storageName: backup-pitr-1 
       timeBetweenUploads: 120
     storages:
-      #backup-1:
-      #  type: filesystem
-      #  labels:
-      #    {{ .Values.label_name }}: {{ .Values.label_value }}
-      #    release: {{ .Values.label_value }}
-      #  volume:
-      #    persistentVolumeClaim:
-      #      storageClassName: {{ .Values.storage_class_name }}
-      #      accessModes: [ "ReadWriteOnce" ]
-      #      resources:
-      #        requests:
-      #          storage: 60Gi
-
       backup-aws-1:
         nodeSelector:
           database-node: "true"
@@ -452,26 +439,7 @@ spec:
           credentialsSecret: {{ .Values.s3_secret_name_backup_pitr_1 }}
           region: {{ .Values.s3_region_backup_pitr_1 }}
 
-      backup-local:
-        nodeSelector:
-          database-node: "true"
-        type: filesystem
-        volume:
-          persistentVolumeClaim:
-            accessModes:
-            - ReadWriteOnce
-            resources:
-              requests:
-                storage: 10Gi
-            storageClassName: {{ .Values.storage_class_name }}
-
     schedule:
-      # At minute 1 past every 12th hour.
-      - name: local
-        schedule: '1 */12 * * *'
-        keep: 14
-        storageName: backup-local
-
       # At minute 1 past every 12th hour from 6 through 23.
       - name: aws
         schedule: "1 6/12 * * *"
