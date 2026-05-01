@@ -1,0 +1,21 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.cluster_name }}-rw
+  labels:
+    {{ .Values.label_name }}: {{ .Values.label_value }}
+    release: {{ .Values.label_value }}
+spec:
+  type: ExternalName
+  externalName: {{ .Values.cluster_name }}-haproxy.{{ .Release.Namespace }}.svc.cluster.local
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.cluster_name }}-ro
+  labels:
+    {{ .Values.label_name }}: {{ .Values.label_value }}
+    release: {{ .Values.label_value }}
+spec:
+  type: ExternalName
+  externalName: {{ .Values.cluster_name }}-haproxy-replicas.{{ .Release.Namespace }}.svc.cluster.local

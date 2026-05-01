@@ -31,6 +31,14 @@ spec:
     size: 3
     image: percona/percona-xtradb-cluster:8.0.44-35.1
     autoRecovery: true
+{{- with .Values.pxc_expose }}
+    expose:
+{{ toYaml . | indent 6 }}
+{{- end }}
+{{- if .Values.replication_channels }}
+    replicationChannels:
+{{ toYaml .Values.replication_channels | indent 6 }}
+{{- end }}
 #   schedulerName: mycustom-scheduler
 #   readinessDelaySec: 15
 #   livenessDelaySec: 600
