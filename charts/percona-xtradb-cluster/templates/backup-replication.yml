@@ -1,0 +1,120 @@
+{{- if .Values.backup_replication.enabled }}
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ .Values.cluster_name }}-backup-replication
+  labels:
+    {{ .Values.label_name }}: {{ .Values.label_value }}
+    release: {{ .Values.label_value }}
+    app.kubernetes.io/component: backup-replication
+spec:
+  schedule: {{ .Values.backup_replication.schedule | quote }}
+  concurrencyPolicy: Forbid
+  failedJobsHistoryLimit: 5
+  successfulJobsHistoryLimit: 5
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      template:
+        metadata:
+          labels:
+            {{ .Values.label_name }}: {{ .Values.label_value }}
+            release: {{ .Values.label_value }}
+            app.kubernetes.io/component: backup-replication
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: backup-replication
+              image: {{ .Values.backup_replication.image }}
+              imagePullPolicy: IfNotPresent
+              command:
+                - /bin/sh
+                - -ec
+              args:
+                - |
+                  cat > /tmp/rclone.conf <<EOF
+                  [source]
+                  type = s3
+                  provider = AWS
+                  env_auth = false
+                  access_key_id = ${SOURCE_ACCESS_KEY_ID}
+                  secret_access_key = ${SOURCE_SECRET_ACCESS_KEY}
+                  region = {{ .Values.s3_region_backup_aws_1 }}
+
+                  [backup-2]
+                  type = s3
+                  provider = Other
+                  env_auth = false
+                  access_key_id = ${BACKUP_2_ACCESS_KEY_ID}
+                  secret_access_key = ${BACKUP_2_SECRET_ACCESS_KEY}
+                  region = {{ .Values.s3_region_backup_2 }}
+                  endpoint = {{ .Values.s3_endpoint_backup_2 }}
+
+                  [backup-3]
+                  type = s3
+                  provider = Other
+                  env_auth = false
+                  access_key_id = ${BACKUP_3_ACCESS_KEY_ID}
+                  secret_access_key = ${BACKUP_3_SECRET_ACCESS_KEY}
+                  region = {{ .Values.s3_region_backup_3 }}
+                  endpoint = {{ .Values.s3_endpoint_backup_3 }}
+
+                  [backup-4]
+                  type = s3
+                  provider = Other
+                  env_auth = false
+                  access_key_id = ${BACKUP_4_ACCESS_KEY_ID}
+                  secret_access_key = ${BACKUP_4_SECRET_ACCESS_KEY}
+                  region = {{ .Values.s3_region_backup_4 }}
+                  endpoint = {{ .Values.s3_endpoint_backup_4 }}
+                  EOF
+
+                  export RCLONE_CONFIG=/tmp/rclone.conf
+
+                  rclone sync --fast-list --checksum --transfers 8 --checkers 16 source:{{ .Values.s3_bucket_name_backup_aws_1 }} backup-2:{{ .Values.s3_bucket_name_backup_2 }}
+                  rclone sync --fast-list --checksum --transfers 8 --checkers 16 source:{{ .Values.s3_bucket_name_backup_aws_1 }} backup-3:{{ .Values.s3_bucket_name_backup_3 }}
+                  rclone sync --fast-list --checksum --transfers 8 --checkers 16 source:{{ .Values.s3_bucket_name_backup_aws_1 }} backup-4:{{ .Values.s3_bucket_name_backup_4 }}
+              env:
+                - name: SOURCE_ACCESS_KEY_ID
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ .Values.s3_secret_name_backup_aws_1 }}
+                      key: AWS_ACCESS_KEY_ID
+                - name: SOURCE_SECRET_ACCESS_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ .Values.s3_secret_name_backup_aws_1 }}
+                      key: AWS_SECRET_ACCESS_KEY
+                - name: BACKUP_2_ACCESS_KEY_ID
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ .Values.s3_secret_name_backup_2 }}
+                      key: AWS_ACCESS_KEY_ID
+                - name: BACKUP_2_SECRET_ACCESS_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ .Values.s3_secret_name_backup_2 }}
+                      key: AWS_SECRET_ACCESS_KEY
+                - name: BACKUP_3_ACCESS_KEY_ID
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ .Values.s3_secret_name_backup_3 }}
+                      key: AWS_ACCESS_KEY_ID
+                - name: BACKUP_3_SECRET_ACCESS_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ .Values.s3_secret_name_backup_3 }}
+                      key: AWS_SECRET_ACCESS_KEY
+                - name: BACKUP_4_ACCESS_KEY_ID
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ .Values.s3_secret_name_backup_4 }}
+                      key: AWS_ACCESS_KEY_ID
+                - name: BACKUP_4_SECRET_ACCESS_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ .Values.s3_secret_name_backup_4 }}
+                      key: AWS_SECRET_ACCESS_KEY
+              resources:
+{{ toYaml .Values.backup_replication.resources | indent 16 }}
+{{- end }}
