@@ -260,9 +260,7 @@ spec:
       storageName: backup-pitr-1 
       timeBetweenUploads: 120
       resources:
-        limits:
-          memory: 1G
-          cpu: '1'
+{{ toYaml .Values.pitr.resources | indent 8 }}
     storages:
       backup-aws-1:
         nodeSelector:
