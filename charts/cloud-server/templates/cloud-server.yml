@@ -2,24 +2,24 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: cloud-server
-  namespace: dc-app
+  name: {{ .Release.Name }}
+  namespace: {{ .Release.Namespace }}
 spec:
   selector:
-    app: cloud-server
+    app: {{ .Release.Name }}
   ports:
-    - port: 9000
-      targetPort: 9000
-      name: fastcgi
+    - port: 80
+      targetPort: 80
+      name: http
 ---
 
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: cloud-server
-  namespace: dc-app
+  name: {{ .Release.Name }}
+  namespace: {{ .Release.Namespace }}
   labels:
-    app: cloud-server
+    app: {{ .Release.Name }}
 spec:
   replicas: 3
   strategy:
@@ -28,25 +28,13 @@ spec:
       maxUnavailable: 1
   selector:
     matchLabels:
-      app: cloud-server
+      app: {{ .Release.Name }}
   template:
     metadata:
       labels:
-        app: cloud-server
-        redis-cluster-client: 'true'
+        app: {{ .Release.Name }}
     spec:
       affinity:
-        podAffinity:
-          requiredDuringSchedulingIgnoredDuringExecution:
-            - labelSelector:
-                matchExpressions:
-                  - key: app.kubernetes.io/name
-                    operator: In
-                    values:
-                      - ingress-nginx
-              namespaces:
-                - ingress-nginx
-              topologyKey: kubernetes.io/hostname
         podAntiAffinity:
           requiredDuringSchedulingIgnoredDuringExecution:
             - labelSelector:
@@ -54,9 +42,9 @@ spec:
                     - key: app
                       operator: In
                       values:
-                        - cloud-server
+                        - {{ .Release.Name }}
               namespaces:
-                - dc-app
+                - {{ .Release.Namespace }}
               topologyKey: kubernetes.io/hostname
             - labelSelector:
                 matchExpressions:
@@ -139,6 +127,34 @@ spec:
             - name: config
               mountPath: /config
               readOnly: true
+        - name: nginx
+          image: 'nginx:1.27.5-alpine'
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 80
+            periodSeconds: 30
+          ports:
+            - name: http
+              containerPort: 80
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 80
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              memory: 512Mi
+          volumeMounts:
+            - name: wordpress
+              mountPath: /srv
+            - name: nginx-config
+              mountPath: /etc/nginx/nginx.conf
+              readOnly: true
+              subPath: nginx.conf
       tolerations:
         - key: node.kubernetes.io/disk-pressure
           operator: Exists
@@ -151,9 +167,13 @@ spec:
           effect: NoSchedule
       volumes:
         - name: wordpress
-          hostPath:
-            path: /srv
-            type: DirectoryOrCreate
+          emptyDir: {}
         - name: config
           secret:
             secretName: secrets
+        - name: nginx-config
+          configMap:
+            name: nginx-config
+            items:
+              - key: nginx.conf
+                path: nginx.conf

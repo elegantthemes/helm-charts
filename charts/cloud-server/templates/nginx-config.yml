@@ -1,0 +1,105 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nginx-config
+  namespace: {{ .Release.Namespace }}
+data:
+  nginx.conf: |
+    worker_processes auto;
+
+    events {
+        worker_connections 1024;
+    }
+
+    http {
+        include /etc/nginx/mime.types;
+        default_type application/octet-stream;
+
+        access_log /var/log/nginx/access.log;
+        error_log /var/log/nginx/error.log error;
+
+        sendfile on;
+        tcp_nopush on;
+        tcp_nodelay on;
+        server_names_hash_bucket_size 128;
+        client_body_buffer_size 50M;
+        client_max_body_size 100M;
+        proxy_read_timeout 300;
+
+        limit_conn_zone $binary_remote_addr zone=conn_limit_per_ip:10m;
+        limit_req_zone $binary_remote_addr zone=req_limit_per_ip:10m rate=8r/s;
+
+        map $http_origin $cors_origin {
+            default $http_origin;
+            "" "*";
+        }
+
+        upstream php {
+            server 127.0.0.1:9000;
+        }
+
+        server {
+            listen 80 default_server;
+            server_name {{ .Values.VIRTUAL_HOST }} _;
+
+            root {{ .Values.INSTALL_PATH }}/web;
+            index index.html index.htm index.php;
+
+            add_header Access-Control-Allow-Origin $cors_origin always;
+            add_header Access-Control-Allow-Methods "GET, POST, PUT, PATCH, DELETE, OPTIONS" always;
+            add_header Access-Control-Allow-Headers "DNT,X-CustomHeader,Keep-Alive,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Authorization,X-Product-Version" always;
+            add_header Access-Control-Allow-Credentials "true" always;
+            add_header Vary Origin always;
+
+            limit_conn conn_limit_per_ip 8;
+            limit_req zone=req_limit_per_ip burst=24 nodelay;
+            limit_conn_status 429;
+            limit_req_status 429;
+
+            location = /healthz {
+                access_log off;
+                return 200;
+            }
+
+            location / {
+                if ($request_method = OPTIONS) {
+                    return 204;
+                }
+
+                try_files $uri $uri/ /index.php?$args;
+            }
+
+            location ~ ([^/]*)sitemap(.*)\.x(m|s)l$ {
+                rewrite ^/sitemap\.xml$ /sitemap_index.xml permanent;
+                rewrite ^/([a-z]+)?-?sitemap\.xsl$ /index.php?xsl=$1 last;
+                rewrite ^/sitemap_index\.xml$ /index.php?sitemap=1 last;
+                rewrite ^/([^/]+?)-sitemap([0-9]+)?\.xml$ /index.php?sitemap=$1&sitemap_n=$2 last;
+            }
+
+            if (!-e $request_filename) {
+                rewrite /wp-admin$ $scheme://$host$uri/ permanent;
+                rewrite ^(/[^/]+)?(/wp-.*) $2 last;
+                rewrite ^(/[^/]+)?(/.*\.php) $2 last;
+            }
+
+            location ~* ^.+\.(ogg|ogv|svg|svgz|eot|otf|woff|mp4|ttf|rss|atom|jpg|jpeg|gif|png|ico|zip|tgz|gz|rar|bz2|doc|xls|exe|ppt|tar|mid|midi|wav|bmp|rtf)$ {
+                access_log off;
+                log_not_found off;
+                expires 1d;
+            }
+
+            location ~ [^/]\.php(/|$) {
+                fastcgi_index index.php;
+                try_files $uri =404;
+                fastcgi_split_path_info ^(.+\.php)(/.+)$;
+                include fastcgi_params;
+                fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+                fastcgi_param HTTP_HOST $host;
+                fastcgi_param HTTP_X_FORWARDED_FOR $http_x_forwarded_for;
+                fastcgi_param HTTP_X_FORWARDED_HOST $http_x_forwarded_host;
+                fastcgi_param HTTP_X_FORWARDED_PROTO $http_x_forwarded_proto;
+                fastcgi_read_timeout 60;
+                fastcgi_pass php;
+            }
+        }
+    }
