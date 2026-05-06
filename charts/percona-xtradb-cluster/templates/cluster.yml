@@ -7,7 +7,6 @@ metadata:
     release: {{ .Values.label_value }}
   finalizers:
     - delete-pxc-pods-in-order
-#    - delete-proxysql-pvc
 #    - delete-pxc-pvc
 #  annotations:
 #    percona.com/issue-vault-token: "true"
@@ -57,8 +56,8 @@ spec:
       compress = lz4
     resources:
       requests:
-        memory: 2G
-        cpu: 1000m
+        memory: 1G
+        cpu: 500m
       limits:
         memory: 8G
         cpu: 6000m
@@ -187,10 +186,10 @@ spec:
     resources:
       requests:
         memory: 100M
+        cpu: 100m
+      limits:
+        memory: 1G
         cpu: 600m
-#      limits:
-#        memory: 1G
-#        cpu: 700m
 #    priorityClassName: high-priority
 #    nodeSelector:
 #      disktype: ssd
@@ -227,107 +226,6 @@ spec:
 #     - 10.0.0.0/8
 #   serviceAnnotations:
 #     service.beta.kubernetes.io/aws-load-balancer-backend-protocol: http
-  proxysql:
-    enabled: false
-    size: 3
-    image: percona/proxysql2:2.7.3-1.2
-#    imagePullPolicy: Always
-    configuration: |
-      datadir="/var/lib/proxysql"
-      errorlog="/var/lib/proxysql/proxysql.log"
-    
-      admin_variables =
-      {
-        admin_credentials="proxyadmin:{{ .Values.proxysql_admin_password }}"
-        mysql_ifaces="0.0.0.0:6032"
-        refresh_interval=2000
-    
-        cluster_check_interval_ms=200
-        cluster_check_status_frequency=100
-        cluster_mysql_query_rules_diffs_before_sync=3
-        cluster_mysql_query_rules_save_to_disk=true
-        cluster_mysql_servers_diffs_before_sync=3
-        cluster_mysql_servers_save_to_disk=true
-        cluster_mysql_users_diffs_before_sync=3
-        cluster_mysql_users_save_to_disk=true
-        cluster_password="{{ .Values.proxysql_admin_password }}"
-        cluster_proxysql_servers_diffs_before_sync=3
-        cluster_proxysql_servers_save_to_disk=true
-        cluster_username="proxyadmin"
-      }
-    
-      mysql_variables=
-      {
-        commands_stats=true
-        connect_timeout_server=10000
-        default_query_delay=0
-        default_query_timeout=10000
-        default_schema="information_schema"
-        have_ssl=true
-        interfaces="0.0.0.0:3306;0.0.0.0:33062"
-        max_connections=2048
-        monitor_connect_interval=20000
-        monitor_galera_healthcheck_interval=5000
-        monitor_galera_healthcheck_max_timeout_count=5
-        monitor_galera_healthcheck_timeout=1200
-        monitor_history=60000
-        monitor_password="{{ .Values.proxysql_monitor_password }}"
-        monitor_ping_interval=10000
-        ping_timeout_server=200
-        poll_timeout=2000
-        sessions_sort=true
-        ssl_p2s_ca="/etc/proxysql/ssl-internal/ca.crt"
-        ssl_p2s_cert="/etc/proxysql/ssl-internal/tls.crt"
-        ssl_p2s_cipher="ECDHE-RSA-AES128-GCM-SHA256"
-        ssl_p2s_key="/etc/proxysql/ssl-internal/tls.key"
-        stacksize=1048576
-        threads=4
-      }
-    labels:
-      {{ .Values.label_name }}: {{ .Values.label_value }}
-      release: {{ .Values.label_value }}
-    resources:
-      requests:
-        memory: 1G
-        cpu: 500m
-      limits:
-        memory: 1G
-        cpu: 2000m
-    affinity:
-      antiAffinityTopologyKey: "kubernetes.io/hostname"
-#      advanced:
-#        nodeAffinity:
-#          requiredDuringSchedulingIgnoredDuringExecution:
-#            nodeSelectorTerms:
-#            - matchExpressions:
-#              - key: kubernetes.io/e2e-az-name
-#                operator: In
-#                values:
-#                - e2e-az1
-#                - e2e-az2
-#    tolerations:
-#    - key: "node.alpha.kubernetes.io/unreachable"
-#      operator: "Exists"
-#      effect: "NoExecute"
-#      tolerationSeconds: 6000
-    volumeSpec:
-      #      emptyDir: {}
-      #      hostPath:
-      #        path: /data
-      #        type: Directory
-      persistentVolumeClaim:
-        storageClassName: {{ .Values.storage_class_name }}
-        resources:
-          requests:
-            storage: 2G
-    podDisruptionBudget:
-      maxUnavailable: 1
-    #      minAvailable: 0
-    gracePeriod: 30
-#   loadBalancerSourceRanges:
-#     - 10.0.0.0/8
-#   serviceAnnotations:
-#     service.beta.kubernetes.io/aws-load-balancer-backend-protocol: http
   logcollector:
     enabled: true
     image: percona/fluentbit:4.0.1-1
@@ -351,28 +249,20 @@ spec:
     resources:
       requests:
         memory: 150M
-        cpu: 300m
+        cpu: 100m
       limits:
         memory: 750M
         cpu: 500m
   backup:
     image: percona/percona-xtrabackup:8.0.35-34.1
-    # Default backup image uses 10 concurrent S3 connections, since the value is hardcoded, it can only be changed
-    # using a custom image: last number in the name specifies the max number of concurrent connections.
-    # image: bitfade/percona-xtradb-cluster-operator:1.10.0-pxc8.0.25-backup-1
-    # image: bitfade/percona-xtradb-cluster-operator:1.10.0-pxc8.0.25-backup-2
-    # image: bitfade/percona-xtradb-cluster-operator:1.10.0-pxc8.0.25-backup-4
-    # image: bitfade/percona-xtradb-cluster-operator:1.10.0-pxc8.0.25-backup-5
-    # image: bitfade/percona-xtradb-cluster-operator:1.10.0-pxc8.0.25-backup-6
-    # image: bitfade/percona-xtradb-cluster-operator:1.10.0-pxc8.0.25-backup-15
-    # image: bitfade/percona-xtradb-cluster-operator:1.10.0-pxc8.0.25-backup-20
-#    serviceAccountName: percona-xtradb-cluster-operator
-#    imagePullSecrets:
-#      - name: private-registry-credentials
     pitr:
       enabled: true
       storageName: backup-pitr-1 
       timeBetweenUploads: 120
+      resources:
+        limits:
+          memory: 1G
+          cpu: '1'
     storages:
       backup-aws-1:
         nodeSelector:
