@@ -344,12 +344,10 @@ spec:
         memory: 100M
         cpu: 200m
   pmm:
-    enabled: false
-    image: percona/pmm-client:3.5.0
-    serverHost: percona-monitoring-server-service
-    serverUser: admin
-#    pxcParams: "--disable-tablestats-limit=2000"
-#    proxysqlParams: "--custom-labels=CUSTOM-LABELS"
+    enabled: {{ .Values.pmm.enabled }}
+    image: {{ .Values.pmm.image }}
+    serverHost: {{ .Values.pmm.serverHost }}
+    serverUser: {{ .Values.pmm.serverUser }}
     resources:
       requests:
         memory: 150M

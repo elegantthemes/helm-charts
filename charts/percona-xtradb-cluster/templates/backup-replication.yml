@@ -10,8 +10,8 @@ metadata:
 spec:
   schedule: {{ .Values.backup_replication.schedule | quote }}
   concurrencyPolicy: Forbid
-  failedJobsHistoryLimit: 5
-  successfulJobsHistoryLimit: 5
+  failedJobsHistoryLimit: 3
+  successfulJobsHistoryLimit: 1
   jobTemplate:
     spec:
       backoffLimit: 2
