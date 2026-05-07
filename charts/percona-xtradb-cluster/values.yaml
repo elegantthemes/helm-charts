@@ -34,6 +34,8 @@ storage_class_name:
 vault_secrets_name:
 pitr:
   resources: {}
+backup:
+  ttlSecondsAfterFinished: 3600
 pmm:
   enabled: false
   image: percona/pmm-client:3.5.0
