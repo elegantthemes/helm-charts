@@ -5,7 +5,6 @@ metadata:
   namespace: {{ .Release.Namespace }}
   annotations:
     cert-manager.io/cluster-issuer: letsencrypt
-    kubernetes.io/ingress.class: nginx
     nginx.ingress.kubernetes.io/backend-protocol: HTTP
     nginx.ingress.kubernetes.io/enable-cors: "true"
     nginx.ingress.kubernetes.io/limit-connections: "5"
@@ -19,6 +18,9 @@ metadata:
     nginx.ingress.kubernetes.io/cors-allow-headers: "DNT,X-CustomHeader,Keep-Alive,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Authorization,X-Product-Version,X-Stainless-Arch,X-Stainless-Lang,X-Stainless-OS,X-Stainless-Package-Version,X-Stainless-Retry-Count,X-Stainless-Runtime,X-Stainless-Runtime-Version,X-Stainless-Helper-Method,X-Stainless-Async,X-Stainless-Timeout"
     nginx.ingress.kubernetes.io/proxy-read-timeout: "80"
 spec:
+{{- if .Values.INGRESS_CLASS_NAME }}
+  ingressClassName: {{ .Values.INGRESS_CLASS_NAME }}
+{{- end }}
   tls:
     - hosts:
         - {{ .Values.VIRTUAL_HOST }}
@@ -27,7 +29,7 @@ spec:
     - host: {{ .Values.VIRTUAL_HOST }}
       http:
         paths:
-          - path: "/.*"
+          - path: /
             pathType: Prefix
             backend:
               service:
