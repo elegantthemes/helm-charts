@@ -76,6 +76,11 @@ spec:
               topologyKey: kubernetes.io/hostname
       nodeSelector:
         screenshot-node: 'true'
+      tolerations:
+        - key: screenshot
+          operator: Equal
+          value: "true"
+          effect: NoSchedule
       hostAliases:
         - ip: '127.0.0.1'
           hostnames:
