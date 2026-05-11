@@ -28,7 +28,7 @@
               cpu: '4'
               memory: 4G
           volumeMounts:
-            - name: wordpress
+            - name: workspace
               mountPath: /srv
             - name: config
               mountPath: /config

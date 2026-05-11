@@ -1,0 +1,73 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-nginx-config
+  namespace: {{ .Release.Namespace }}
+data:
+  nginx.conf: |
+    worker_processes auto;
+
+    events {
+        worker_connections 1024;
+    }
+
+    http {
+        include /etc/nginx/mime.types;
+        default_type application/octet-stream;
+
+        access_log /var/log/nginx/access.log;
+        error_log /var/log/nginx/error.log error;
+
+        sendfile on;
+        tcp_nopush on;
+        tcp_nodelay on;
+        server_names_hash_bucket_size 128;
+        client_body_buffer_size 50M;
+        client_max_body_size 100M;
+        keepalive_timeout 65;
+
+        upstream php {
+            server 127.0.0.1:9000;
+        }
+
+        server {
+            listen 80 default_server;
+            server_name {{ .Values.VIRTUAL_HOST }} _;
+
+            root {{ .Values.HUB_SERVER_PATH }}/public;
+            index index.php;
+
+            location = /time {
+                default_type text/plain;
+                add_header Cache-Control "public, max-age=5" always;
+                add_header X-Robots-Tag "noindex, nofollow" always;
+                return 200 $msec;
+            }
+
+            location = /public-key {
+                default_type text/plain;
+                add_header Cache-Control "public, max-age=3600" always;
+                add_header X-Robots-Tag "noindex, nofollow" always;
+                return 200 {{ .Values.PUBLIC_KEY | squote }};
+            }
+
+            location / {
+                add_header X-Robots-Tag "noindex, nofollow" always;
+                try_files $uri $uri/ /index.php?$args;
+            }
+
+            location ~ [^/]\.php(/|$) {
+                fastcgi_index index.php;
+                try_files $uri =404;
+                fastcgi_split_path_info ^(.+\.php)(/.+)$;
+                include fastcgi_params;
+                fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+                fastcgi_param HTTP_HOST $host;
+                fastcgi_param HTTP_X_FORWARDED_FOR $http_x_forwarded_for;
+                fastcgi_param HTTP_X_FORWARDED_HOST $http_x_forwarded_host;
+                fastcgi_param HTTP_X_FORWARDED_PROTO $http_x_forwarded_proto;
+                fastcgi_read_timeout 300;
+                fastcgi_pass php;
+            }
+        }
+    }

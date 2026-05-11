@@ -2,15 +2,15 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: hub-server
-  namespace: dh-app
+  name: {{ .Release.Name }}
+  namespace: {{ .Release.Namespace }}
 spec:
   selector:
-    app: hub-server
+    app: {{ .Release.Name }}
   ports:
-    - port: 9000
-      targetPort: 9000
-      name: fastcgi
+    - port: 80
+      targetPort: 80
+      name: http
 ---
 
 apiVersion: apps/v1
@@ -36,17 +36,6 @@ spec:
         redis-client: 'true'
     spec:
       affinity:
-        podAffinity:
-          requiredDuringSchedulingIgnoredDuringExecution:
-            - labelSelector:
-                matchExpressions:
-                  - key: app.kubernetes.io/name
-                    operator: In
-                    values:
-                      - ingress-nginx
-              namespaces:
-                - ingress-nginx
-              topologyKey: kubernetes.io/hostname
         podAntiAffinity:
           requiredDuringSchedulingIgnoredDuringExecution:
             - labelSelector:
@@ -85,9 +74,9 @@ spec:
             - name: HUB_SERVER_INIT
               value: '1'
             - name: PHP_OPCACHE_FILE_CACHE
-              value: {{ ternary "/var/cache/php" "" (eq "production" .Values.WP_ENV) | squote }}
+              value: {{ ternary "/var/cache/php" "" (eq "production" .Values.HUB_SERVER_ENV) | squote }}
             - name: PHP_OPCACHE_VALIDATE_TIMESTAMPS
-              value: {{ ternary "false" "true" (eq "production" .Values.WP_ENV) | squote }}
+              value: {{ ternary "false" "true" (eq "production" .Values.HUB_SERVER_ENV) | squote }}
           image: {{ .Values.HUB_SERVER_IMAGE | squote }}
           command: [ '/etc/cont-init.d/init' ]
           resources:
@@ -98,7 +87,7 @@ spec:
               cpu: '4'
               memory: 2G
           volumeMounts:
-            - name: wordpress
+            - name: workspace
               mountPath: /srv
             - name: config
               mountPath: /config
@@ -122,8 +111,6 @@ spec:
               value: ""
             - name: PHP_OPCACHE_VALIDATE_TIMESTAMPS
               value: "1"
-
-          image: {{ .Values.HUB_SERVER_IMAGE | squote }}
           livenessProbe:
             exec:
               command:
@@ -168,11 +155,39 @@ spec:
             failureThreshold: 30
             periodSeconds: 10
           volumeMounts:
-            - name: wordpress
+            - name: workspace
               mountPath: /srv
             - name: config
               mountPath: /config
               readOnly: true
+        - name: nginx
+          image: 'nginx:1.27.5-alpine'
+          livenessProbe:
+            httpGet:
+              path: /time
+              port: 80
+            periodSeconds: 30
+          ports:
+            - name: http
+              containerPort: 80
+          readinessProbe:
+            httpGet:
+              path: /time
+              port: 80
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              memory: 512Mi
+          volumeMounts:
+            - name: workspace
+              mountPath: /srv
+            - name: nginx-config
+              mountPath: /etc/nginx/nginx.conf
+              readOnly: true
+              subPath: nginx.conf
 
 {{ range $_, $index := untilStep 1 (int .Values.HUB_SERVER_WORKERS) 1 }}
 {{ include "hub.container.worker" (dict "Values" $.Values "index" $index) }}
@@ -186,10 +201,14 @@ spec:
         - key: node.kubernetes.io/pid-pressure
           operator: Exists
       volumes:
-        - name: wordpress
-          hostPath:
-            path: /srv
-            type: DirectoryOrCreate
+        - name: workspace
+          emptyDir: {}
         - name: config
           secret:
             secretName: secrets
+        - name: nginx-config
+          configMap:
+            name: {{ .Release.Name }}-nginx-config
+            items:
+              - key: nginx.conf
+                path: nginx.conf

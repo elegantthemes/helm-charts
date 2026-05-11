@@ -35,17 +35,6 @@ spec:
         redis-client: 'true'
     spec:
       affinity:
-        podAffinity:
-          requiredDuringSchedulingIgnoredDuringExecution:
-            - labelSelector:
-                matchExpressions:
-                  - key: app.kubernetes.io/name
-                    operator: In
-                    values:
-                      - ingress-nginx
-              namespaces:
-                - ingress-nginx
-              topologyKey: kubernetes.io/hostname
         podAntiAffinity:
           requiredDuringSchedulingIgnoredDuringExecution:
             - labelSelector:
@@ -118,8 +107,6 @@ spec:
             failureThreshold: 30
             periodSeconds: 10
           volumeMounts:
-            - name: wordpress
-              mountPath: /srv
             - name: config
               mountPath: /config
               readOnly: true
@@ -131,10 +118,6 @@ spec:
         - key: node.kubernetes.io/pid-pressure
           operator: Exists
       volumes:
-        - name: wordpress
-          hostPath:
-            path: /srv
-            type: DirectoryOrCreate
         - name: config
           secret:
             secretName: secrets
