@@ -18,7 +18,7 @@ apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
   name: ds-server
-  namespace: ds-app
+  namespace: {{ .Release.Namespace }}
 spec:
   selector:
     matchLabels:
@@ -50,17 +50,6 @@ spec:
         redis-client: 'true'
     spec:
       affinity:
-        podAffinity:
-          requiredDuringSchedulingIgnoredDuringExecution:
-            - labelSelector:
-                matchExpressions:
-                  - key: app.kubernetes.io/name
-                    operator: In
-                    values:
-                      - ingress-nginx
-              namespaces:
-                - ingress-nginx
-              topologyKey: kubernetes.io/hostname
         podAntiAffinity:
           requiredDuringSchedulingIgnoredDuringExecution:
             - labelSelector:
@@ -71,15 +60,6 @@ spec:
                         - {{ .Release.Name }}
               namespaces:
                 - {{ .Release.Namespace }}
-              topologyKey: kubernetes.io/hostname
-            - labelSelector:
-                matchExpressions:
-                    - key: app
-                      operator: In
-                      values:
-                        - cloud-screenshot
-              namespaces:
-                - dc-screenshot
               topologyKey: kubernetes.io/hostname
       containers:
         - name: {{ .Release.Name }}
@@ -144,9 +124,7 @@ spec:
           operator: Exists
       volumes:
         - name: wordpress
-          hostPath:
-            path: /srv
-            type: DirectoryOrCreate
+          emptyDir: {}
         - name: config
           secret:
             secretName: secrets
