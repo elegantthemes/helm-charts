@@ -3,21 +3,21 @@ apiVersion: v1
 kind: Service
 metadata:
   name: d5-demo-server
-  namespace: d5d-app
+  namespace: {{ .Release.Namespace }}
 spec:
   selector:
     app: d5-demo-server
   ports:
-    - port: 9000
-      targetPort: 9000
-      name: fastcgi
+    - port: 80
+      targetPort: 80
+      name: http
 ---
 
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: d5-demo-server
-  namespace: d5d-app
+  namespace: {{ .Release.Namespace }}
   labels:
     app: d5-demo-server
 spec:
@@ -35,17 +35,6 @@ spec:
         app: d5-demo-server
     spec:
       affinity:
-        podAffinity:
-          requiredDuringSchedulingIgnoredDuringExecution:
-            - labelSelector:
-                matchExpressions:
-                  - key: app.kubernetes.io/name
-                    operator: In
-                    values:
-                      - ingress-nginx
-              namespaces:
-                - ingress-nginx
-              topologyKey: kubernetes.io/hostname
         podAntiAffinity:
           requiredDuringSchedulingIgnoredDuringExecution:
             - labelSelector:
@@ -55,7 +44,7 @@ spec:
                       values:
                         - d5-demo-server
               namespaces:
-                - d5d-app
+                - {{ .Release.Namespace }}
               topologyKey: kubernetes.io/hostname
       initContainers:
         - name: init
@@ -308,19 +297,48 @@ spec:
               mountPath: /config
               readOnly: true
 
+        - name: nginx
+          image: 'nginx:1.27.5-alpine'
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 80
+            periodSeconds: 30
+          ports:
+            - name: http
+              containerPort: 80
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 80
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              memory: 512Mi
+          volumeMounts:
+            - name: wordpress
+              mountPath: /srv
+            - name: nginx-config
+              mountPath: /etc/nginx/nginx.conf
+              readOnly: true
+              subPath: nginx.conf
+
       volumes:
         - name: wordpress
-          hostPath:
-            path: /srv
-            type: DirectoryOrCreate
+          emptyDir: {}
         - name: demo-mysql
-          hostPath:
-            path: /var/lib/demo-mysql
-            type: DirectoryOrCreate
+          emptyDir: {}
         - name: demo-redis
-          hostPath:
-            path: /var/lib/demo-redis
-            type: DirectoryOrCreate
+          emptyDir: {}
         - name: config
           secret:
             secretName: secrets
+        - name: nginx-config
+          configMap:
+            name: nginx-config
+            items:
+              - key: nginx.conf
+                path: nginx.conf
