@@ -71,9 +71,9 @@ spec:
 
                   export RCLONE_CONFIG=/tmp/rclone.conf
 
-                  rclone sync --fast-list --checksum --transfers 8 --checkers 16 source:{{ .Values.s3_bucket_name_backup_aws_1 }} backup-2:{{ .Values.s3_bucket_name_backup_2 }}
-                  rclone sync --fast-list --checksum --transfers 8 --checkers 16 source:{{ .Values.s3_bucket_name_backup_aws_1 }} backup-3:{{ .Values.s3_bucket_name_backup_3 }}
-                  rclone sync --fast-list --checksum --transfers 8 --checkers 16 source:{{ .Values.s3_bucket_name_backup_aws_1 }} backup-4:{{ .Values.s3_bucket_name_backup_4 }}
+                  rclone sync -v --fast-list --checksum --transfers 8 --checkers 16 source:{{ .Values.s3_bucket_name_backup_aws_1 }} backup-2:{{ .Values.s3_bucket_name_backup_2 }}
+                  rclone sync -v --fast-list --checksum --transfers 8 --checkers 16 source:{{ .Values.s3_bucket_name_backup_aws_1 }} backup-3:{{ .Values.s3_bucket_name_backup_3 }}
+                  rclone sync -v --fast-list --checksum --transfers 8 --checkers 16 source:{{ .Values.s3_bucket_name_backup_aws_1 }} backup-4:{{ .Values.s3_bucket_name_backup_4 }}
               env:
                 - name: SOURCE_ACCESS_KEY_ID
                   valueFrom:
