@@ -448,6 +448,18 @@ entries:
     version: 1.0.0
   cloud-screenshot:
   - apiVersion: v1
+    created: "2026-05-13T19:23:09.289488274Z"
+    description: Elegant Themes Cloud Screenshot Generator
+    digest: 0218ea0699b657bfb5f95dad4bec7abec0c2f295ac95c8ce580a76b8b79b80f5
+    icon: https://bitnami.com/assets/stacks/wordpress/img/wordpress-stack-220x234.png
+    maintainers:
+    - email: dustin@elegantthemes.com
+      name: Elegant Themes
+    name: cloud-screenshot
+    urls:
+    - https://github.com/elegantthemes/helm-charts/releases/download/cloud-screenshot-1.2.1/cloud-screenshot-1.2.1.tgz
+    version: 1.2.1
+  - apiVersion: v1
     created: "2026-05-08T16:53:36.609651035Z"
     description: Elegant Themes Cloud Screenshot Generator
     digest: 7aa2fbecfe889a0b538bfa554471047216337016efaa723cdcc07ddc3381de05
@@ -880,6 +892,18 @@ entries:
     - https://github.com/elegantthemes/helm-charts/releases/download/cloud-screenshot-0.5.0/cloud-screenshot-0.5.0.tgz
     version: 0.5.0
   cloud-server:
+  - apiVersion: v1
+    created: "2026-05-13T19:23:09.51045933Z"
+    description: Elegant Themes Cloud Server
+    digest: dcb9ac661539e7bf40503feb1d6bb90d0462313e763be7c5d37a2890c94fdcf0
+    icon: https://bitnami.com/assets/stacks/wordpress/img/wordpress-stack-220x234.png
+    maintainers:
+    - email: dustin@elegantthemes.com
+      name: Elegant Themes
+    name: cloud-server
+    urls:
+    - https://github.com/elegantthemes/helm-charts/releases/download/cloud-server-1.1.1/cloud-server-1.1.1.tgz
+    version: 1.1.1
   - apiVersion: v1
     created: "2026-05-06T21:39:02.177333171Z"
     description: Elegant Themes Cloud Server
@@ -2073,6 +2097,18 @@ entries:
     version: 0.0.2
   d5-demo-server:
   - apiVersion: v1
+    created: "2026-05-13T19:23:09.705862403Z"
+    description: Divi Demo Server
+    digest: 3597227746c9cdb6394d64a66460d3c988531119de4ddbc3cdb8babec332f1d5
+    icon: https://bitnami.com/assets/stacks/wordpress/img/wordpress-stack-220x234.png
+    maintainers:
+    - email: dustin@elegantthemes.com
+      name: Elegant Themes
+    name: d5-demo-server
+    urls:
+    - https://github.com/elegantthemes/helm-charts/releases/download/d5-demo-server-1.1.1/d5-demo-server-1.1.1.tgz
+    version: 1.1.1
+  - apiVersion: v1
     created: "2026-05-12T07:11:45.41973396Z"
     description: Divi Demo Server
     digest: eb898e6a2035af96dbb0e1ec1a89db6d93ad56e35de0384ac8373acedcb56a5e
@@ -2563,6 +2599,18 @@ entries:
     - https://github.com/elegantthemes/helm-charts/releases/download/gha-runner-scale-set-controller-0.12.1/gha-runner-scale-set-controller-0.12.1.tgz
     version: 0.12.1
   hub-server:
+  - apiVersion: v1
+    created: "2026-05-13T19:23:09.903686202Z"
+    description: Divi Hub Server
+    digest: 172f25d9bbe68e1dd25f56ea754df2f8bc00f6f4a22da0d2174433f0e8772720
+    icon: https://bitnami.com/assets/stacks/wordpress/img/wordpress-stack-220x234.png
+    maintainers:
+    - email: dustin@elegantthemes.com
+      name: Elegant Themes
+    name: hub-server
+    urls:
+    - https://github.com/elegantthemes/helm-charts/releases/download/hub-server-1.3.1/hub-server-1.3.1.tgz
+    version: 1.3.1
   - apiVersion: v1
     created: "2026-05-11T16:56:35.367113031Z"
     description: Divi Hub Server
