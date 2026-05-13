@@ -26,6 +26,11 @@ data:
         client_max_body_size 100M;
         keepalive_timeout 65;
 
+        map $http_x_real_ip $php_client_ip {
+            default $http_x_real_ip;
+            "" $remote_addr;
+        }
+
         upstream php {
             server 127.0.0.1:9000;
         }
@@ -63,9 +68,11 @@ data:
                 include fastcgi_params;
                 fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
                 fastcgi_param HTTP_HOST $host;
+                fastcgi_param HTTP_X_REAL_IP $php_client_ip;
                 fastcgi_param HTTP_X_FORWARDED_FOR $http_x_forwarded_for;
                 fastcgi_param HTTP_X_FORWARDED_HOST $http_x_forwarded_host;
                 fastcgi_param HTTP_X_FORWARDED_PROTO $http_x_forwarded_proto;
+                fastcgi_param REMOTE_ADDR $remote_addr;
                 fastcgi_read_timeout 300;
                 fastcgi_pass php;
             }
