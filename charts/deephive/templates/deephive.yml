@@ -22,8 +22,8 @@ spec:
     - ReadWriteOnce
   resources:
     requests:
-      storage: 250Gi
-  storageClassName: do-block-storage
+      storage: {{ .Values.WORKSPACE_STORAGE_SIZE | squote }}
+  storageClassName: {{ .Values.WORKSPACE_STORAGE_CLASS_NAME | squote }}
 ---
 
 apiVersion: apps/v1
@@ -49,17 +49,6 @@ spec:
         redis-client: 'true'
     spec:
       affinity:
-        podAffinity:
-          requiredDuringSchedulingIgnoredDuringExecution:
-            - labelSelector:
-                matchExpressions:
-                  - key: app.kubernetes.io/name
-                    operator: In
-                    values:
-                      - ingress-nginx
-              namespaces:
-                - ingress-nginx
-              topologyKey: kubernetes.io/hostname
         podAntiAffinity:
           requiredDuringSchedulingIgnoredDuringExecution:
             - labelSelector:
@@ -179,9 +168,7 @@ spec:
           effect: NoSchedule
       volumes:
         - name: wordpress
-          hostPath:
-            path: /srv
-            type: DirectoryOrCreate
+          emptyDir: {}
         - name: workspace
           persistentVolumeClaim:
             claimName: {{ .Release.Name }}-workspace
