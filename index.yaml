@@ -2182,6 +2182,18 @@ entries:
     version: 1.0.0
   deephive:
   - apiVersion: v1
+    created: "2026-05-15T08:53:05.839399882Z"
+    description: DeepHive
+    digest: b652cfee43251f33a3793311ebe60133011e0a0a0c3447fa5f5fe2f588892220
+    icon: https://raw.githubusercontent.com/nodejs/nodejs.org/main/public/static/images/logo-hexagon.svg
+    maintainers:
+    - email: dustin@elegantthemes.com
+      name: Elegant Themes
+    name: deephive
+    urls:
+    - https://github.com/elegantthemes/helm-charts/releases/download/deephive-1.1.0/deephive-1.1.0.tgz
+    version: 1.1.0
+  - apiVersion: v1
     created: "2026-01-26T18:23:24.503858388Z"
     description: DeepHive
     digest: 09c0c1b426f432e7a89159da182e50bb11c1adaa34145405e042f9ac8bfa0e10
