@@ -2351,6 +2351,18 @@ entries:
     version: 1.0.0
   deephive-chatbot:
   - apiVersion: v1
+    created: "2026-05-19T05:49:29.417237052Z"
+    description: DeepHive Chatbot
+    digest: 92f02bec1286097bf15d09c59d168dc5e6ae0c00f893d997c976046e889238b4
+    icon: https://raw.githubusercontent.com/nodejs/nodejs.org/main/public/static/images/logo-hexagon.svg
+    maintainers:
+    - email: dustin@elegantthemes.com
+      name: Elegant Themes
+    name: deephive-chatbot
+    urls:
+    - https://github.com/elegantthemes/helm-charts/releases/download/deephive-chatbot-1.1.0/deephive-chatbot-1.1.0.tgz
+    version: 1.1.0
+  - apiVersion: v1
     created: "2026-03-04T19:44:18.195351359Z"
     description: DeepHive Chatbot
     digest: cf867b2ddfac47dfb0491c9a6d40794361803e72787bf800d0c70bb06989b08e
