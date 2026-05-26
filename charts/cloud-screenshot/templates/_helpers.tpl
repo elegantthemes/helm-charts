@@ -15,6 +15,8 @@
               value: {{ .Values.CLOUD_SCREENSHOT_VERSION | squote }}
             - name: CLOUD_SCREENSHOT_WORKER
               value: '1'
+            - name: PHP_MEMORY_LIMIT
+              value: {{ .Values.PHP_MEMORY_LIMIT | squote }}
             - name: PHP_OPCACHE_FILE_CACHE
               value: {{ ternary "/var/cache/php" "" (eq "production" .Values.WP_ENV) | squote }}
             - name: PHP_OPCACHE_VALIDATE_TIMESTAMPS
