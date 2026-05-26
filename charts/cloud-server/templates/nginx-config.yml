@@ -29,11 +29,6 @@ data:
         limit_conn_zone $binary_remote_addr zone=conn_limit_per_ip:10m;
         limit_req_zone $binary_remote_addr zone=req_limit_per_ip:10m rate=8r/s;
 
-        map $http_origin $cors_origin {
-            default $http_origin;
-            "" "*";
-        }
-
         map $http_x_forwarded_for $forwarded_client_ip {
             ~^\s*([^,\s]+) $1;
             default "";
@@ -65,11 +60,9 @@ data:
             root {{ .Values.INSTALL_PATH }}/web;
             index index.html index.htm index.php;
 
-            add_header Access-Control-Allow-Origin $cors_origin always;
+            add_header Access-Control-Allow-Origin "*" always;
             add_header Access-Control-Allow-Methods "GET, POST, PUT, PATCH, DELETE, OPTIONS" always;
             add_header Access-Control-Allow-Headers "DNT,X-CustomHeader,Keep-Alive,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Authorization,X-Product-Version" always;
-            add_header Access-Control-Allow-Credentials "true" always;
-            add_header Vary Origin always;
 
             limit_conn conn_limit_per_ip 8;
             limit_req zone=req_limit_per_ip burst=24 nodelay;
