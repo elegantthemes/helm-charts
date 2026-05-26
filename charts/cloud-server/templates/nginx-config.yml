@@ -113,6 +113,11 @@ data:
                 try_files $uri =404;
                 fastcgi_split_path_info ^(.+\.php)(/.+)$;
                 include fastcgi_params;
+                # Allow larger upstream response headers from PHP-FPM, such as
+                # JWT/cookie-heavy auth responses, without tripping nginx defaults.
+                fastcgi_buffer_size 64k;
+                fastcgi_buffers 8 64k;
+                fastcgi_busy_buffers_size 128k;
                 fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
                 fastcgi_param HTTP_HOST $host;
                 fastcgi_param HTTP_X_REAL_IP $php_client_ip;
