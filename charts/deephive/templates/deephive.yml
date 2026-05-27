@@ -69,6 +69,10 @@ spec:
               namespaces:
                 - dc-screenshot
               topologyKey: kubernetes.io/hostname
+{{- if .Values.NODE_SELECTOR_HOSTNAME }}
+      nodeSelector:
+        kubernetes.io/hostname: {{ .Values.NODE_SELECTOR_HOSTNAME | squote }}
+{{- end }}
       containers:
         - name: {{ .Release.Name }}
           env:
