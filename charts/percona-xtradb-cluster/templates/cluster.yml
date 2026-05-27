@@ -254,7 +254,7 @@ spec:
         memory: 750M
         cpu: 500m
   backup:
-    image: percona/percona-xtrabackup:8.0.35-34.1
+    image: percona/percona-xtrabackup:8.0.35-35
     ttlSecondsAfterFinished: {{ .Values.backup.ttlSecondsAfterFinished }}
     pitr:
       enabled: true
