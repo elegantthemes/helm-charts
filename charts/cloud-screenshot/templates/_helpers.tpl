@@ -15,6 +15,8 @@
               value: {{ .Values.CLOUD_SCREENSHOT_VERSION | squote }}
             - name: CLOUD_SCREENSHOT_WORKER
               value: '1'
+            - name: REDIS_HOST
+              value: {{ .Values.REDIS_HOST | squote }}
             - name: PHP_MEMORY_LIMIT
               value: {{ .Values.PHP_MEMORY_LIMIT | squote }}
             - name: PHP_OPCACHE_FILE_CACHE
