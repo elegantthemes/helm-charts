@@ -202,7 +202,13 @@ spec:
           operator: Exists
       volumes:
         - name: workspace
+{{- if .Values.WORKSPACE_HOST_PATH }}
+          hostPath:
+            path: {{ .Values.WORKSPACE_HOST_PATH | squote }}
+            type: DirectoryOrCreate
+{{- else }}
           emptyDir: {}
+{{- end }}
         - name: config
           secret:
             secretName: secrets
