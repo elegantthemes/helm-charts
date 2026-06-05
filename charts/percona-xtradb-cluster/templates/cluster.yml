@@ -6,29 +6,32 @@ metadata:
     {{ .Values.label_name }}: {{ .Values.label_value }}
     release: {{ .Values.label_value }}
   finalizers:
-    - delete-pxc-pods-in-order
+    - percona.com/delete-pxc-pods-in-order
 #    - delete-pxc-pvc
 #  annotations:
 #    percona.com/issue-vault-token: "true"
 spec:
   # Set to true to pause the cluster.
   pause: false
-  crVersion: 1.19.1
+  crVersion: 1.20.0
   secretsName: {{ .Values.secrets_name }}
   sslSecretName: {{ .Values.ssl_secrets_name }}
   sslInternalSecretName: {{ .Values.ssl_internal_secrets_name }}
   vaultSecretName: {{ .Values.vault_secrets_name }}
   logCollectorSecretName: {{ .Values.secrets_name }}-log-collector
-  initImage: percona/percona-xtradb-cluster-operator:1.19.1
+  initContainer:
+    image: percona/percona-xtradb-cluster-operator:1.20.0
+  tls:
+    enabled: true
   allowUnsafeConfigurations: false
   updateStrategy: RollingUpdate
   upgradeOptions:
   # versionServiceEndpoint: https://check.percona.com
-    apply: Never
+    apply: disabled
   # schedule: "0 4 * * *"
   pxc:
     size: 3
-    image: percona/percona-xtradb-cluster:8.0.44-35.1
+    image: percona/percona-xtradb-cluster:8.0.45-36.1
     autoRecovery: true
 {{- with .Values.pxc_expose }}
     expose:
@@ -101,7 +104,7 @@ spec:
   haproxy:
     enabled: true
     size: 3
-    image: percona/haproxy:2.8.17
+    image: percona/haproxy:2.8.18-1
 #    replicasServiceEnabled: false
 #    imagePullPolicy: Always
 #    schedulerName: mycustom-scheduler
@@ -228,7 +231,7 @@ spec:
 #     service.beta.kubernetes.io/aws-load-balancer-backend-protocol: http
   logcollector:
     enabled: true
-    image: percona/fluentbit:4.0.1-1
+    image: percona/fluentbit:5.0.6-1
 #    configuration: |
 #      [OUTPUT]
 #           Name  es
@@ -254,7 +257,7 @@ spec:
         memory: 750M
         cpu: 500m
   backup:
-    image: percona/percona-xtrabackup:8.0.35-35
+    image: percona/percona-xtrabackup:8.0.35-35.1
     ttlSecondsAfterFinished: {{ .Values.backup.ttlSecondsAfterFinished }}
     pitr:
       enabled: true

@@ -38,7 +38,7 @@ backup:
   ttlSecondsAfterFinished: 3600
 pmm:
   enabled: false
-  image: percona/pmm-client:3.5.0
+  image: percona/pmm-client:3.8.0
   serverHost: monitoring-service
   serverUser: admin
 backup_replication:
