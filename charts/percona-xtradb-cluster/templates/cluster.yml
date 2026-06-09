@@ -57,7 +57,7 @@ spec:
       [sst]
       xbstream-opts = --decompress
       [xtrabackup]
-      compress = lz4
+      compress = zstd
     resources:
 {{ toYaml .Values.pxc.resources | indent 6 }}
 #        ephemeral-storage: 1G
