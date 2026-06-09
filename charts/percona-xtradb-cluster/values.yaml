@@ -40,7 +40,7 @@ pxc:
     limits:
       memory: 8G
       cpu: 6000m
-  innodb_redo_log_capacity: 104857600
+  innodb_redo_log_capacity: "104857600"
 pitr:
   resources: {}
 backup:
