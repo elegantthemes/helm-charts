@@ -458,6 +458,18 @@ entries:
     urls:
     - https://github.com/elegantthemes/helm-charts/releases/download/auth-server-1.0.0/auth-server-1.0.0.tgz
     version: 1.0.0
+  bots-server:
+  - apiVersion: v1
+    created: "2026-06-12T17:08:38.013273812Z"
+    description: Elegant Themes legacy bots-server
+    digest: 723e1603eda1044d3b72391d8f7f284ca447b99f2baac9fd9f313000a709a6fa
+    maintainers:
+    - email: dustin@elegantthemes.com
+      name: Elegant Themes
+    name: bots-server
+    urls:
+    - https://github.com/elegantthemes/helm-charts/releases/download/bots-server-0.1.0/bots-server-0.1.0.tgz
+    version: 0.1.0
   cloud-screenshot:
   - apiVersion: v1
     created: "2026-06-01T19:50:20.86746067Z"
