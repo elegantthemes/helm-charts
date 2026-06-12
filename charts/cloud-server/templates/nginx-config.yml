@@ -63,6 +63,7 @@ data:
             add_header Access-Control-Allow-Origin "*" always;
             add_header Access-Control-Allow-Methods "GET, POST, PUT, PATCH, DELETE, OPTIONS" always;
             add_header Access-Control-Allow-Headers "DNT,X-CustomHeader,Keep-Alive,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Authorization,X-Product-Version" always;
+            add_header Access-Control-Max-Age "3600" always;
 
             limit_conn conn_limit_per_ip 8;
             limit_req zone=req_limit_per_ip burst=24 nodelay;
