@@ -139,6 +139,8 @@ spec:
               value: {{ .Values.CLOUD_SCREENSHOT_REPO_URL | squote }}
             - name: IMAGE_VERSION
               value: {{ .Values.CLOUD_SCREENSHOT_VERSION | squote }}
+            - name: CLOUD_SCREENSHOT_WORKER_CAPACITY
+              value: {{ sub (int .Values.CLOUD_SCREENSHOT_WORKERS) 1 | squote }}
             - name: REDIS_HOST
               value: {{ .Values.REDIS_HOST | squote }}
             - name: PHP_MEMORY_LIMIT
