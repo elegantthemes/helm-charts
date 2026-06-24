@@ -4,6 +4,8 @@ kind: Service
 metadata:
   name: {{ .Release.Name }}
   namespace: {{ .Release.Namespace }}
+  labels:
+    app: {{ .Release.Name }}
 spec:
   selector:
     app: {{ .Release.Name }}
@@ -11,6 +13,25 @@ spec:
     - port: 80
       targetPort: 80
       name: http
+    - port: 9090
+      targetPort: 9090
+      name: metrics
+---
+
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ .Release.Name }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: {{ .Release.Name }}
+spec:
+  selector:
+    matchLabels:
+      app: {{ .Release.Name }}
+  endpoints:
+    - path: /metrics
+      port: metrics
 ---
 
 apiVersion: apps/v1
@@ -137,6 +158,8 @@ spec:
           ports:
             - name: http
               containerPort: 80
+            - name: metrics
+              containerPort: 9090
           readinessProbe:
             httpGet:
               path: /healthz

@@ -54,6 +54,25 @@ data:
         }
 
         server {
+            listen 9090;
+            server_name _;
+
+            location = /metrics {
+                access_log off;
+                fastcgi_index metrics.php;
+                include fastcgi_params;
+                fastcgi_param SCRIPT_FILENAME {{ .Values.INSTALL_PATH }}/metrics.php;
+                fastcgi_param SCRIPT_NAME /metrics.php;
+                fastcgi_param REQUEST_METHOD GET;
+                fastcgi_pass php;
+            }
+
+            location / {
+                return 404;
+            }
+        }
+
+        server {
             listen 80 default_server;
             server_name {{ .Values.VIRTUAL_HOST }} _;
 
