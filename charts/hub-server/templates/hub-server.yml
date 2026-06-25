@@ -4,6 +4,8 @@ kind: Service
 metadata:
   name: {{ .Release.Name }}
   namespace: {{ .Release.Namespace }}
+  labels:
+    app: {{ .Release.Name }}
 spec:
   selector:
     app: {{ .Release.Name }}
@@ -13,6 +15,29 @@ spec:
       name: http
 ---
 
+{{- if .Values.SERVICE_MONITOR_ENABLED }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ .Release.Name }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: {{ .Release.Name }}
+spec:
+  selector:
+    matchLabels:
+      app: {{ .Release.Name }}
+  endpoints:
+    - path: /metrics
+      port: http
+      authorization:
+        type: Bearer
+        credentials:
+          name: secrets
+          key: DIVI_METRICS_ENDPOINT_TOKEN
+---
+
+{{- end }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
