@@ -2792,6 +2792,18 @@ entries:
     version: 0.12.1
   hub-server:
   - apiVersion: v1
+    created: "2026-06-25T20:29:11.358625891Z"
+    description: Divi Hub Server
+    digest: 5b268f58968a91916d26bbcd2847285f5982d7379cbb83d6031910e6c21706c2
+    icon: https://bitnami.com/assets/stacks/wordpress/img/wordpress-stack-220x234.png
+    maintainers:
+    - email: dustin@elegantthemes.com
+      name: Elegant Themes
+    name: hub-server
+    urls:
+    - https://github.com/elegantthemes/helm-charts/releases/download/hub-server-1.3.4/hub-server-1.3.4.tgz
+    version: 1.3.4
+  - apiVersion: v1
     created: "2026-06-02T20:30:50.513775662Z"
     description: Divi Hub Server
     digest: b4784dc4edbb849fcc04018ebd1dae02ad3d562c948e77ec6eb7cd336f69242b
