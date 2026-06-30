@@ -26,25 +26,12 @@ data:
         client_max_body_size 100M;
         proxy_read_timeout 300;
 
-        map $http_x_forwarded_for $forwarded_client_ip {
-            ~^\s*([^,\s]+) $1;
-            default "";
-        }
-
-        map $http_cf_connecting_ip $cloudflare_client_ip {
-            default $http_cf_connecting_ip;
-            "" $forwarded_client_ip;
-        }
-
-        map $cloudflare_client_ip $canonical_client_ip {
-            default $cloudflare_client_ip;
-            "" $http_x_real_ip;
-        }
-
-        map $canonical_client_ip $php_client_ip {
-            default $canonical_client_ip;
-            "" $remote_addr;
-        }
+        # Traefik validates the edge connection and supplies the canonical client
+        # address in X-Real-IP. Only trust that header from cluster proxy peers.
+{{- range .Values.TRUSTED_PROXY_CIDRS }}
+        set_real_ip_from {{ . }};
+{{- end }}
+        real_ip_header X-Real-IP;
 
         upstream php {
             server 127.0.0.1:9000;
@@ -89,11 +76,10 @@ data:
                 include fastcgi_params;
                 fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
                 fastcgi_param HTTP_HOST $host;
-                fastcgi_param HTTP_X_REAL_IP $php_client_ip;
+                fastcgi_param HTTP_X_REAL_IP $remote_addr;
                 fastcgi_param HTTP_X_FORWARDED_FOR $http_x_forwarded_for;
                 fastcgi_param HTTP_X_FORWARDED_HOST $http_x_forwarded_host;
                 fastcgi_param HTTP_X_FORWARDED_PROTO $http_x_forwarded_proto;
-                fastcgi_param REMOTE_ADDR $php_client_ip;
                 fastcgi_read_timeout 60;
                 fastcgi_pass php;
             }
