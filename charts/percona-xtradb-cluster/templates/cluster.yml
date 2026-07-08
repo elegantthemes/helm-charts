@@ -54,6 +54,9 @@ spec:
       wsrep_sync_wait = 7
       binlog_expire_logs_seconds=259200
       innodb_redo_log_capacity={{ .Values.pxc.innodb_redo_log_capacity }}
+{{- range .Values.pxc.mysql_configuration }}
+      {{ . }}
+{{- end }}
       [sst]
       xbstream-opts = --decompress
       [xtrabackup]

@@ -41,6 +41,7 @@ pxc:
       memory: 8G
       cpu: 6000m
   innodb_redo_log_capacity: "104857600"
+  mysql_configuration: []
 pitr:
   resources: {}
 backup:
