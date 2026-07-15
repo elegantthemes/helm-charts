@@ -2748,6 +2748,16 @@ entries:
     urls:
     - https://github.com/elegantthemes/helm-charts/releases/download/et-dot-com-server-1.0.0/et-dot-com-server-1.0.0.tgz
     version: 1.0.0
+  gha-runner-autoscaler:
+  - apiVersion: v2
+    created: "2026-07-15T17:27:04.089316061Z"
+    description: GitHub Actions runner node autoscaler
+    digest: 3dc3ab0075ecc90ba7afcef2ca7055ee809d1e5764538281a6c9294edcd83af3
+    name: gha-runner-autoscaler
+    type: application
+    urls:
+    - https://github.com/elegantthemes/helm-charts/releases/download/gha-runner-autoscaler-0.1.0/gha-runner-autoscaler-0.1.0.tgz
+    version: 0.1.0
   gha-runner-scale-set:
   - apiVersion: v2
     appVersion: 0.13.0
