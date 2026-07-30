@@ -1,7 +1,9 @@
 affinity: {}
 clusterRoleName: gha-runner-autoscaler
 configMapName: gha-runner-autoscaler
+dryRun: true
 image: elegantthemes/gha-runner-autoscaler:26.7.15
+imageVersion: 0.1.2
 secretName: gha-runner-autoscaler
 
 resources:
@@ -11,3 +13,5 @@ resources:
   requests:
     cpu: 50m
     memory: 64Mi
+
+scaleDownEnabled: false

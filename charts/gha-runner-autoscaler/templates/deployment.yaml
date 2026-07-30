@@ -28,6 +28,12 @@ spec:
             - configMapRef:
                 name: {{ .Values.configMapName }}
           env:
+            - name: DRY_RUN
+              value: {{ .Values.dryRun | quote }}
+            - name: IMAGE_VERSION
+              value: {{ .Values.imageVersion | quote }}
+            - name: RUNNER_SCALE_DOWN_ENABLED
+              value: {{ .Values.scaleDownEnabled | quote }}
             - name: LINODE_TOKEN
               valueFrom:
                 secretKeyRef:
