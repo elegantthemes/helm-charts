@@ -21,6 +21,12 @@ spec:
             pathType: Prefix
             backend:
               service:
+{{- if .Values.MAINTENANCE_MODE }}
+                name: {{ .Release.Name }}-maintenance
+                port:
+                  number: 80
+{{- else }}
                 name: {{ .Release.Name }}
                 port:
                   number: 9999
+{{- end }}
