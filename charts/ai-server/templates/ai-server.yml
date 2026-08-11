@@ -3,6 +3,8 @@ kind: Service
 metadata:
   name: {{ .Release.Name }}
   namespace: {{ .Release.Namespace }}
+  labels:
+    app: {{ .Release.Name }}
 spec:
   selector:
     app: {{ .Release.Name }}
@@ -10,6 +12,9 @@ spec:
     - port: 9999
       targetPort: 9999
       name: nodejs
+    - port: 9090
+      targetPort: 9090
+      name: metrics
 ---
 
 apiVersion: apps/v1
@@ -83,6 +88,8 @@ spec:
           ports:
             - name: nodejs
               containerPort: 9999
+            - name: metrics
+              containerPort: 9090
           readinessProbe:
             httpGet:
               path: /healthz
