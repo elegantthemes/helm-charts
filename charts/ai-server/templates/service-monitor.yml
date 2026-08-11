@@ -1,0 +1,17 @@
+{{- if .Values.METRICS_SERVICE_MONITOR_ENABLED }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ .Release.Name }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: {{ .Release.Name }}
+spec:
+  selector:
+    matchLabels:
+      app: {{ .Release.Name }}
+  endpoints:
+    - path: /metrics
+      port: metrics
+      interval: {{ .Values.METRICS_SCRAPE_INTERVAL | squote }}
+{{- end }}
