@@ -44,6 +44,8 @@ spec:
       app: {{ .Release.Name }}
   template:
     metadata:
+      annotations:
+        checksum/env-file: {{ required "ENV_FILE is required" .Values.ENV_FILE | sha256sum | quote }}
       labels:
         app: {{ .Release.Name }}
         redis-client: 'true'
