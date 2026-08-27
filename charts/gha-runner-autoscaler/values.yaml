@@ -15,3 +15,9 @@ resources:
     memory: 64Mi
 
 scaleDownEnabled: false
+
+monitoring:
+  enabled: false
+  scrapeInterval: 30s
+  manualReviewAlertFor: 5m
+  runbookUrl: https://github.com/elegantthemes/gha-runner-autoscaler#manual-review-alert

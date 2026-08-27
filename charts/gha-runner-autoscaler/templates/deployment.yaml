@@ -39,11 +39,6 @@ spec:
                 secretKeyRef:
                   name: {{ .Values.secretName }}
                   key: LINODE_TOKEN
-            - name: RANCHER_REGISTRATION_COMMAND
-              valueFrom:
-                secretKeyRef:
-                  name: {{ .Values.secretName }}
-                  key: RANCHER_REGISTRATION_COMMAND
             - name: RANCHER_TOKEN
               valueFrom:
                 secretKeyRef:

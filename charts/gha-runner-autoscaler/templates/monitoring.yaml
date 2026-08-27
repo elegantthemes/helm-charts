@@ -1,0 +1,54 @@
+{{- if .Values.monitoring.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: {{ .Release.Name }}
+spec:
+  selector:
+    app: {{ .Release.Name }}
+  ports:
+    - name: metrics
+      port: 8080
+      targetPort: http
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ .Release.Name }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: {{ .Release.Name }}
+spec:
+  selector:
+    matchLabels:
+      app: {{ .Release.Name }}
+  endpoints:
+    - path: /metrics
+      port: metrics
+      interval: {{ .Values.monitoring.scrapeInterval | quote }}
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: {{ .Release.Name }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    source: prometheus
+spec:
+  groups:
+    - name: {{ .Release.Name }}.rules
+      rules:
+        - alert: GhaRunnerAutoscalerManualReviewRequired
+          expr: gha_node_autoscaler_manual_review_resources > 0
+          for: {{ .Values.monitoring.manualReviewAlertFor | quote }}
+          labels:
+            severity: critical
+            source: et
+          annotations:
+            summary: GitHub Actions runner nodes require manual review
+            description: The gha-runner-autoscaler has detected one or more stale or ambiguously correlated resources. Runner scale-up may be blocked by the hard node limit.
+            runbook_url: {{ .Values.monitoring.runbookUrl | quote }}
+{{- end }}
