@@ -1,7 +1,26 @@
+{{- $intakeCutover := and .Values.INTAKE_ENABLED .Values.INTAKE_CUTOVER }}
 apiVersion: v1
 kind: Service
 metadata:
   name: {{ .Release.Name }}
+  namespace: {{ .Release.Namespace }}
+spec:
+  selector:
+{{- if $intakeCutover }}
+    app: {{ .Release.Name }}-intake
+{{- else }}
+    app: {{ .Release.Name }}
+{{- end }}
+  ports:
+    - port: {{ .Values.PORT }}
+      targetPort: {{ .Values.PORT }}
+      name: nodejs
+{{- if $intakeCutover }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-consumer
   namespace: {{ .Release.Namespace }}
 spec:
   selector:
@@ -10,6 +29,7 @@ spec:
     - port: {{ .Values.PORT }}
       targetPort: {{ .Values.PORT }}
       name: nodejs
+{{- end }}
 ---
 
 apiVersion: v1
@@ -48,8 +68,12 @@ spec:
         checksum/env-file: {{ required "ENV_FILE is required" .Values.ENV_FILE | sha256sum | quote }}
       labels:
         app: {{ .Release.Name }}
+{{- if .Values.INTAKE_ENABLED }}
+        deephive/role: consumer
+{{- end }}
         redis-client: 'true'
     spec:
+      terminationGracePeriodSeconds: {{ .Values.CONSUMER_TERMINATION_GRACE_SECONDS | default 1800 }}
       affinity:
         podAntiAffinity:
           requiredDuringSchedulingIgnoredDuringExecution:
@@ -92,6 +116,14 @@ spec:
               value: {{ .Values.DEEPHIVE_VERSION | squote }}
             - name: GIT_REF
               value: {{ .Values.GIT_REF | squote }}
+{{- if .Values.INTAKE_ENABLED }}
+            - name: DEEPHIVE_ROLE
+              value: consumer
+{{- end }}
+{{- if $intakeCutover }}
+            - name: DEEPHIVE_SERVE_INTAKE
+              value: 'false'
+{{- end }}
 
           image: {{ .Values.DEEPHIVE_IMAGE | squote }}
           livenessProbe:

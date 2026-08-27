@@ -1,0 +1,128 @@
+{{- if .Values.INTAKE_ENABLED }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-intake
+  namespace: {{ .Release.Namespace }}
+spec:
+  selector:
+    app: {{ .Release.Name }}-intake
+  ports:
+    - port: {{ .Values.PORT }}
+      targetPort: {{ .Values.PORT }}
+      name: nodejs
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-intake
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: {{ .Release.Name }}-intake
+    deephive/role: intake
+spec:
+  replicas: {{ .Values.INTAKE_REPLICAS | default 2 }}
+  strategy:
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: {{ .Release.Name }}-intake
+  template:
+    metadata:
+      annotations:
+        checksum/env-file: {{ required "ENV_FILE is required" .Values.ENV_FILE | sha256sum | quote }}
+      labels:
+        app: {{ .Release.Name }}-intake
+        deephive/role: intake
+        redis-client: 'true'
+    spec:
+      terminationGracePeriodSeconds: {{ .Values.INTAKE_TERMINATION_GRACE_SECONDS | default 60 }}
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                    - key: app
+                      operator: In
+                      values:
+                        - {{ .Release.Name }}-intake
+                topologyKey: kubernetes.io/hostname
+            - weight: 50
+              podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                    - key: app
+                      operator: In
+                      values:
+                        - cloud-screenshot
+                namespaces:
+                  - dc-screenshot
+                topologyKey: kubernetes.io/hostname
+      containers:
+        - name: {{ .Release.Name }}-intake
+          env:
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+            - name: DEEPHIVE_PATH
+              value: {{ .Values.INSTALL_PATH | squote }}
+            - name: VIRTUAL_HOST
+              value: {{ .Values.VIRTUAL_HOST | squote }}
+            - name: DEEPHIVE_REPO_URL
+              value: {{ .Values.DEEPHIVE_REPO_URL | squote }}
+            - name: IMAGE_VERSION
+              value: {{ .Values.DEEPHIVE_VERSION | squote }}
+            - name: GIT_REF
+              value: {{ .Values.GIT_REF | squote }}
+            - name: DEEPHIVE_ROLE
+              value: intake
+          image: {{ .Values.DEEPHIVE_IMAGE | squote }}
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: {{ .Values.PORT }}
+              scheme: HTTP
+            periodSeconds: 30
+          ports:
+            - name: nodejs
+              containerPort: {{ .Values.PORT }}
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: {{ .Values.PORT }}
+              scheme: HTTP
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: '1'
+              memory: {{ .Values.INTAKE_MEMORY_LIMIT | default "1Gi" | squote }}
+          startupProbe:
+            exec:
+              command:
+                - cat
+                - {{ .Values.INSTALL_PATH }}/dist/healthz
+            initialDelaySeconds: 60
+            failureThreshold: 60
+            periodSeconds: 5
+            timeoutSeconds: 3
+          volumeMounts:
+            - name: wordpress
+              mountPath: /srv
+            - name: config
+              mountPath: /config
+              readOnly: true
+      volumes:
+        - name: wordpress
+          emptyDir: {}
+        - name: config
+          secret:
+            secretName: secrets
+{{- end }}

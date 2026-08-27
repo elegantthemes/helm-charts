@@ -1,3 +1,4 @@
+{{- $intakeCutover := and .Values.INTAKE_ENABLED .Values.INTAKE_CUTOVER }}
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -15,6 +16,36 @@ spec:
     - host: {{ .Values.VIRTUAL_HOST }}
       http:
         paths:
+{{- if $intakeCutover }}
+          - path: /admin
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ .Release.Name }}-consumer
+                port:
+                  number: {{ .Values.PORT }}
+          - path: /graph
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ .Release.Name }}-consumer
+                port:
+                  number: {{ .Values.PORT }}
+          - path: /stream
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ .Release.Name }}-consumer
+                port:
+                  number: {{ .Values.PORT }}
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ .Release.Name }}-consumer
+                port:
+                  number: {{ .Values.PORT }}
+{{- end }}
           - path: /
             pathType: Prefix
             backend:
