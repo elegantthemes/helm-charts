@@ -2846,6 +2846,15 @@ entries:
     version: 1.0.0
   gha-runner-autoscaler:
   - apiVersion: v2
+    created: "2026-08-27T19:34:39.866835133Z"
+    description: GitHub Actions runner node autoscaler
+    digest: baabf4dc6718f8c9cf5cdc6c33dea618ba43e65241197a2134befaffa8cf105b
+    name: gha-runner-autoscaler
+    type: application
+    urls:
+    - https://github.com/elegantthemes/helm-charts/releases/download/gha-runner-autoscaler-0.1.4/gha-runner-autoscaler-0.1.4.tgz
+    version: 0.1.4
+  - apiVersion: v2
     created: "2026-08-04T18:13:13.655572691Z"
     description: GitHub Actions runner node autoscaler
     digest: aa2c22994c189349ef9e0129ca1bdd4b9a0c29b649da0b32b74becd8ae2674f4
@@ -4463,4 +4472,4 @@ entries:
     urls:
     - https://github.com/elegantthemes/helm-charts/releases/download/percona-xtradb-cluster-operator-1.0.2/percona-xtradb-cluster-operator-1.0.2.tgz
     version: 1.0.2
-generated: "2026-08-19T09:17:08.331096843Z"
+generated: "2026-08-27T19:34:39.867360193Z"
