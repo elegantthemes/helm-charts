@@ -15,11 +15,12 @@ WORKSPACE_ROOT:
 WORKSPACE_STORAGE_CLASS_NAME: linode-block-storage
 WORKSPACE_STORAGE_SIZE: 250Gi
 
-# Intake vs consumer split (DeepHive#164). Keep both false until:
-# 1. DeepHive app version includes `yarn start:intake`
-# 2. deephive image starts s6 services from DEEPHIVE_ROLE
-# Then: INTAKE_ENABLED=true (warm intake pods, Slack still on consumer),
-# then INTAKE_CUTOVER=true (Ingress / → intake, consumer DEEPHIVE_SERVE_INTAKE=false).
+# Intake vs consumer (DeepHive#164).
+# Discord login is only `intake.ts`. INTAKE_ENABLED=false with a current app tag
+# takes Discord down (consumer app.ts does not client.login).
+# Slack HTTP can stay on the consumer until INTAKE_CUTOVER.
+# Chart default is false so `helm template` matches today’s one Deployment;
+# staging Terraform sets INTAKE_ENABLED=true when this chart ships.
 INTAKE_ENABLED: false
 INTAKE_CUTOVER: false
 INTAKE_REPLICAS: 2
