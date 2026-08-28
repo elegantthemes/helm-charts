@@ -15,8 +15,7 @@ WORKSPACE_ROOT:
 WORKSPACE_STORAGE_CLASS_NAME: linode-block-storage
 WORKSPACE_STORAGE_SIZE: 250Gi
 
-# Intake vs consumer (DeepHive#164). Ingress / → intake Service.
-# First apply: Slack/Discord down until intake pods are Ready.
+# Intake Deployment (DeepHive#164). Ingress / → intake Service.
 INTAKE_REPLICAS: 2
 INTAKE_MEMORY_LIMIT: 1Gi
 INTAKE_TERMINATION_GRACE_SECONDS: 60
