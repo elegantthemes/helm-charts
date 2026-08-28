@@ -5,6 +5,19 @@ metadata:
   namespace: {{ .Release.Namespace }}
 spec:
   selector:
+    app: {{ .Release.Name }}-intake
+  ports:
+    - port: {{ .Values.PORT }}
+      targetPort: {{ .Values.PORT }}
+      name: nodejs
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-consumer
+  namespace: {{ .Release.Namespace }}
+spec:
+  selector:
     app: {{ .Release.Name }}
   ports:
     - port: {{ .Values.PORT }}
@@ -48,8 +61,10 @@ spec:
         checksum/env-file: {{ required "ENV_FILE is required" .Values.ENV_FILE | sha256sum | quote }}
       labels:
         app: {{ .Release.Name }}
+        deephive/role: consumer
         redis-client: 'true'
     spec:
+      terminationGracePeriodSeconds: {{ .Values.CONSUMER_TERMINATION_GRACE_SECONDS | default 1800 }}
       affinity:
         podAntiAffinity:
           requiredDuringSchedulingIgnoredDuringExecution:
@@ -92,6 +107,8 @@ spec:
               value: {{ .Values.DEEPHIVE_VERSION | squote }}
             - name: GIT_REF
               value: {{ .Values.GIT_REF | squote }}
+            - name: DEEPHIVE_ROLE
+              value: consumer
 
           image: {{ .Values.DEEPHIVE_IMAGE | squote }}
           livenessProbe:
