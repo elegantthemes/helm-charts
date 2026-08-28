@@ -6,7 +6,7 @@ Design, glossary, four-repo map, and deploys: DeepHive `specs/intake-drain-consu
 
 ## Intake vs consumer (chart 1.2.0)
 
-Always two Deployments. No `INTAKE_ENABLED` / `INTAKE_CUTOVER` flags.
+Two Deployments:
 
 - **Intake** (`DEEPHIVE_ROLE=intake`): Slack, webhooks, Discord gateway. No PVC. `maxSurge: 1`. Service `deephive` (Ingress `/`).
 - **Consumer** (`DEEPHIVE_ROLE=consumer`): `app.ts` admin + `worker.ts`. RWO `/workspace`. `maxSurge: 0`. Service `deephive-consumer` (`/admin`, `/graph`, `/stream`, `/api`).
