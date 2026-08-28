@@ -1,4 +1,3 @@
-{{- if .Values.INTAKE_ENABLED }}
 apiVersion: v1
 kind: Service
 metadata:
@@ -125,4 +124,3 @@ spec:
         - name: config
           secret:
             secretName: secrets
-{{- end }}

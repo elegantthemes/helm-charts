@@ -15,14 +15,9 @@ WORKSPACE_ROOT:
 WORKSPACE_STORAGE_CLASS_NAME: linode-block-storage
 WORKSPACE_STORAGE_SIZE: 250Gi
 
-# Intake vs consumer (DeepHive#164).
-# Discord login is only `intake.ts`. INTAKE_ENABLED=false with a current app tag
-# takes Discord down (consumer app.ts does not client.login).
-# Slack HTTP can stay on the consumer until INTAKE_CUTOVER.
-# Chart default is false so `helm template` matches today’s one Deployment;
-# staging Terraform sets INTAKE_ENABLED=true when this chart ships.
-INTAKE_ENABLED: false
-INTAKE_CUTOVER: false
+# Intake vs consumer (DeepHive#164). Always-on: intake Deployment + Ingress /
+# → intake Service. Chart 1.2.0 is this shape; first apply has a Slack/Discord
+# hole until intake pods are Ready. After that, intake rolls with no hole.
 INTAKE_REPLICAS: 2
 INTAKE_MEMORY_LIMIT: 1Gi
 INTAKE_TERMINATION_GRACE_SECONDS: 60
