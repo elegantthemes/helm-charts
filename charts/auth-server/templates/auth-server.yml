@@ -100,10 +100,10 @@ spec:
               cpu: 1000m
               memory: {{ .Values.MEMORY_LIMIT | squote }}
           startupProbe:
-            exec:
-              command:
-                - cat
-                - {{ .Values.INSTALL_PATH }}/dist/healthz
+            httpGet:
+              path: /livez
+              port: {{ .Values.AUTH_SERVER_PORT }}
+              scheme: HTTP
             failureThreshold: 30
             periodSeconds: 10
           volumeMounts:
