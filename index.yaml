@@ -411,6 +411,18 @@ entries:
     version: 1.0.1
   auth-server:
   - apiVersion: v1
+    created: "2026-09-03T20:28:05.939919541Z"
+    description: Elegant Themes Auth Server
+    digest: f0acc53b6baf3dc1a0d69d670d5bf65e2147ec0a30436ce68bb63f19adb3bb9d
+    icon: https://raw.githubusercontent.com/nodejs/nodejs.org/main/public/static/images/logo-hexagon.svg
+    maintainers:
+    - email: dustin@elegantthemes.com
+      name: Elegant Themes
+    name: auth-server
+    urls:
+    - https://github.com/elegantthemes/helm-charts/releases/download/auth-server-1.2.1/auth-server-1.2.1.tgz
+    version: 1.2.1
+  - apiVersion: v1
     created: "2026-08-18T18:13:36.02576859Z"
     description: Elegant Themes Auth Server
     digest: 047362ef068a310216303006a251ee76cdbd1df5384d665dc0318e0756912b00
@@ -4472,4 +4484,4 @@ entries:
     urls:
     - https://github.com/elegantthemes/helm-charts/releases/download/percona-xtradb-cluster-operator-1.0.2/percona-xtradb-cluster-operator-1.0.2.tgz
     version: 1.0.2
-generated: "2026-08-27T19:34:39.867360193Z"
+generated: "2026-09-03T20:28:05.940649864Z"
