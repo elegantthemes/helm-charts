@@ -18,6 +18,7 @@ scaleDownEnabled: false
 
 monitoring:
   enabled: false
+  clusterName: unknown
   scrapeInterval: 30s
   manualReviewAlertFor: 5m
   runbookUrl: https://github.com/elegantthemes/gha-runner-autoscaler#manual-review-alert

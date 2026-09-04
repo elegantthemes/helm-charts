@@ -6,6 +6,8 @@ metadata:
   namespace: {{ .Release.Namespace }}
   labels:
     app: {{ .Release.Name }}
+    app.kubernetes.io/name: {{ .Chart.Name }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
 spec:
   selector:
     app: {{ .Release.Name }}
@@ -21,6 +23,8 @@ metadata:
   namespace: {{ .Release.Namespace }}
   labels:
     app: {{ .Release.Name }}
+    app.kubernetes.io/name: {{ .Chart.Name }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
 spec:
   selector:
     matchLabels:
@@ -37,6 +41,8 @@ metadata:
   namespace: {{ .Release.Namespace }}
   labels:
     source: prometheus
+    app.kubernetes.io/name: {{ .Chart.Name }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
 spec:
   groups:
     - name: {{ .Release.Name }}.rules
@@ -47,8 +53,16 @@ spec:
           labels:
             severity: critical
             source: et
+            cluster: {{ .Values.monitoring.clusterName | quote }}
           annotations:
             summary: GitHub Actions runner nodes require manual review
-            description: The gha-runner-autoscaler has detected one or more stale or ambiguously correlated resources. Runner scale-up may be blocked by the hard node limit.
+            description: >-
+              Cluster {{ .Values.monitoring.clusterName }} has
+              {{ "{{ $value | printf \"%.0f\" }}" }} autoscaler resources requiring
+              manual review. Runner scale-up may be blocked by the hard node limit.
+            namespace: {{ .Release.Namespace | quote }}
+            logs: {{ printf "kubectl -n %s logs deployment/%s" .Release.Namespace .Release.Name | quote }}
+            oldest_age_metric: gha_node_autoscaler_manual_review_oldest_age_seconds
+            procedure: Verify the autoscaler label, Kubernetes node name, and Linode ID correlation before deleting any resource.
             runbook_url: {{ .Values.monitoring.runbookUrl | quote }}
 {{- end }}
