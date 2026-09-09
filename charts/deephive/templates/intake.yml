@@ -96,7 +96,7 @@ spec:
               containerPort: {{ .Values.PORT }}
           readinessProbe:
             httpGet:
-              path: /healthz
+              path: /readyz
               port: {{ .Values.PORT }}
               scheme: HTTP
             periodSeconds: 10
