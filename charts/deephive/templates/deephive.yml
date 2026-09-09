@@ -64,7 +64,7 @@ spec:
         deephive/role: consumer
         redis-client: 'true'
     spec:
-      terminationGracePeriodSeconds: {{ .Values.CONSUMER_TERMINATION_GRACE_SECONDS | default 1800 }}
+      terminationGracePeriodSeconds: {{ .Values.CONSUMER_TERMINATION_GRACE_SECONDS | default 120 }}
       affinity:
         podAntiAffinity:
           requiredDuringSchedulingIgnoredDuringExecution:
@@ -109,6 +109,12 @@ spec:
               value: {{ .Values.GIT_REF | squote }}
             - name: DEEPHIVE_ROLE
               value: consumer
+            - name: S6_SERVICES_GRACETIME
+              value: '110000'
+            - name: S6_KILL_GRACETIME
+              value: '5000'
+            - name: WORKER_SHUTDOWN_DEADLINE_MS
+              value: '90000'
 
           image: {{ .Values.DEEPHIVE_IMAGE | squote }}
           livenessProbe:

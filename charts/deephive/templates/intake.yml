@@ -37,7 +37,7 @@ spec:
         deephive/role: intake
         redis-client: 'true'
     spec:
-      terminationGracePeriodSeconds: {{ .Values.INTAKE_TERMINATION_GRACE_SECONDS | default 60 }}
+      terminationGracePeriodSeconds: {{ .Values.INTAKE_TERMINATION_GRACE_SECONDS | default 30 }}
       affinity:
         podAntiAffinity:
           preferredDuringSchedulingIgnoredDuringExecution:
@@ -80,6 +80,10 @@ spec:
               value: {{ .Values.GIT_REF | squote }}
             - name: DEEPHIVE_ROLE
               value: intake
+            - name: S6_SERVICES_GRACETIME
+              value: '25000'
+            - name: S6_KILL_GRACETIME
+              value: '3000'
           image: {{ .Values.DEEPHIVE_IMAGE | squote }}
           livenessProbe:
             httpGet:
