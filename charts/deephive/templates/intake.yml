@@ -84,6 +84,8 @@ spec:
               value: '25000'
             - name: S6_KILL_GRACETIME
               value: '3000'
+            - name: INTAKE_SHUTDOWN_DEADLINE_MS
+              value: '20000'
           image: {{ .Values.DEEPHIVE_IMAGE | squote }}
           livenessProbe:
             httpGet:
