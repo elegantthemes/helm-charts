@@ -15,6 +15,34 @@ spec:
     - host: {{ .Values.VIRTUAL_HOST }}
       http:
         paths:
+          - path: /admin
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ .Release.Name }}-consumer
+                port:
+                  number: {{ .Values.PORT }}
+          - path: /graph
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ .Release.Name }}-consumer
+                port:
+                  number: {{ .Values.PORT }}
+          - path: /stream
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ .Release.Name }}-consumer
+                port:
+                  number: {{ .Values.PORT }}
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ .Release.Name }}-consumer
+                port:
+                  number: {{ .Values.PORT }}
           - path: /
             pathType: Prefix
             backend:
