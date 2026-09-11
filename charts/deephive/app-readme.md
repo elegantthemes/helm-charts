@@ -8,7 +8,7 @@ Design: DeepHive `specs/intake-drain-consumer.md` ([DeepHive#164](https://github
 
 Two Deployments:
 
-- **Intake** (`DEEPHIVE_ROLE=intake`): Slack, webhooks, Discord gateway. No PVC. `maxSurge: 1`. Service `deephive` (Ingress `/`).
+- **Intake** (`DEEPHIVE_ROLE=intake`): Slack, webhooks, Discord gateway. No PVC. `maxSurge: 1`. Service `deephive` (Ingress `/`). The 2Gi memory limit covers the dependency install + TypeScript build performed at container startup.
 - **Consumer** (`DEEPHIVE_ROLE=consumer`): `app.ts` admin + `worker.ts`. RWO `/workspace`. `maxSurge: 0`. Service `deephive-consumer` (`/admin`, `/graph`, `/stream`, `/api`).
 
 Intake deploys roll (`maxSurge: 1`). Readiness is `/readyz` (Discord connected, recent Discord source replay complete, and Redis accepting work); liveness is `/healthz`. Consumer deploys drain in 120s: stop fetch, interrupt Cursor, stage fix/feedback successors before retiring predecessors, allow a bounded short-job finish window, then exit. Kubernetes grace is 120s consumer / 30s intake. Application deadlines are 90s consumer / 20s intake, with matching outer s6 grace (not the 3s default).
