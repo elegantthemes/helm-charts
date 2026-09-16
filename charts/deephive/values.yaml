@@ -12,8 +12,16 @@ PORT: 3000
 REPLICAS:
 VIRTUAL_HOST:
 WORKSPACE_ROOT:
+WORKSPACE_ACCESS_MODES:
+  - ReadWriteOnce
+WORKSPACE_CLAIM_NAME:
 WORKSPACE_STORAGE_CLASS_NAME: linode-block-storage
 WORKSPACE_STORAGE_SIZE: 250Gi
+
+# Preserve the original workspace PVC during a cutover to a different claim.
+LEGACY_WORKSPACE_RETAIN: false
+LEGACY_WORKSPACE_STORAGE_CLASS_NAME: linode-block-storage
+LEGACY_WORKSPACE_STORAGE_SIZE: 250Gi
 
 # Intake Deployment (DeepHive#164). Ingress / → intake Service.
 INTAKE_REPLICAS: 2

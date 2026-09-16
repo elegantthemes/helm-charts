@@ -1,3 +1,7 @@
+{{- $workspaceClaim := default (printf "%s-workspace" .Release.Name) .Values.WORKSPACE_CLAIM_NAME -}}
+{{- if and .Values.LEGACY_WORKSPACE_RETAIN (eq $workspaceClaim (printf "%s-workspace" .Release.Name)) -}}
+{{- fail "LEGACY_WORKSPACE_RETAIN requires a different WORKSPACE_CLAIM_NAME" -}}
+{{- end -}}
 apiVersion: v1
 kind: Service
 metadata:
@@ -28,16 +32,33 @@ spec:
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: {{ .Release.Name }}-workspace
+  name: {{ $workspaceClaim }}
   namespace: {{ .Release.Namespace }}
 spec:
   accessModes:
-    - ReadWriteOnce
+{{ toYaml .Values.WORKSPACE_ACCESS_MODES | indent 4 }}
   resources:
     requests:
       storage: {{ .Values.WORKSPACE_STORAGE_SIZE | squote }}
   storageClassName: {{ .Values.WORKSPACE_STORAGE_CLASS_NAME | squote }}
 ---
+{{ if .Values.LEGACY_WORKSPACE_RETAIN }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ .Release.Name }}-workspace
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    helm.sh/resource-policy: keep
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: {{ .Values.LEGACY_WORKSPACE_STORAGE_SIZE | squote }}
+  storageClassName: {{ .Values.LEGACY_WORKSPACE_STORAGE_CLASS_NAME | squote }}
+---
+{{ end }}
 
 apiVersion: apps/v1
 kind: Deployment
@@ -200,7 +221,7 @@ spec:
           emptyDir: {}
         - name: workspace
           persistentVolumeClaim:
-            claimName: {{ .Release.Name }}-workspace
+            claimName: {{ $workspaceClaim }}
         - name: config
           secret:
             secretName: secrets
