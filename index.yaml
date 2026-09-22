@@ -2458,6 +2458,18 @@ entries:
     version: 1.0.0
   deephive:
   - apiVersion: v1
+    created: "2026-09-22T19:16:28.715856412Z"
+    description: DeepHive
+    digest: a16e36800aca42ae222584ce4bd8d2952b04a78ea224f8cbeb4af8b7d46ca93b
+    icon: https://raw.githubusercontent.com/nodejs/nodejs.org/main/public/static/images/logo-hexagon.svg
+    maintainers:
+    - email: dustin@elegantthemes.com
+      name: Elegant Themes
+    name: deephive
+    urls:
+    - https://github.com/elegantthemes/helm-charts/releases/download/deephive-1.2.1/deephive-1.2.1.tgz
+    version: 1.2.1
+  - apiVersion: v1
     created: "2026-08-17T18:50:59.731441615Z"
     description: DeepHive
     digest: 488e5e10b8c40da4ba653e95df31afd9f42823ca3d8326841bd59b12081cd271
@@ -4493,4 +4505,4 @@ entries:
     urls:
     - https://github.com/elegantthemes/helm-charts/releases/download/percona-xtradb-cluster-operator-1.0.2/percona-xtradb-cluster-operator-1.0.2.tgz
     version: 1.0.2
-generated: "2026-09-04T15:41:18.763128361Z"
+generated: "2026-09-22T19:16:28.71647638Z"
