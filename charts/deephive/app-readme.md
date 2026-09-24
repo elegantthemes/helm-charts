@@ -4,16 +4,16 @@ Slack Events HTTP, GitHub/ZenHub webhooks, Discord, BullMQ workers, and a config
 
 Design: DeepHive `specs/intake-drain-consumer.md` ([DeepHive#164](https://github.com/elegantthemes/DeepHive/issues/164)).
 
-## Intake vs consumer (chart 1.2.1)
+## Intake vs consumer (chart 1.2.2)
 
 Two Deployments:
 
-- **Intake** (`DEEPHIVE_ROLE=intake`): Slack, webhooks, Discord gateway. No PVC. `maxSurge: 1`. Service `deephive` (Ingress `/`). The 2Gi memory limit covers the dependency install + TypeScript build performed at container startup.
+- **Intake** (`DEEPHIVE_ROLE=intake`): Slack, webhooks, Discord gateway. No PVC. RollingUpdate `maxSurge: 0` `maxUnavailable: 1`, default 2 replicas. Service `deephive` (Ingress `/`). The 2Gi memory limit covers the dependency install + TypeScript build performed at container startup.
 - **Consumer** (`DEEPHIVE_ROLE=consumer`): `app.ts` admin + `worker.ts`. Persistent `/workspace`. `maxSurge: 0`. Service `deephive-consumer` (`/admin`, `/graph`, `/stream`, `/api`).
 
-Intake deploys roll (`maxSurge: 1`). Readiness is `/readyz` (Discord connected, recent Discord source replay complete, and Redis accepting work); liveness is `/healthz`. Consumer deploys drain in 120s: stop fetch, interrupt Cursor, stage fix/feedback successors before retiring predecessors, allow a bounded short-job finish window, then exit. Kubernetes grace is 120s consumer / 30s intake. Application deadlines are 90s consumer / 20s intake, with matching outer s6 grace (not the 3s default).
+Intake rolls **one replica at a time**: `maxUnavailable: 1` with 2 replicas means Kubernetes will not take both down — at least one Ready intake stays on `deephive`. `maxSurge: 0` means it does not add a third pod; it replaces one instance, then the other. Slack Events, GitHub/ZenHub webhooks, and Discord stay up on the remaining replica. `/readyz` is Discord connected, recent Discord source replay complete, and Redis accepting work; liveness is `/healthz`. Consumer deploys drain in 120s: stop fetch, interrupt Cursor, stage fix/feedback successors before retiring predecessors, allow a bounded short-job finish window, then exit. Kubernetes grace is 120s consumer / 30s intake. Application deadlines are 90s consumer / 20s intake, with matching outer s6 grace (not the 3s default). Processor work can pause while the RWO consumer Recreates; jobs wait in Redis.
 
-This chart replaces the previous single Deployment. Merge with the matching DeepHive app tag and `DEEPHIVE_ROLE` image in one apply. Slack/Discord are down until intake is Ready.
+This chart replaces the previous single Deployment. Merge with the matching DeepHive app tag and `DEEPHIVE_ROLE` image in one apply. First cutover (or a roll when **no** intake is Ready) is the only time Slack/Discord HTTP is down until a new intake passes `/readyz`.
 
 ## Workspace cutover
 
