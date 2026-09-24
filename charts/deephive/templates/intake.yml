@@ -21,10 +21,12 @@ metadata:
     deephive/role: intake
 spec:
   replicas: {{ .Values.INTAKE_REPLICAS | default 2 }}
+  minReadySeconds: {{ .Values.INTAKE_MIN_READY_SECONDS | default 15 }}
   strategy:
+    type: RollingUpdate
     rollingUpdate:
-      maxSurge: 1
-      maxUnavailable: 0
+      maxSurge: 0
+      maxUnavailable: 1
   selector:
     matchLabels:
       app: {{ .Release.Name }}-intake
