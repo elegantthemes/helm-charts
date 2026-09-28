@@ -1,0 +1,74 @@
+{{- if .Values.monitoring.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-arc-controller
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    meta.helm.sh/release-name: {{ .Release.Name }}
+    meta.helm.sh/release-namespace: {{ .Release.Namespace }}
+  labels:
+    app: {{ .Release.Name }}-arc-controller
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+spec:
+  selector:
+    app.kubernetes.io/instance: {{ .Values.monitoring.arcControllerReleaseName }}
+    app.kubernetes.io/name: gha-rs-controller
+  ports:
+    - name: metrics
+      port: 8080
+      targetPort: metrics
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ .Release.Name }}-arc-controller
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    meta.helm.sh/release-name: {{ .Release.Name }}
+    meta.helm.sh/release-namespace: {{ .Release.Namespace }}
+  labels:
+    app: {{ .Release.Name }}-arc-controller
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+spec:
+  selector:
+    matchLabels:
+      app: {{ .Release.Name }}-arc-controller
+  endpoints:
+    - path: /metrics
+      port: metrics
+      interval: {{ .Values.monitoring.scrapeInterval | quote }}
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: {{ .Release.Name }}-arc-controller
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    meta.helm.sh/release-name: {{ .Release.Name }}
+    meta.helm.sh/release-namespace: {{ .Release.Namespace }}
+  labels:
+    source: prometheus
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+    app.kubernetes.io/name: {{ .Chart.Name }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+spec:
+  groups:
+    - name: {{ .Release.Name }}.arc.rules
+      rules:
+        - alert: GhaRunnerListenerMissing
+          expr: absent(gha_controller_running_listeners{namespace={{ .Release.Namespace | quote }},name=~{{ printf "%s-.*" .Values.monitoring.arcControllerReleaseName | quote }}})
+          for: {{ .Values.monitoring.arcListenerAlertFor | quote }}
+          labels:
+            severity: critical
+            source: et
+            cluster: {{ .Values.monitoring.clusterName | quote }}
+          annotations:
+            summary: GitHub Actions runner listener is missing
+            description: >-
+              The ARC runner listener in {{ .Release.Namespace }} has not reported a running instance.
+              Check the AutoscalingRunnerSet status and controller logs; an Outdated scale set can remain stuck without runners.
+            namespace: {{ .Release.Namespace | quote }}
+            procedure: Check kubectl -n {{ .Release.Namespace }} get autoscalingrunnerset et-runners and inspect ARC controller logs.
+            runbook_url: {{ .Values.monitoring.arcRunbookUrl | quote }}
+{{- end }}

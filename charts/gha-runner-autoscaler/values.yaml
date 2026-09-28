@@ -21,4 +21,7 @@ monitoring:
   clusterName: unknown
   scrapeInterval: 30s
   manualReviewAlertFor: 5m
+  arcListenerAlertFor: 2m
+  arcControllerReleaseName: et-runners
+  arcRunbookUrl: https://github.com/elegantthemes/terraform/blob/master/apps/gha-runners/README.md#arc-listener-alert
   runbookUrl: https://github.com/elegantthemes/gha-runner-autoscaler#manual-review-alert
