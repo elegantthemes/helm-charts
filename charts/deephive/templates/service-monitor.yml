@@ -1,0 +1,15 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ .Release.Name }}-consumer
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: {{ .Release.Name }}-consumer
+spec:
+  selector:
+    matchLabels:
+      app: {{ .Release.Name }}-consumer
+  endpoints:
+    - path: /metrics
+      port: nodejs
+      interval: 30s
