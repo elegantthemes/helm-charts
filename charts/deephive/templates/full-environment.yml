@@ -1,0 +1,181 @@
+{{- if .Values.fullEnvironment.enabled }}
+{{- $f := .Values.fullEnvironment }}
+{{- if not (regexMatch "@sha256:[a-f0-9]{64}$" $f.runnerImage) }}{{ fail "fullEnvironment.runnerImage must pin a digest" }}{{ end }}
+{{- if not (regexMatch "@sha256:[a-f0-9]{64}$" $f.sessionImage) }}{{ fail "fullEnvironment.sessionImage must pin a digest" }}{{ end }}
+{{- if not (regexMatch "@sha256:[a-f0-9]{64}$" $f.databaseImage) }}{{ fail "fullEnvironment.databaseImage must pin a digest" }}{{ end }}
+{{- if not $f.pressureCommand }}{{ fail "Node-wide active-writer pressure fencing must be configured" }}{{ end }}
+{{- if not $f.approvedEgressDomains }}{{ fail "Explicit approved package/model/test domains required" }}{{ end }}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ .Release.Name }}-runner
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ .Release.Name }}-runner
+rules:
+  - apiGroups: [""]
+    resources: [pods]
+    verbs: [get, list, create, patch, delete]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ .Release.Name }}-runner
+subjects:
+  - kind: ServiceAccount
+    name: {{ .Release.Name }}-runner
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ .Release.Name }}-runner
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ .Release.Namespace }}-{{ .Release.Name }}-execution-node
+rules:
+  - apiGroups: [""]
+    resources: [nodes]
+    resourceNames: [{{ required "Execution node required" $f.nodeName | quote }}]
+    verbs: [get]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ .Release.Namespace }}-{{ .Release.Name }}-execution-node
+subjects:
+  - kind: ServiceAccount
+    name: {{ .Release.Name }}-runner
+    namespace: {{ .Release.Namespace }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ .Release.Namespace }}-{{ .Release.Name }}-execution-node
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-runner
+data:
+  runner.json: |
+    {{ dict "namespace" .Release.Namespace "nodeName" $f.nodeName "image" $f.sessionImage "databaseImage" $f.databaseImage "imagePullSecret" $f.pullSecret "agentSecret" (required "Session agent Secret required" $f.agentSecret) "workspaceClaim" $f.workspaceClaim "workspaceRoot" $f.workspaceRoot "scratchRoot" "/node-scratch" "cacheRoot" "/node-cache" "runnerUrl" (printf "http://%s-runner:3001" .Release.Name) "proxyUrl" (printf "http://%s-session-egress:3128" .Release.Name) "pressureCommand" $f.pressureCommand "signingKeyFile" "/runner-secret/signing-key" "controlPort" 3001 | toJson }}
+{{/* The config contains no credentials; signing key is read from runner-only Secret. */}}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-runner
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: {{ .Release.Name }}-runner }
+  template:
+    metadata:
+      labels: { app: {{ .Release.Name }}-runner, redis-client: "true" }
+    spec:
+      nodeName: {{ $f.nodeName | quote }}
+      serviceAccountName: {{ .Release.Name }}-runner
+      imagePullSecrets:
+        - name: {{ required "Private pull secret required" $f.pullSecret }}
+      containers:
+        - name: runner
+          image: {{ $f.runnerImage | quote }}
+          command: [node, /opt/deephive/dist/src/runner.js]
+          env:
+            - name: FULL_ENVIRONMENT_CONFIG
+              value: /runner-config/runner.json
+          envFrom:
+            - secretRef: { name: {{ required "Runner-only secret required" $f.runnerSecret }} }
+          resources:
+            requests: { memory: 512Mi, cpu: 250m }
+            limits: { memory: 1Gi, cpu: "2" }
+          ports: [{ name: control, containerPort: 3001 }]
+          volumeMounts:
+            - { name: config, mountPath: /runner-config, readOnly: true }
+            - { name: secret, mountPath: /runner-secret, readOnly: true }
+            - { name: workspace, mountPath: {{ $f.workspaceRoot | quote }} }
+            - { name: cache-probe, mountPath: /node-cache, readOnly: true }
+            - { name: scratch-probe, mountPath: /node-scratch, readOnly: true }
+      volumes:
+        - name: config
+          configMap: { name: {{ .Release.Name }}-runner }
+        - name: secret
+          secret: { secretName: {{ $f.runnerSecret }} }
+        - name: workspace
+          persistentVolumeClaim: { claimName: {{ required "Workspace claim required" $f.workspaceClaim }} }
+        - name: cache-probe
+          hostPath: { path: {{ required "Retained CSI cache path required" $f.cacheProbePath | quote }}, type: Directory }
+        - name: scratch-probe
+          hostPath: { path: {{ $f.scratchProbePath | quote }}, type: Directory }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-runner
+spec:
+  selector: { app: {{ .Release.Name }}-runner }
+  ports: [{ port: 3001, targetPort: control }]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ .Release.Name }}-sessions
+spec:
+  podSelector:
+    matchLabels: { app.kubernetes.io/name: deephive-session }
+  policyTypes: [Ingress, Egress]
+  ingress: []
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: kube-system }
+          podSelector:
+            matchLabels: { k8s-app: kube-dns }
+      ports: [{ protocol: UDP, port: 53 }, { protocol: TCP, port: 53 }]
+    - to:
+        - podSelector:
+            matchLabels: { app: {{ .Release.Name }}-runner }
+      ports: [{ protocol: TCP, port: 3001 }]
+    - to:
+        - podSelector:
+            matchLabels: { app: {{ .Release.Name }}-session-egress }
+      ports: [{ protocol: TCP, port: 3128 }]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ .Release.Name }}-runner-control
+spec:
+  podSelector:
+    matchLabels: { app: {{ .Release.Name }}-runner }
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels: { app.kubernetes.io/name: deephive-session }
+      ports: [{ protocol: TCP, port: 3001 }]
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: {{ .Release.Name }}-session-prepull
+spec:
+  selector:
+    matchLabels: { app: {{ .Release.Name }}-session-prepull }
+  template:
+    metadata:
+      labels: { app: {{ .Release.Name }}-session-prepull }
+    spec:
+      nodeSelector: { kubernetes.io/hostname: {{ $f.nodeName | quote }} }
+      automountServiceAccountToken: false
+      imagePullSecrets: [{ name: {{ $f.pullSecret }} }]
+      containers:
+        - name: cache
+          image: {{ $f.sessionImage | quote }}
+          command: [sleep, infinity]
+          resources:
+            requests: { memory: 16Mi, cpu: 10m }
+            limits: { memory: 32Mi, cpu: 100m }
+{{- end }}
