@@ -45,3 +45,24 @@ DB_PORT: "3306"
 DB_DATABASE: deephive
 DB_USERNAME: deephive
 DB_PASSWORD:
+
+# Phase 2 preparation only. Routing and workload creation remain disabled.
+fullEnvironment:
+  enabled: false
+  nodeName: ""
+  runnerImage: "" # immutable ghcr.io/...@sha256:...
+  sessionImage: ""
+  databaseImage: ""
+  proxyImage: "" # approved Squid image, pinned digest
+  pullSecret: ""
+  agentSecret: "" # OPENAI_API_KEY only; never the consumer Secret
+  integrationSecret: "" # optional ET_USERNAME, ET_API_KEY, ET_PASSWORD, GITHUB_TOKEN
+  runnerSecret: "" # Redis, signing key, scoped source-publication credentials
+  workspaceClaim: ""
+  workspaceRoot: /workspace-root # must match enrolled canonical paths
+  scratchProbePath: /var/lib/kubelet
+  cacheProbePath: "" # retained JuiceFS staging/cache filesystem; must be real node path
+  sourceReadHosts: []
+  approvedEgressDomains: []
+  # Infrastructure-supplied trusted command fences ordinary AND full writers.
+  pressureCommand: []
