@@ -82,6 +82,9 @@ spec:
     metadata:
       annotations:
         checksum/env-file: {{ required "ENV_FILE is required" .Values.ENV_FILE | sha256sum | quote }}
+{{- if .Values.MYSQL_ENABLED }}
+        checksum/mysql-credentials: {{ list .Values.MYSQL_PASSWORD .Values.MYSQL_ROOT_PASSWORD | toJson | sha256sum | quote }}
+{{- end }}
       labels:
         app: {{ .Release.Name }}
         deephive/role: consumer
@@ -189,9 +192,11 @@ spec:
             - name: MYSQL_USER
               value: {{ .Values.MYSQL_USER | squote }}
             - name: MYSQL_PASSWORD
-              value: {{ .Values.MYSQL_PASSWORD | squote }}
+              valueFrom:
+                secretKeyRef: { name: secrets, key: MYSQL_PASSWORD }
             - name: MYSQL_ROOT_PASSWORD
-              value: {{ .Values.MYSQL_ROOT_PASSWORD | squote }}
+              valueFrom:
+                secretKeyRef: { name: secrets, key: MYSQL_ROOT_PASSWORD }
           ports:
             - name: mysql
               containerPort: {{ .Values.MYSQL_PORT }}

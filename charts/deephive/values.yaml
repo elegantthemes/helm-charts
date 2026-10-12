@@ -45,3 +45,28 @@ DB_PORT: "3306"
 DB_DATABASE: deephive
 DB_USERNAME: deephive
 DB_PASSWORD:
+
+# Phase 2 preparation only. Routing and workload creation remain disabled.
+fullEnvironment:
+  enabled: false
+  nodeName: ""
+  runnerImage: "" # immutable ghcr.io/...@sha256:...
+  sessionImage: ""
+  compatibleSessionImages: [] # prior approved digests needed during compatible runner upgrades
+  databaseImage: ""
+  proxyImage: "" # approved Squid image, pinned digest
+  pullSecret: ""
+  agentSecret: "" # OPENAI_API_KEY only; never the consumer Secret
+  integrationSecret: "" # optional ET_USERNAME, ET_API_KEY, ET_PASSWORD, GITHUB_TOKEN
+  runnerSecret: "" # Redis, signing key, scoped source-publication credentials
+  # Increment on in-place Secret rotation and upgrade Helm to roll envFrom credentials.
+  # Alternatively: kubectl rollout restart deployment/<release>-runner
+  runnerSecretRevision: ""
+  prepullTolerations: [] # match the dedicated execution node's NoSchedule taints
+  workspaceClaim: ""
+  workspaceRoot: /workspace-root # must match enrolled canonical paths
+  scratchProbePath: "" # dedicated DeepHive scratch directory on the kubelet filesystem
+  cacheProbePath: "" # retained JuiceFS staging/cache filesystem; must be real node path
+  approvedEgressDomains: []
+  # Infrastructure-supplied trusted command fences ordinary AND full writers.
+  pressureCommand: []

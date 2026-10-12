@@ -1,0 +1,81 @@
+{{- if .Values.fullEnvironment.enabled }}
+{{- $f := .Values.fullEnvironment }}
+{{- $egress := printf "%s-session-egress" .Release.Name | trunc 63 | trimSuffix "-" }}
+{{- if not (regexMatch "@sha256:[a-f0-9]{64}$" $f.proxyImage) }}{{ fail "fullEnvironment.proxyImage must pin a digest" }}{{ end }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ $egress }}
+data:
+  squid.conf: |
+    http_port 3128
+    pid_filename /tmp/squid.pid
+    access_log stdio:/dev/stdout
+    cache_log /dev/stderr
+    cache deny all
+    acl TLS_ports port 443
+    acl CONNECT method CONNECT
+    acl private_destinations dst 0.0.0.0/8 10.0.0.0/8 127.0.0.0/8 169.254.0.0/16 172.16.0.0/12 192.168.0.0/16 ::1/128 fc00::/7 fe80::/10
+    acl approved dstdomain -n {{ join " " $f.approvedEgressDomains }}
+    http_access deny private_destinations
+    http_access deny !TLS_ports
+    http_access allow CONNECT approved
+    http_access deny all
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $egress }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: {{ $egress }} }
+  template:
+    metadata:
+      annotations:
+        checksum/egress-config: {{ toJson $f.approvedEgressDomains | sha256sum | quote }}
+      labels: { app: {{ $egress }} }
+    spec:
+      automountServiceAccountToken: false
+      imagePullSecrets: [{ name: {{ $f.pullSecret | quote }} }]
+      containers:
+        - name: proxy
+          image: {{ $f.proxyImage | quote }}
+          command: [squid, -N, -f, /etc/squid/squid.conf]
+          resources:
+            requests: { memory: 128Mi, cpu: 100m }
+            limits: { memory: 512Mi, cpu: "1" }
+          ports: [{ name: proxy, containerPort: 3128 }]
+          readinessProbe:
+            tcpSocket: { port: proxy }
+            periodSeconds: 5
+            timeoutSeconds: 2
+            failureThreshold: 2
+          volumeMounts:
+            - { name: config, mountPath: /etc/squid/squid.conf, subPath: squid.conf, readOnly: true }
+      volumes:
+        - name: config
+          configMap: { name: {{ $egress }} }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $egress }}
+spec:
+  selector: { app: {{ $egress }} }
+  ports: [{ port: 3128, targetPort: proxy }]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ $egress }}
+spec:
+  podSelector:
+    matchLabels: { app: {{ $egress }} }
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels: { app.kubernetes.io/name: deephive-session, app.kubernetes.io/instance: {{ .Release.Name | quote }} }
+      ports: [{ protocol: TCP, port: 3128 }]
+{{- end }}
