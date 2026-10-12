@@ -6,6 +6,7 @@
     "namespace": "dph-app",
     "labels": {
       "app.kubernetes.io/name": "deephive-session",
+      "app.kubernetes.io/instance": "review",
       "deephive/session": "dh-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
     },
     "annotations": {

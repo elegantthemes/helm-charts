@@ -20,3 +20,8 @@ Increment `fullEnvironment.runnerSecretRevision` and upgrade Helm after rotating
 an existing runner Secret in place, or explicitly restart `<release>-runner`.
 The chart does not watch external Secret changes automatically. Configure
 `fullEnvironment.prepullTolerations` for the dedicated node's scheduling taints.
+
+Session pods must carry the chart's `app.kubernetes.io/instance` release label.
+Before upgrading an older runner/chart that created unlabeled pods, drain those
+sessions while the old policy still permits cleanup; do not strand them behind
+the new release-scoped admission policy. This is a Phase 4 rollout gate.

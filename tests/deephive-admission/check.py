@@ -31,6 +31,11 @@ def case(name, expected, change=None, operation='CREATE', old=None):
 
 
 case('real session manifest', True)
+case('foreign release', False, lambda p: p['metadata']['labels'].update({'app.kubernetes.io/instance': 'other'}))
+case('missing release', False, lambda p: p['metadata']['labels'].pop('app.kubernetes.io/instance'))
+foreign = copy.deepcopy(original)
+foreign['metadata']['labels']['app.kubernetes.io/instance'] = 'other'
+case('relabel foreign pod', False, operation='UPDATE', old=foreign)
 case('compatible image adoption after upgrade', True, lambda p: p['spec']['containers'][0].update(image='ghcr.io/elegantthemes/session@sha256:' + 'e' * 64))
 case('hostPath', False, lambda p: p['spec']['volumes'].append({'name': 'host', 'hostPath': {'path': '/'}}))
 case('consumer credential env', False, lambda p: p['spec']['containers'][0]['env'].append({'name': 'BAD', 'valueFrom': {'secretKeyRef': {'name': 'secrets', 'key': 'GITHUB_TOKEN'}}}))

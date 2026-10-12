@@ -37,7 +37,7 @@ spec:
       labels: { app: {{ $egress }} }
     spec:
       automountServiceAccountToken: false
-      imagePullSecrets: [{ name: {{ $f.pullSecret }} }]
+      imagePullSecrets: [{ name: {{ $f.pullSecret | quote }} }]
       containers:
         - name: proxy
           image: {{ $f.proxyImage | quote }}
@@ -46,6 +46,11 @@ spec:
             requests: { memory: 128Mi, cpu: 100m }
             limits: { memory: 512Mi, cpu: "1" }
           ports: [{ name: proxy, containerPort: 3128 }]
+          readinessProbe:
+            tcpSocket: { port: proxy }
+            periodSeconds: 5
+            timeoutSeconds: 2
+            failureThreshold: 2
           volumeMounts:
             - { name: config, mountPath: /etc/squid/squid.conf, subPath: squid.conf, readOnly: true }
       volumes:
@@ -71,6 +76,6 @@ spec:
   ingress:
     - from:
         - podSelector:
-            matchLabels: { app.kubernetes.io/name: deephive-session }
+            matchLabels: { app.kubernetes.io/name: deephive-session, app.kubernetes.io/instance: {{ .Release.Name | quote }} }
       ports: [{ protocol: TCP, port: 3128 }]
 {{- end }}

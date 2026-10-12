@@ -36,11 +36,15 @@ spec:
         variables.pod.metadata.name.matches('^dh-[a-f0-9]{40}$') &&
         has(variables.pod.metadata.labels) &&
         variables.pod.metadata.labels['app.kubernetes.io/name'] == 'deephive-session' &&
+        variables.pod.metadata.labels['app.kubernetes.io/instance'] == {{ .Release.Name | quote }} &&
         variables.pod.metadata.labels['deephive/session'] == variables.pod.metadata.name &&
-        variables.pod.metadata.labels.all(k, k in ['app.kubernetes.io/name', 'deephive/session'])
+        variables.pod.metadata.labels.all(k, k in ['app.kubernetes.io/name', 'app.kubernetes.io/instance', 'deephive/session'])
       message: Runner access is limited to task session pods, without privileged workload labels.
-    - expression: "request.operation != 'UPDATE' || object.spec == oldObject.spec"
-      message: The runner may update termination metadata, not replace a live pod specification.
+    - expression: >-
+        request.operation != 'UPDATE' || (
+          object.spec == oldObject.spec && has(oldObject.metadata.labels) &&
+          oldObject.metadata.labels['app.kubernetes.io/instance'] == {{ .Release.Name | quote }})
+      message: The runner may update its own termination metadata, not adopt another release or replace a live pod specification.
     # CREATE-only pins must not prevent cleanup/adoption of an older approved
     # image after a compatible runner/chart upgrade.
     - expression: >-

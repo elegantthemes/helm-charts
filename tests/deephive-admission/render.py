@@ -50,6 +50,21 @@ for name in ['true', 'null', '123']:
     changed['fullEnvironment'].update(pullSecret=name, runnerSecret=name, workspaceClaim=name)
     runner = item(render(config=changed), 'Deployment', '-runner')['spec']['template']['spec']
     assert runner['imagePullSecrets'][0]['name'] == name
+    proxy = item(render(config=changed), 'Deployment', '-session-egress')['spec']['template']['spec']
+    assert proxy['imagePullSecrets'][0]['name'] == name
+    assert proxy['containers'][0]['readinessProbe']['tcpSocket']['port'] == 'proxy'
     assert runner['containers'][0]['envFrom'][0]['secretRef']['name'] == name
     assert next(v for v in runner['volumes'] if 'persistentVolumeClaim' in v)['persistentVolumeClaim']['claimName'] == name
 print('PASS configured object names remain strings')
+
+for release in ['first', 'second']:
+    docs = render(release=release)
+    runner_config = json.loads(item(docs, 'ConfigMap', '-runner')['data']['runner.json'])
+    assert runner_config['release'] == release
+    policies = [p for p in docs if p['kind'] == 'NetworkPolicy']
+    sessions = next(p for p in policies if p['metadata']['name'] == release + '-sessions')
+    assert sessions['spec']['podSelector']['matchLabels']['app.kubernetes.io/instance'] == release
+    for suffix in ['-runner-control', '-session-egress']:
+        ingress = next(p for p in policies if p['metadata']['name'] == release + suffix)
+        assert ingress['spec']['ingress'][0]['from'][0]['podSelector']['matchLabels']['app.kubernetes.io/instance'] == release
+print('PASS release-specific session, runner and proxy selectors')
