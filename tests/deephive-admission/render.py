@@ -68,3 +68,22 @@ for release in ['first', 'second']:
         ingress = next(p for p in policies if p['metadata']['name'] == release + suffix)
         assert ingress['spec']['ingress'][0]['from'][0]['podSelector']['matchLabels']['app.kubernetes.io/instance'] == release
 print('PASS release-specific session, runner and proxy selectors')
+
+mysql = copy.deepcopy(values)
+mysql.update(MYSQL_ENABLED=True, MYSQL_PASSWORD='fixture-user-password', MYSQL_ROOT_PASSWORD='fixture-root-password')
+mysql_docs = render(config=mysql)
+consumer = next(p for p in mysql_docs if p['kind'] == 'Deployment' and p['metadata']['name'] == 'review')
+secret = next(p for p in mysql_docs if p['kind'] == 'Secret' and p['metadata']['name'] == 'secrets')
+for key in ['MYSQL_PASSWORD', 'MYSQL_ROOT_PASSWORD']:
+    assert secret['stringData'][key] == mysql[key]
+    for pod_owner in (p for p in mysql_docs if p['kind'] in ['Deployment', 'DaemonSet']):
+        assert mysql[key] not in json.dumps(pod_owner['spec']['template'])
+    sidecar = next(c for c in consumer['spec']['template']['spec']['containers'] if c['name'] == 'mysql')
+    env = next(e for e in sidecar['env'] if e['name'] == key)
+    assert env == {'name': key, 'valueFrom': {'secretKeyRef': {'name': 'secrets', 'key': key}}}
+mysql['MYSQL_PASSWORD'] = 'rotated-fixture-password'
+rotated = next(p for p in render(config=mysql) if p['kind'] == 'Deployment' and p['metadata']['name'] == 'review')
+assert rotated['spec']['template']['metadata']['annotations'] != consumer['spec']['template']['metadata']['annotations']
+runner_role = next(p for p in mysql_docs if p['kind'] == 'Role' and p['metadata']['name'] == 'review-runner')
+assert all('secrets' not in rule['resources'] and 'list' not in rule['verbs'] for rule in runner_role['rules'])
+print('PASS consumer MySQL credential references, rotation and runner read permissions')
