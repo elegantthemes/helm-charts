@@ -66,6 +66,22 @@ spec:
         )
       message: Sessions may mount only local scratch and a nonempty task subpath of the workspace claim.
     - expression: >-
+        request.operation != 'CREATE' || (
+          variables.pod.spec.volumes.all(v, !has(v.emptyDir) || (
+            v.name in ['dependencies', 'scratch', 'database-run', 'database', 'evidence', 'shm'] &&
+            has(v.emptyDir.sizeLimit) &&
+            v.emptyDir.sizeLimit == {'dependencies': '30Gi', 'scratch': '5Gi', 'database-run': '16Mi', 'database': '5Gi', 'evidence': '5Gi', 'shm': '1Gi'}[v.name] &&
+            (v.name == 'shm' ? (has(v.emptyDir.medium) && v.emptyDir.medium == 'Memory') :
+              (!has(v.emptyDir.medium) || v.emptyDir.medium == '')))) &&
+          variables.containers.all(c,
+            c.name in ['session', 'database', 'local-mounts'] &&
+            has(c.resources) && has(c.resources.limits) &&
+            'memory' in c.resources.limits && 'ephemeral-storage' in c.resources.limits &&
+            c.resources.limits['memory'] == {'session': '16Gi', 'database': '1Gi', 'local-mounts': '256Mi'}[c.name] &&
+            c.resources.limits['ephemeral-storage'] == {'session': '45Gi', 'database': '5Gi', 'local-mounts': '30Gi'}[c.name])
+        )
+      message: Sessions must retain the prepared recipe's bounded memory and local scratch resources.
+    - expression: >-
         request.operation != 'CREATE' || variables.containers.all(c,
           (!has(c.envFrom) || size(c.envFrom) == 0) &&
           (!has(c.env) || c.env.all(e, !has(e.valueFrom) || !has(e.valueFrom.secretKeyRef) ||

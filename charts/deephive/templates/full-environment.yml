@@ -83,7 +83,7 @@ spec:
       nodeName: {{ $f.nodeName | quote }}
       serviceAccountName: {{ .Release.Name }}-runner
       imagePullSecrets:
-        - name: {{ required "Private pull secret required" $f.pullSecret }}
+        - name: {{ required "Private pull secret required" $f.pullSecret | quote }}
       containers:
         - name: runner
           image: {{ $f.runnerImage | quote }}
@@ -92,7 +92,7 @@ spec:
             - name: FULL_ENVIRONMENT_CONFIG
               value: /runner-config/runner.json
           envFrom:
-            - secretRef: { name: {{ required "Runner-only secret required" $f.runnerSecret }} }
+            - secretRef: { name: {{ required "Runner-only secret required" $f.runnerSecret | quote }} }
           resources:
             requests: { memory: 512Mi, cpu: 250m }
             limits: { memory: 1Gi, cpu: "2" }
@@ -107,9 +107,9 @@ spec:
         - name: config
           configMap: { name: {{ .Release.Name }}-runner }
         - name: secret
-          secret: { secretName: {{ $f.runnerSecret }} }
+          secret: { secretName: {{ $f.runnerSecret | quote }} }
         - name: workspace
-          persistentVolumeClaim: { claimName: {{ required "Workspace claim required" $f.workspaceClaim }} }
+          persistentVolumeClaim: { claimName: {{ required "Workspace claim required" $f.workspaceClaim | quote }} }
         - name: cache-probe
           hostPath: { path: {{ required "Retained CSI cache path required" $f.cacheProbePath | quote }}, type: Directory }
         - name: scratch-probe
@@ -182,7 +182,7 @@ spec:
                     operator: In
                     values: [{{ $f.nodeName | quote }}]
       automountServiceAccountToken: false
-      imagePullSecrets: [{ name: {{ $f.pullSecret }} }]
+      imagePullSecrets: [{ name: {{ $f.pullSecret | quote }} }]
       containers:
         - name: cache
           image: {{ $f.sessionImage | quote }}

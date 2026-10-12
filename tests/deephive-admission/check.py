@@ -51,6 +51,14 @@ case('compatible old-image cleanup', True, lambda p: p['spec']['containers'][0].
 case('metadata-only update', True, lambda p: p['metadata'].update(finalizers=[]), operation='UPDATE', old=original)
 case('spec-changing update', False, lambda p: p['spec'].update(hostNetwork=True), operation='UPDATE', old=original)
 
+case('unbounded emptyDir', False, lambda p: p['spec']['volumes'][1].update(emptyDir={}))
+case('oversized emptyDir', False, lambda p: p['spec']['volumes'][1]['emptyDir'].update(sizeLimit='300Gi'))
+case('unexpected memory-backed dependencies', False, lambda p: p['spec']['volumes'][1]['emptyDir'].update(medium='Memory'))
+case('missing memory limit', False, lambda p: p['spec']['containers'][0]['resources']['limits'].pop('memory'))
+case('oversized memory limit', False, lambda p: p['spec']['containers'][0]['resources']['limits'].update(memory='32Gi'))
+case('missing database disk limit', False, lambda p: p['spec']['containers'][1]['resources']['limits'].pop('ephemeral-storage'))
+case('missing init disk limit', False, lambda p: p['spec']['initContainers'][0]['resources']['limits'].pop('ephemeral-storage'))
+
 with tempfile.TemporaryDirectory(prefix='deephive-admission-') as temp:
     fixture = Path(temp) / 'fixtures.json'
     fixture.write_text(json.dumps({'Expressions': [v['expression'] for v in policy['spec']['validations']], 'Cases': cases}))
