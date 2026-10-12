@@ -16,7 +16,7 @@ data:
     acl TLS_ports port 443
     acl CONNECT method CONNECT
     acl private_destinations dst 0.0.0.0/8 10.0.0.0/8 127.0.0.0/8 169.254.0.0/16 172.16.0.0/12 192.168.0.0/16 ::1/128 fc00::/7 fe80::/10
-    acl approved dstdomain {{ join " " $f.approvedEgressDomains }}
+    acl approved dstdomain -n {{ join " " $f.approvedEgressDomains }}
     http_access deny private_destinations
     http_access deny !TLS_ports
     http_access allow CONNECT approved

@@ -1,6 +1,7 @@
 {{- if .Values.fullEnvironment.enabled }}
 {{- $f := .Values.fullEnvironment }}
-{{- $name := printf "%s-%s-session-admission" .Release.Namespace .Release.Name | trunc 63 | trimSuffix "-" }}
+{{- $identity := printf "%s-%s-session-admission" .Release.Namespace .Release.Name }}
+{{- $name := printf "%s-%s" ($identity | trunc 50 | trimSuffix "-") ($identity | sha256sum | trunc 12) }}
 {{- $images := concat (list $f.sessionImage) ($f.compatibleSessionImages | default list) }}
 {{- range $image := $images }}
 {{- if not (regexMatch "@sha256:[a-f0-9]{64}$" $image) }}{{ fail "Compatible session images must pin a digest" }}{{ end }}
@@ -76,7 +77,8 @@ spec:
           variables.containers.all(c,
             c.name in ['session', 'database', 'local-mounts'] &&
             has(c.resources) && has(c.resources.limits) &&
-            'memory' in c.resources.limits && 'ephemeral-storage' in c.resources.limits &&
+            'memory' in c.resources.limits && 'ephemeral-storage' in c.resources.limits && 'cpu' in c.resources.limits &&
+            c.resources.limits['cpu'] == {'session': '12', 'database': '1', 'local-mounts': '1'}[c.name] &&
             c.resources.limits['memory'] == {'session': '16Gi', 'database': '1Gi', 'local-mounts': '256Mi'}[c.name] &&
             c.resources.limits['ephemeral-storage'] == {'session': '45Gi', 'database': '5Gi', 'local-mounts': '30Gi'}[c.name])
         )

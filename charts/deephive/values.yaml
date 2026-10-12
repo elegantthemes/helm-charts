@@ -59,6 +59,10 @@ fullEnvironment:
   agentSecret: "" # OPENAI_API_KEY only; never the consumer Secret
   integrationSecret: "" # optional ET_USERNAME, ET_API_KEY, ET_PASSWORD, GITHUB_TOKEN
   runnerSecret: "" # Redis, signing key, scoped source-publication credentials
+  # Increment on in-place Secret rotation and upgrade Helm to roll envFrom credentials.
+  # Alternatively: kubectl rollout restart deployment/<release>-runner
+  runnerSecretRevision: ""
+  prepullTolerations: [] # match the dedicated execution node's NoSchedule taints
   workspaceClaim: ""
   workspaceRoot: /workspace-root # must match enrolled canonical paths
   scratchProbePath: "" # dedicated DeepHive scratch directory on the kubelet filesystem

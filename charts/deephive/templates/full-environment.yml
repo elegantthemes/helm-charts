@@ -97,6 +97,12 @@ spec:
             requests: { memory: 512Mi, cpu: 250m }
             limits: { memory: 1Gi, cpu: "2" }
           ports: [{ name: control, containerPort: 3001 }]
+          # The listener starts only after configuration, Kubernetes and ledger initialization.
+          readinessProbe:
+            tcpSocket: { port: control }
+            periodSeconds: 5
+            timeoutSeconds: 2
+            failureThreshold: 2
           volumeMounts:
             - { name: config, mountPath: /runner-config, readOnly: true }
             - { name: secret, mountPath: /runner-secret, readOnly: true }
@@ -173,6 +179,10 @@ spec:
     metadata:
       labels: { app: {{ $prepull }} }
     spec:
+      {{- with $f.prepullTolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       affinity:
         nodeAffinity:
           requiredDuringSchedulingIgnoredDuringExecution:

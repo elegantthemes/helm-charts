@@ -11,3 +11,12 @@ that pod contract changes. Checks cover a valid session, forbidden mounts,
 credentials, identities, host access, labels and image replacements, plus cleanup
 of an older approved image and metadata-only updates. Kubernetes API schema and
 live admission enforcement remain separate cluster acceptance checks.
+
+Run `python3 tests/deephive-admission/render.py` for release-name collisions,
+quoted identifiers, Secret-revision rollouts, readiness, pre-pull taints and proxy
+lookup configuration. This is rendering validation, not deployed acceptance.
+
+Increment `fullEnvironment.runnerSecretRevision` and upgrade Helm after rotating
+an existing runner Secret in place, or explicitly restart `<release>-runner`.
+The chart does not watch external Secret changes automatically. Configure
+`fullEnvironment.prepullTolerations` for the dedicated node's scheduling taints.
