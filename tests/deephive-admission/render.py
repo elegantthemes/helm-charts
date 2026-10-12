@@ -16,7 +16,8 @@ def item(docs, kind, suffix):
     return next(p for p in docs if p['kind'] == kind and p['metadata']['name'].endswith(suffix))
 
 names = set()
-for namespace, release in [('n' * 63, 'one'), ('n' * 63, 'two'), ('m' * 63, 'one')]:
+roles = set()
+for namespace, release in [('n' * 63, 'one'), ('n' * 63, 'two'), ('m' * 63, 'one'), ('a-b', 'c'), ('a', 'b-c')]:
     docs = render(release, namespace)
     policy = next(p for p in docs if p['kind'] == 'ValidatingAdmissionPolicy')
     binding = next(p for p in docs if p['kind'] == 'ValidatingAdmissionPolicyBinding')
@@ -24,6 +25,12 @@ for namespace, release in [('n' * 63, 'one'), ('n' * 63, 'two'), ('m' * 63, 'one
     assert len(name) <= 63 and name not in names
     assert binding['spec']['policyName'] == name
     names.add(name)
+    role = next(p for p in docs if p['kind'] == 'ClusterRole')
+    role_binding = next(p for p in docs if p['kind'] == 'ClusterRoleBinding')
+    role_name = role['metadata']['name']
+    assert len(role_name) <= 63 and role_name not in roles
+    assert role_binding['roleRef']['name'] == role_name
+    roles.add(role_name)
 print('PASS long namespace/release admission identity')
 
 before = item(render(), 'Deployment', '-runner')['spec']['template']

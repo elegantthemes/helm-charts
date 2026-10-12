@@ -1,5 +1,6 @@
 {{- if .Values.fullEnvironment.enabled }}
 {{- $f := .Values.fullEnvironment }}
+{{- $nodeRole := printf "%s-%s" (printf "%s-%s-execution-node" .Release.Namespace .Release.Name | trunc 50 | trimSuffix "-") ((list .Release.Namespace .Release.Name "execution-node") | toJson | sha256sum | trunc 12) }}
 {{- $prepull := printf "%s-session-prepull" .Release.Name | trunc 63 | trimSuffix "-" }}
 {{- $egress := printf "%s-session-egress" .Release.Name | trunc 63 | trimSuffix "-" }}
 {{- if not (regexMatch "@sha256:[a-f0-9]{64}$" $f.runnerImage) }}{{ fail "fullEnvironment.runnerImage must pin a digest" }}{{ end }}
@@ -37,7 +38,7 @@ roleRef:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: {{ .Release.Namespace }}-{{ .Release.Name }}-execution-node
+  name: {{ $nodeRole }}
 rules:
   - apiGroups: [""]
     resources: [nodes]
@@ -47,7 +48,7 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: {{ .Release.Namespace }}-{{ .Release.Name }}-execution-node
+  name: {{ $nodeRole }}
 subjects:
   - kind: ServiceAccount
     name: {{ .Release.Name }}-runner
@@ -55,7 +56,7 @@ subjects:
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: {{ .Release.Namespace }}-{{ .Release.Name }}-execution-node
+  name: {{ $nodeRole }}
 ---
 apiVersion: v1
 kind: ConfigMap

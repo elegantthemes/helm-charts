@@ -1,7 +1,7 @@
 {{- if .Values.fullEnvironment.enabled }}
 {{- $f := .Values.fullEnvironment }}
 {{- $identity := printf "%s-%s-session-admission" .Release.Namespace .Release.Name }}
-{{- $name := printf "%s-%s" ($identity | trunc 50 | trimSuffix "-") ($identity | sha256sum | trunc 12) }}
+{{- $name := printf "%s-%s" ($identity | trunc 50 | trimSuffix "-") ((list .Release.Namespace .Release.Name "session-admission") | toJson | sha256sum | trunc 12) }}
 {{- $images := concat (list $f.sessionImage) ($f.compatibleSessionImages | default list) }}
 {{- range $image := $images }}
 {{- if not (regexMatch "@sha256:[a-f0-9]{64}$" $image) }}{{ fail "Compatible session images must pin a digest" }}{{ end }}
