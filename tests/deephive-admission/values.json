@@ -1,0 +1,27 @@
+{
+  "ENV_FILE": "VALIDATION_ONLY=true",
+  "fullEnvironment": {
+    "enabled": true,
+    "nodeName": "test-execution",
+    "runnerImage": "ghcr.io/elegantthemes/runner@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "sessionImage": "ghcr.io/elegantthemes/session@sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "databaseImage": "mariadb@sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "proxyImage": "squid@sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "pullSecret": "pull",
+    "agentSecret": "agent",
+    "integrationSecret": "integration",
+    "runnerSecret": "runner",
+    "workspaceClaim": "workspace",
+    "cacheProbePath": "/var/lib/deephive/cache",
+    "scratchProbePath": "/var/lib/deephive/scratch",
+    "approvedEgressDomains": [
+      "github.com"
+    ],
+    "pressureCommand": [
+      "/opt/bin/fence"
+    ],
+    "compatibleSessionImages": [
+      "ghcr.io/elegantthemes/session@sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+    ]
+  }
+}

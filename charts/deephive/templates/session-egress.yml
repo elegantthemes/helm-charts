@@ -1,10 +1,11 @@
 {{- if .Values.fullEnvironment.enabled }}
 {{- $f := .Values.fullEnvironment }}
+{{- $egress := printf "%s-session-egress" .Release.Name | trunc 63 | trimSuffix "-" }}
 {{- if not (regexMatch "@sha256:[a-f0-9]{64}$" $f.proxyImage) }}{{ fail "fullEnvironment.proxyImage must pin a digest" }}{{ end }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: {{ .Release.Name }}-session-egress
+  name: {{ $egress }}
 data:
   squid.conf: |
     http_port 3128
@@ -24,14 +25,16 @@ data:
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ .Release.Name }}-session-egress
+  name: {{ $egress }}
 spec:
   replicas: 1
   selector:
-    matchLabels: { app: {{ .Release.Name }}-session-egress }
+    matchLabels: { app: {{ $egress }} }
   template:
     metadata:
-      labels: { app: {{ .Release.Name }}-session-egress }
+      annotations:
+        checksum/egress-config: {{ toJson $f.approvedEgressDomains | sha256sum | quote }}
+      labels: { app: {{ $egress }} }
     spec:
       automountServiceAccountToken: false
       imagePullSecrets: [{ name: {{ $f.pullSecret }} }]
@@ -47,23 +50,23 @@ spec:
             - { name: config, mountPath: /etc/squid/squid.conf, subPath: squid.conf, readOnly: true }
       volumes:
         - name: config
-          configMap: { name: {{ .Release.Name }}-session-egress }
+          configMap: { name: {{ $egress }} }
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ .Release.Name }}-session-egress
+  name: {{ $egress }}
 spec:
-  selector: { app: {{ .Release.Name }}-session-egress }
+  selector: { app: {{ $egress }} }
   ports: [{ port: 3128, targetPort: proxy }]
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: {{ .Release.Name }}-session-egress
+  name: {{ $egress }}
 spec:
   podSelector:
-    matchLabels: { app: {{ .Release.Name }}-session-egress }
+    matchLabels: { app: {{ $egress }} }
   policyTypes: [Ingress]
   ingress:
     - from:

@@ -1,0 +1,321 @@
+{
+  "apiVersion": "v1",
+  "kind": "Pod",
+  "metadata": {
+    "name": "dh-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "namespace": "dph-app",
+    "labels": {
+      "app.kubernetes.io/name": "deephive-session",
+      "deephive/session": "dh-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    "annotations": {
+      "deephive/protocol": "2",
+      "deephive/owner-generation": "1"
+    }
+  },
+  "spec": {
+    "automountServiceAccountToken": false,
+    "restartPolicy": "Never",
+    "nodeName": "test-execution",
+    "terminationGracePeriodSeconds": 60,
+    "imagePullSecrets": [
+      {
+        "name": "pull"
+      }
+    ],
+    "securityContext": {
+      "runAsUser": 1000,
+      "runAsGroup": 1000,
+      "fsGroup": 1000
+    },
+    "initContainers": [
+      {
+        "name": "local-mounts",
+        "image": "ghcr.io/elegantthemes/session@sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "command": [
+          "node",
+          "-e",
+          "const fs=require('fs');for(const [i,m] of [{\"path\":\"node_modules\",\"kind\":\"directory\"},{\"path\":\".yarn/install-state.gz\",\"kind\":\"file\"}].entries()){const p='/dependencies/mount-'+i;if(m.kind==='file')fs.closeSync(fs.openSync(p,'a'));else fs.mkdirSync(p,{recursive:true});}"
+        ],
+        "securityContext": {
+          "allowPrivilegeEscalation": false,
+          "capabilities": {
+            "drop": [
+              "ALL"
+            ]
+          }
+        },
+        "volumeMounts": [
+          {
+            "name": "dependencies",
+            "mountPath": "/dependencies"
+          }
+        ],
+        "resources": {
+          "requests": {
+            "memory": "128Mi",
+            "cpu": "100m"
+          },
+          "limits": {
+            "memory": "256Mi",
+            "cpu": "1"
+          }
+        }
+      }
+    ],
+    "containers": [
+      {
+        "name": "session",
+        "image": "ghcr.io/elegantthemes/session@sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "command": [
+          "/usr/local/bin/deephive-session-init"
+        ],
+        "securityContext": {
+          "runAsUser": 0,
+          "runAsGroup": 0,
+          "allowPrivilegeEscalation": false,
+          "capabilities": {
+            "drop": [
+              "ALL"
+            ],
+            "add": [
+              "CHOWN",
+              "DAC_OVERRIDE",
+              "FOWNER",
+              "SETUID",
+              "SETGID",
+              "KILL"
+            ]
+          }
+        },
+        "resources": {
+          "requests": {
+            "memory": "3Gi",
+            "cpu": "1"
+          },
+          "limits": {
+            "memory": "16Gi",
+            "cpu": "12",
+            "ephemeral-storage": "45Gi"
+          }
+        },
+        "env": [
+          {
+            "name": "ET_USERNAME",
+            "valueFrom": {
+              "secretKeyRef": {
+                "name": "integration",
+                "key": "ET_USERNAME",
+                "optional": true
+              }
+            }
+          },
+          {
+            "name": "ET_API_KEY",
+            "valueFrom": {
+              "secretKeyRef": {
+                "name": "integration",
+                "key": "ET_API_KEY",
+                "optional": true
+              }
+            }
+          },
+          {
+            "name": "ET_PASSWORD",
+            "valueFrom": {
+              "secretKeyRef": {
+                "name": "integration",
+                "key": "ET_PASSWORD",
+                "optional": true
+              }
+            }
+          },
+          {
+            "name": "GITHUB_TOKEN",
+            "valueFrom": {
+              "secretKeyRef": {
+                "name": "integration",
+                "key": "GITHUB_TOKEN",
+                "optional": true
+              }
+            }
+          },
+          {
+            "name": "HOME",
+            "value": "/scratch/home"
+          },
+          {
+            "name": "TMPDIR",
+            "value": "/scratch/tmp"
+          },
+          {
+            "name": "DISPLAY",
+            "value": ":1"
+          },
+          {
+            "name": "SESSION_ID",
+            "value": "dh-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          {
+            "name": "DEEPHIVE_POD_SANDBOX",
+            "value": "1"
+          },
+          {
+            "name": "SESSION_PROTOCOL",
+            "value": "2"
+          },
+          {
+            "name": "SESSION_RUNNER_URL",
+            "value": "http://review-runner:3001"
+          },
+          {
+            "name": "SESSION_TOKEN",
+            "value": "fixture"
+          },
+          {
+            "name": "HTTPS_PROXY",
+            "value": "http://review-session-egress:3128"
+          },
+          {
+            "name": "HTTP_PROXY",
+            "value": "http://review-session-egress:3128"
+          },
+          {
+            "name": "NO_PROXY",
+            "value": "127.0.0.1,localhost,review-runner"
+          },
+          {
+            "name": "OPENAI_API_KEY",
+            "valueFrom": {
+              "secretKeyRef": {
+                "name": "agent",
+                "key": "OPENAI_API_KEY"
+              }
+            }
+          }
+        ],
+        "volumeMounts": [
+          {
+            "name": "source",
+            "subPath": "tasks/task",
+            "mountPath": "/workspace"
+          },
+          {
+            "name": "scratch",
+            "mountPath": "/scratch"
+          },
+          {
+            "name": "evidence",
+            "mountPath": "/evidence"
+          },
+          {
+            "name": "shm",
+            "mountPath": "/dev/shm"
+          },
+          {
+            "name": "dependencies",
+            "subPath": "mount-0",
+            "mountPath": "/workspace/node_modules"
+          },
+          {
+            "name": "dependencies",
+            "subPath": "mount-1",
+            "mountPath": "/workspace/.yarn/install-state.gz"
+          }
+        ]
+      },
+      {
+        "name": "database",
+        "image": "mariadb@sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "args": [
+          "--bind-address=127.0.0.1",
+          "--skip-log-bin"
+        ],
+        "securityContext": {
+          "allowPrivilegeEscalation": false,
+          "capabilities": {
+            "drop": [
+              "ALL"
+            ]
+          }
+        },
+        "resources": {
+          "requests": {
+            "memory": "1Gi",
+            "cpu": "100m"
+          },
+          "limits": {
+            "memory": "1Gi",
+            "cpu": "1"
+          }
+        },
+        "env": [
+          {
+            "name": "MARIADB_ALLOW_EMPTY_ROOT_PASSWORD",
+            "value": "1"
+          },
+          {
+            "name": "MARIADB_DATABASE",
+            "value": "wordpress"
+          }
+        ],
+        "volumeMounts": [
+          {
+            "name": "database",
+            "mountPath": "/var/lib/mysql"
+          },
+          {
+            "name": "database-run",
+            "mountPath": "/run/mysqld"
+          }
+        ]
+      }
+    ],
+    "volumes": [
+      {
+        "name": "source",
+        "persistentVolumeClaim": {
+          "claimName": "workspace"
+        }
+      },
+      {
+        "name": "dependencies",
+        "emptyDir": {
+          "sizeLimit": "30Gi"
+        }
+      },
+      {
+        "name": "scratch",
+        "emptyDir": {
+          "sizeLimit": "5Gi"
+        }
+      },
+      {
+        "name": "database-run",
+        "emptyDir": {
+          "sizeLimit": "16Mi"
+        }
+      },
+      {
+        "name": "database",
+        "emptyDir": {
+          "sizeLimit": "5Gi"
+        }
+      },
+      {
+        "name": "evidence",
+        "emptyDir": {
+          "sizeLimit": "5Gi"
+        }
+      },
+      {
+        "name": "shm",
+        "emptyDir": {
+          "medium": "Memory",
+          "sizeLimit": "1Gi"
+        }
+      }
+    ],
+    "serviceAccountName": "default"
+  }
+}

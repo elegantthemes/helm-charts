@@ -1,8 +1,11 @@
 {{- if .Values.fullEnvironment.enabled }}
 {{- $f := .Values.fullEnvironment }}
+{{- $prepull := printf "%s-session-prepull" .Release.Name | trunc 63 | trimSuffix "-" }}
+{{- $egress := printf "%s-session-egress" .Release.Name | trunc 63 | trimSuffix "-" }}
 {{- if not (regexMatch "@sha256:[a-f0-9]{64}$" $f.runnerImage) }}{{ fail "fullEnvironment.runnerImage must pin a digest" }}{{ end }}
 {{- if not (regexMatch "@sha256:[a-f0-9]{64}$" $f.sessionImage) }}{{ fail "fullEnvironment.sessionImage must pin a digest" }}{{ end }}
 {{- if not (regexMatch "@sha256:[a-f0-9]{64}$" $f.databaseImage) }}{{ fail "fullEnvironment.databaseImage must pin a digest" }}{{ end }}
+{{- if or (eq $f.agentSecret "secrets") (eq ($f.integrationSecret | default "") "secrets") (eq $f.agentSecret $f.runnerSecret) (and $f.integrationSecret (eq $f.integrationSecret $f.runnerSecret)) }}{{ fail "Session credentials must not reference consumer or runner Secrets" }}{{ end }}
 {{- if not $f.pressureCommand }}{{ fail "Node-wide active-writer pressure fencing must be configured" }}{{ end }}
 {{- if not $f.approvedEgressDomains }}{{ fail "Explicit approved package/model/test domains required" }}{{ end }}
 apiVersion: v1
@@ -60,7 +63,7 @@ metadata:
   name: {{ .Release.Name }}-runner
 data:
   runner.json: |
-    {{ dict "namespace" .Release.Namespace "nodeName" $f.nodeName "image" $f.sessionImage "databaseImage" $f.databaseImage "imagePullSecret" $f.pullSecret "agentSecret" (required "Session agent Secret required" $f.agentSecret) "integrationSecret" ($f.integrationSecret | default "") "workspaceClaim" $f.workspaceClaim "workspaceRoot" $f.workspaceRoot "scratchRoot" "/node-scratch" "cacheRoot" "/node-cache" "runnerUrl" (printf "http://%s-runner:3001" .Release.Name) "proxyUrl" (printf "http://%s-session-egress:3128" .Release.Name) "pressureCommand" $f.pressureCommand "signingKeyFile" "/runner-secret/signing-key" "controlPort" 3001 | toJson }}
+    {{ dict "namespace" .Release.Namespace "nodeName" $f.nodeName "image" $f.sessionImage "databaseImage" $f.databaseImage "imagePullSecret" $f.pullSecret "agentSecret" (required "Session agent Secret required" $f.agentSecret) "integrationSecret" ($f.integrationSecret | default "") "workspaceClaim" $f.workspaceClaim "workspaceRoot" $f.workspaceRoot "scratchRoot" "/node-scratch" "cacheRoot" "/node-cache" "runnerUrl" (printf "http://%s-runner:3001" .Release.Name) "proxyUrl" (printf "http://%s:3128" $egress) "pressureCommand" $f.pressureCommand "signingKeyFile" "/runner-secret/signing-key" "controlPort" 3001 | toJson }}
 {{/* The config contains no credentials; signing key is read from runner-only Secret. */}}
 ---
 apiVersion: apps/v1
@@ -73,6 +76,8 @@ spec:
     matchLabels: { app: {{ .Release.Name }}-runner }
   template:
     metadata:
+      annotations:
+        checksum/runner-config: {{ toJson $f | sha256sum | quote }}
       labels: { app: {{ .Release.Name }}-runner, redis-client: "true" }
     spec:
       nodeName: {{ $f.nodeName | quote }}
@@ -108,7 +113,7 @@ spec:
         - name: cache-probe
           hostPath: { path: {{ required "Retained CSI cache path required" $f.cacheProbePath | quote }}, type: Directory }
         - name: scratch-probe
-          hostPath: { path: {{ $f.scratchProbePath | quote }}, type: Directory }
+          hostPath: { path: {{ required "Dedicated DeepHive scratch probe directory required" $f.scratchProbePath | quote }}, type: Directory }
 ---
 apiVersion: v1
 kind: Service
@@ -140,7 +145,7 @@ spec:
       ports: [{ protocol: TCP, port: 3001 }]
     - to:
         - podSelector:
-            matchLabels: { app: {{ .Release.Name }}-session-egress }
+            matchLabels: { app: {{ $egress }} }
       ports: [{ protocol: TCP, port: 3128 }]
 ---
 apiVersion: networking.k8s.io/v1
@@ -160,15 +165,22 @@ spec:
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
-  name: {{ .Release.Name }}-session-prepull
+  name: {{ $prepull }}
 spec:
   selector:
-    matchLabels: { app: {{ .Release.Name }}-session-prepull }
+    matchLabels: { app: {{ $prepull }} }
   template:
     metadata:
-      labels: { app: {{ .Release.Name }}-session-prepull }
+      labels: { app: {{ $prepull }} }
     spec:
-      nodeSelector: { kubernetes.io/hostname: {{ $f.nodeName | quote }} }
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchFields:
+                  - key: metadata.name
+                    operator: In
+                    values: [{{ $f.nodeName | quote }}]
       automountServiceAccountToken: false
       imagePullSecrets: [{ name: {{ $f.pullSecret }} }]
       containers:

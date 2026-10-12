@@ -1,0 +1,100 @@
+{{- if .Values.fullEnvironment.enabled }}
+{{- $f := .Values.fullEnvironment }}
+{{- $name := printf "%s-%s-session-admission" .Release.Namespace .Release.Name | trunc 63 | trimSuffix "-" }}
+{{- $images := concat (list $f.sessionImage) ($f.compatibleSessionImages | default list) }}
+{{- range $image := $images }}
+{{- if not (regexMatch "@sha256:[a-f0-9]{64}$" $image) }}{{ fail "Compatible session images must pin a digest" }}{{ end }}
+{{- end }}
+{{- $secrets := list $f.agentSecret }}
+{{- if $f.integrationSecret }}{{- $secrets = append $secrets $f.integrationSecret }}{{- end }}
+# RBAC alone cannot restrict a Pod creator's Secret/hostPath access. This policy
+# applies to the runner identity, even when it omits or forges workload labels.
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: {{ $name }}
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    resourceRules:
+      - apiGroups: [""]
+        apiVersions: [v1]
+        operations: [CREATE, UPDATE, DELETE]
+        resources: [pods]
+  matchConditions:
+    - name: runner-identity
+      expression: {{ printf "request.userInfo.username == 'system:serviceaccount:%s:%s-runner'" .Release.Namespace .Release.Name | quote }}
+  variables:
+    - name: pod
+      expression: "request.operation == 'DELETE' ? oldObject : object"
+    - name: containers
+      expression: "variables.pod.spec.containers + (has(variables.pod.spec.initContainers) ? variables.pod.spec.initContainers : [])"
+  validations:
+    - expression: >-
+        variables.pod.metadata.namespace == {{ .Release.Namespace | quote }} &&
+        variables.pod.metadata.name.matches('^dh-[a-f0-9]{40}$') &&
+        has(variables.pod.metadata.labels) &&
+        variables.pod.metadata.labels['app.kubernetes.io/name'] == 'deephive-session' &&
+        variables.pod.metadata.labels['deephive/session'] == variables.pod.metadata.name &&
+        variables.pod.metadata.labels.all(k, k in ['app.kubernetes.io/name', 'deephive/session'])
+      message: Runner access is limited to task session pods, without privileged workload labels.
+    - expression: "request.operation != 'UPDATE' || object.spec == oldObject.spec"
+      message: The runner may update termination metadata, not replace a live pod specification.
+    # CREATE-only pins must not prevent cleanup/adoption of an older approved
+    # image after a compatible runner/chart upgrade.
+    - expression: >-
+        request.operation != 'CREATE' || (
+          variables.pod.spec.nodeName == {{ $f.nodeName | quote }} &&
+          variables.pod.spec.serviceAccountName == 'default' &&
+          has(variables.pod.spec.automountServiceAccountToken) && !variables.pod.spec.automountServiceAccountToken &&
+          (!has(variables.pod.spec.hostNetwork) || !variables.pod.spec.hostNetwork) &&
+          (!has(variables.pod.spec.hostPID) || !variables.pod.spec.hostPID) &&
+          (!has(variables.pod.spec.hostIPC) || !variables.pod.spec.hostIPC) &&
+          variables.pod.spec.restartPolicy == 'Never'
+        )
+      message: Sessions must use the execution node and have no host namespaces or API token.
+    - expression: >-
+        request.operation != 'CREATE' || (
+          variables.pod.spec.volumes.all(v,
+            has(v.emptyDir) ||
+            (v.name == 'source' && has(v.persistentVolumeClaim) &&
+             v.persistentVolumeClaim.claimName == {{ $f.workspaceClaim | quote }})) &&
+          variables.containers.all(c, !has(c.volumeMounts) || c.volumeMounts.all(m,
+            m.name != 'source' ||
+            (has(m.subPath) && m.subPath != '' && !m.subPath.startsWith('/') &&
+             m.subPath.split('/').all(p, p != '' && p != '.' && p != '..') && !has(m.subPathExpr))))
+        )
+      message: Sessions may mount only local scratch and a nonempty task subpath of the workspace claim.
+    - expression: >-
+        request.operation != 'CREATE' || variables.containers.all(c,
+          (!has(c.envFrom) || size(c.envFrom) == 0) &&
+          (!has(c.env) || c.env.all(e, !has(e.valueFrom) || !has(e.valueFrom.secretKeyRef) ||
+            (e.valueFrom.secretKeyRef.name in {{ toJson $secrets }} &&
+             e.valueFrom.secretKeyRef.key in ['OPENAI_API_KEY', 'ET_USERNAME', 'ET_API_KEY', 'ET_PASSWORD', 'GITHUB_TOKEN']))) &&
+          has(c.securityContext) &&
+          has(c.securityContext.allowPrivilegeEscalation) && !c.securityContext.allowPrivilegeEscalation &&
+          (!has(c.securityContext.privileged) || !c.securityContext.privileged) &&
+          has(c.securityContext.capabilities) && 'ALL' in c.securityContext.capabilities.drop &&
+          (!has(c.securityContext.capabilities.add) || c.securityContext.capabilities.add.all(cap,
+            cap in ['CHOWN', 'DAC_OVERRIDE', 'FOWNER', 'SETUID', 'SETGID', 'KILL'])) &&
+          (!has(c.ports) || c.ports.all(p, !has(p.hostPort) || p.hostPort == 0)))
+      message: Sessions cannot inherit controller Secrets, escalate privileges or expose host ports.
+    - expression: >-
+        request.operation != 'CREATE' || (
+          size(variables.pod.spec.containers) == 2 &&
+          variables.pod.spec.containers.all(c,
+            (c.name == 'session' && c.image in {{ toJson $images }}) ||
+            (c.name == 'database' && c.image == {{ $f.databaseImage | quote }})) &&
+          has(variables.pod.spec.initContainers) && size(variables.pod.spec.initContainers) == 1 &&
+          variables.pod.spec.initContainers.all(c, c.name == 'local-mounts' && c.image in {{ toJson $images }})
+        )
+      message: Only the approved session, database and mount-init images are permitted.
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: {{ $name }}
+spec:
+  policyName: {{ $name }}
+  validationActions: [Deny]
+{{- end }}

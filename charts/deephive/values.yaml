@@ -52,6 +52,7 @@ fullEnvironment:
   nodeName: ""
   runnerImage: "" # immutable ghcr.io/...@sha256:...
   sessionImage: ""
+  compatibleSessionImages: [] # prior approved digests needed during compatible runner upgrades
   databaseImage: ""
   proxyImage: "" # approved Squid image, pinned digest
   pullSecret: ""
@@ -60,9 +61,8 @@ fullEnvironment:
   runnerSecret: "" # Redis, signing key, scoped source-publication credentials
   workspaceClaim: ""
   workspaceRoot: /workspace-root # must match enrolled canonical paths
-  scratchProbePath: /var/lib/kubelet
+  scratchProbePath: "" # dedicated DeepHive scratch directory on the kubelet filesystem
   cacheProbePath: "" # retained JuiceFS staging/cache filesystem; must be real node path
-  sourceReadHosts: []
   approvedEgressDomains: []
   # Infrastructure-supplied trusted command fences ordinary AND full writers.
   pressureCommand: []
