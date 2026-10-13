@@ -49,3 +49,8 @@ same absolute canonical root (`WORKSPACE_CLAIM_NAME`/`WORKSPACE_ROOT` and
 DNS hosts, matching the chart ingress deployment. IP-literal origins are not
 supported by this chart. Optional nondefault ports must be 1–65535; omit port
 443 and leading zeroes so the configured string matches the browser Origin.
+
+The trusted credential-free source seed must be a canonical descendant of that
+shared workspace mount, for example `/workspace-root/seed`. Rendering rejects
+outside paths and lexical traversal/aliases. Phase 4 still verifies the actual
+seed contents and fresh CSI mount; Helm cannot establish filesystem freshness.

@@ -13,6 +13,7 @@
 {{- end }}
 {{- $workspaceClaim := default (printf "%s-workspace" .Release.Name) .Values.WORKSPACE_CLAIM_NAME -}}
 {{- if and (or .Values.fullEnvironment.routingEnabled .Values.fullEnvironment.taskAllowlist) (or (ne $workspaceClaim .Values.fullEnvironment.workspaceClaim) (ne .Values.WORKSPACE_ROOT .Values.fullEnvironment.workspaceRoot) (not (hasPrefix "/" .Values.fullEnvironment.workspaceRoot))) }}{{ fail "Routing requires consumer and runner to share the same workspace claim and absolute canonical workspace root" }}{{ end }}
+{{- if and (or .Values.fullEnvironment.routingEnabled .Values.fullEnvironment.taskAllowlist) (or (ne (clean .Values.fullEnvironment.sourceSeedPath) .Values.fullEnvironment.sourceSeedPath) (ne (clean .Values.fullEnvironment.workspaceRoot) .Values.fullEnvironment.workspaceRoot) (not (hasPrefix (printf "%s/" .Values.fullEnvironment.workspaceRoot) .Values.fullEnvironment.sourceSeedPath))) }}{{ fail "Routing source seed must be a canonical descendant of the shared workspace root" }}{{ end }}
 {{- if and .Values.LEGACY_WORKSPACE_RETAIN (eq $workspaceClaim (printf "%s-workspace" .Release.Name)) -}}
 {{- fail "LEGACY_WORKSPACE_RETAIN requires a different WORKSPACE_CLAIM_NAME" -}}
 {{- end -}}
@@ -139,6 +140,10 @@ spec:
       containers:
         - name: {{ .Release.Name }}
           env:
+{{- if or .Values.fullEnvironment.routingEnabled .Values.fullEnvironment.taskAllowlist }}
+            - name: WORKSPACE_ROOT
+              value: {{ .Values.WORKSPACE_ROOT | quote }}
+{{- end }}
             - name: FULL_ENVIRONMENT_ROUTING
               value: {{ ternary "1" "0" .Values.fullEnvironment.routingEnabled | quote }}
             - name: FULL_ENVIRONMENT_TASK_ALLOWLIST

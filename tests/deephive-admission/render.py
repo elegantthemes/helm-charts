@@ -95,7 +95,7 @@ assert all(rule['ports'][0]['port'] != 3002 for rule in item(plain, 'NetworkPoli
 phase3 = copy.deepcopy(values)
 phase3.update(WORKSPACE_CLAIM_NAME='workspace', WORKSPACE_ROOT='/workspace-root')
 phase3['fullEnvironment'].update(
-    routingEnabled=True, observationEnabled=True, sourceSeedPath='/workspace/seed',
+    routingEnabled=True, observationEnabled=True, sourceSeedPath='/workspace-root/seed',
     sourceReader={'readerId': 'fresh-csi-fixture', 'command': ['/opt/bin/read-source']},
     evidenceBucket='private-fixture', evidenceRegion='us-east-1',
     evidenceReadSecret='evidence-read', evidenceReadSecretRevision='1',
@@ -165,3 +165,13 @@ for key in ['WORKSPACE_CLAIM_NAME', 'WORKSPACE_ROOT']:
     missing[key] = 'different' if key.endswith('NAME') else '/different-root'
     rejected(missing, 'share the same workspace claim')
 print('PASS canonical origin ports and shared workspace claim/root admission')
+
+for seed in ['/workspace/seed', '/workspace-root', '/workspace-root/../seed', '/workspace-root//seed']:
+    missing = copy.deepcopy(phase3)
+    missing['fullEnvironment']['sourceSeedPath'] = seed
+    rejected(missing, 'canonical descendant')
+print('PASS canonical shared source seed admission')
+
+consumer_env = consumer_template(phase3_docs)['spec']['containers'][0]['env']
+assert next(e['value'] for e in consumer_env if e['name'] == 'WORKSPACE_ROOT') == phase3['WORKSPACE_ROOT']
+print('PASS routing consumer uses the configured canonical workspace root')
