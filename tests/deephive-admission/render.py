@@ -191,3 +191,17 @@ for secret in ['runner', 'agent', 'integration', 'secrets']:
     missing['fullEnvironment']['evidenceReadSecret'] = secret
     rejected(missing, 'dedicated read-only Secret')
 print('PASS disjoint scratch, ingress host, multi-node claim and reader credential boundaries')
+
+# Old protocol 2 manifests drain without invented bootstrap metadata.
+legacy = copy.deepcopy(values)
+image = legacy['fullEnvironment']['compatibleSessionImages'][0]
+legacy['fullEnvironment']['approvedBootstraps'].pop(image)
+legacy['fullEnvironment']['legacyProtocol2Images'] = [image]
+render(config=legacy)
+invalid = copy.deepcopy(legacy)
+invalid['fullEnvironment']['legacyProtocol2Images'].append(invalid['fullEnvironment']['sessionImage'])
+assert subprocess.run(['helm', 'template', 'review', str(root.parent.parent / 'charts/deephive'), '-f', '-'], input=json.dumps(invalid).encode(), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode != 0
+invalid = copy.deepcopy(phase3)
+invalid['fullEnvironment']['ordinaryInstallCommand'] = []
+assert subprocess.run(['helm', 'template', 'review', str(root.parent.parent / 'charts/deephive'), '-f', '-'], input=json.dumps(invalid).encode(), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode != 0
+print('PASS explicit protocol 2 drain exception and mandatory isolated installer')

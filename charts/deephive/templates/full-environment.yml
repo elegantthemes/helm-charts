@@ -12,8 +12,12 @@
 {{- if and $f.observationEnabled (not $f.publicOrigin) }}{{ fail "Exact public observation origin required" }}{{ end }}
 {{- if not (has (toJson $f.sessionProtocol) (list "2" "3")) }}{{ fail "Session protocol must be 2 or 3" }}{{ end }}
 {{- if and (or $f.routingEnabled $f.taskAllowlist) (ne (int $f.sessionProtocol) 3) }}{{ fail "Phase 3 routing requires session protocol 3" }}{{ end }}
+{{- range $image := $f.legacyProtocol2Images }}
+{{- if not (has $image (append $f.compatibleSessionImages $f.sessionImage)) }}{{ fail "Legacy protocol 2 images must be retained compatible images" }}{{ end }}
+{{- if and (eq $image $f.sessionImage) (ne (int $f.sessionProtocol) 2) }}{{ fail "Current protocol 3 image cannot be a legacy bootstrap exception" }}{{ end }}
+{{- end }}
 {{- range $image := append $f.compatibleSessionImages $f.sessionImage }}
-{{- if not (regexMatch "^[a-f0-9]{64}$" (index $f.approvedBootstraps $image | default "")) }}{{ fail "Every pinned and compatible session image requires its approved bootstrap/runtime identity" }}{{ end }}
+{{- if and (not (has $image $f.legacyProtocol2Images)) (not (regexMatch "^[a-f0-9]{64}$" (index $f.approvedBootstraps $image | default ""))) }}{{ fail "Every pinned and compatible session image requires its approved bootstrap/runtime identity" }}{{ end }}
 {{- end }}
 apiVersion: v1
 kind: ServiceAccount

@@ -53,9 +53,11 @@ fullEnvironment:
   routingEnabled: false
   taskAllowlist: "" # comma-separated explicit staging issue numbers
   sourceSeedPath: "" # trusted credential-free /opt/divi-seed export on the shared PVC
+  legacyProtocol2Images: [] # explicit drain-only exceptions; never permits protocol 3 validation
   approvedBootstraps: {} # immutable session digest -> bootstrap/runtime identity
   sessionProtocol: 3
   ordinaryAdmissionCommand: [] # trusted command reserves existing ordinary worker capacity
+  ordinaryInstallCommand: [] # audited isolated installer; no consumer credentials or worker mounts
   ordinaryHandoffCommand: [] # proves task source writers stopped and reservation released
   ordinaryScratchRoot: "" # outside candidate source
   sourceReader:

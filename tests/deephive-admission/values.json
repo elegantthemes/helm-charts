@@ -26,6 +26,9 @@
     "approvedBootstraps": {
       "ghcr.io/elegantthemes/session@sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
       "ghcr.io/elegantthemes/session@sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
-    }
+    },
+    "ordinaryInstallCommand": [
+      "/infra/ordinary-install"
+    ]
   }
 }

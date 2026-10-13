@@ -1,7 +1,7 @@
 {{- if and (or .Values.fullEnvironment.routingEnabled .Values.fullEnvironment.taskAllowlist .Values.fullEnvironment.observationEnabled) (not .Values.fullEnvironment.enabled) }}{{ fail "Routing or observation requires fullEnvironment.enabled" }}{{ end }}
-{{- if and (or .Values.fullEnvironment.routingEnabled .Values.fullEnvironment.taskAllowlist) (or (not .Values.fullEnvironment.sourceSeedPath) (not (hasPrefix "/" .Values.fullEnvironment.sourceSeedPath)) (not .Values.fullEnvironment.ordinaryAdmissionCommand) (not .Values.fullEnvironment.ordinaryHandoffCommand) (not (hasPrefix "/" .Values.fullEnvironment.ordinaryScratchRoot)) (not .Values.fullEnvironment.sourceReader.command) (not (.Values.fullEnvironment.sourceReader.readerId | trim)) (not .Values.fullEnvironment.evidenceBucket) (not .Values.fullEnvironment.publicOrigin)) }}{{ fail "Routing requires source seed, fresh reader, private evidence bucket and stable origin" }}{{ end }}
+{{- if and (or .Values.fullEnvironment.routingEnabled .Values.fullEnvironment.taskAllowlist) (or (not .Values.fullEnvironment.sourceSeedPath) (not (hasPrefix "/" .Values.fullEnvironment.sourceSeedPath)) (not .Values.fullEnvironment.ordinaryAdmissionCommand) (not .Values.fullEnvironment.ordinaryHandoffCommand) (not .Values.fullEnvironment.ordinaryInstallCommand) (not (hasPrefix "/" .Values.fullEnvironment.ordinaryScratchRoot)) (not .Values.fullEnvironment.sourceReader.command) (not (.Values.fullEnvironment.sourceReader.readerId | trim)) (not .Values.fullEnvironment.evidenceBucket) (not .Values.fullEnvironment.publicOrigin)) }}{{ fail "Routing requires source seed, fresh reader, private evidence bucket and stable origin" }}{{ end }}
 {{- if or .Values.fullEnvironment.routingEnabled .Values.fullEnvironment.taskAllowlist }}
-{{- range $command := list .Values.fullEnvironment.sourceReader.command .Values.fullEnvironment.ordinaryAdmissionCommand .Values.fullEnvironment.ordinaryHandoffCommand }}
+{{- range $command := list .Values.fullEnvironment.sourceReader.command .Values.fullEnvironment.ordinaryAdmissionCommand .Values.fullEnvironment.ordinaryHandoffCommand .Values.fullEnvironment.ordinaryInstallCommand }}
 {{- if not (hasPrefix "/" (index $command 0)) }}{{ fail "Source reader and ordinary-worker fencing commands must use absolute executable paths" }}{{ end }}
 {{- end }}
 {{- end }}
@@ -163,6 +163,8 @@ spec:
               value: {{ .Values.fullEnvironment.sourceSeedPath | quote }}
             - name: FULL_ENVIRONMENT_ORDINARY_ADMISSION_COMMAND
               value: {{ toJson .Values.fullEnvironment.ordinaryAdmissionCommand | quote }}
+            - name: FULL_ENVIRONMENT_ORDINARY_INSTALL_COMMAND
+              value: {{ toJson .Values.fullEnvironment.ordinaryInstallCommand | quote }}
             - name: FULL_ENVIRONMENT_ORDINARY_HANDOFF_COMMAND
               value: {{ toJson .Values.fullEnvironment.ordinaryHandoffCommand | quote }}
             - name: FULL_ENVIRONMENT_ORDINARY_SCRATCH_ROOT
