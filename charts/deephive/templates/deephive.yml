@@ -6,8 +6,13 @@
 {{- end }}
 {{- end }}
 {{- if and .Values.fullEnvironment.evidenceBucket (not .Values.fullEnvironment.evidenceRegion) }}{{ fail "Private evidence bucket requires its region" }}{{ end }}
-{{- if and (or .Values.fullEnvironment.routingEnabled .Values.fullEnvironment.taskAllowlist .Values.fullEnvironment.observationEnabled .Values.fullEnvironment.evidenceBucket) (not (regexMatch "^https://([A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?|\\[[0-9A-Fa-f:]+\\])(:[0-9]{1,5})?$" .Values.fullEnvironment.publicOrigin)) }}{{ fail "Stable public origin must be an exact HTTPS origin without userinfo, path, query or fragment" }}{{ end }}
+{{- if or .Values.fullEnvironment.routingEnabled .Values.fullEnvironment.taskAllowlist .Values.fullEnvironment.observationEnabled .Values.fullEnvironment.evidenceBucket }}
+{{- if not (regexMatch "^https://([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\\.)*[a-z]([a-z0-9-]{0,61}[a-z0-9])?(:[1-9][0-9]{0,4})?$" .Values.fullEnvironment.publicOrigin) }}{{ fail "Stable public origin must be an exact HTTPS origin using a lowercase DNS host without userinfo, path, query or fragment" }}{{ end }}
+{{- $port := trimPrefix ":" (regexFind ":[0-9]+$" .Values.fullEnvironment.publicOrigin) }}
+{{- if and $port (or (gt (int $port) 65535) (eq (int $port) 443)) }}{{ fail "Public origin port must be at most 65535; omit the default HTTPS port 443" }}{{ end }}
+{{- end }}
 {{- $workspaceClaim := default (printf "%s-workspace" .Release.Name) .Values.WORKSPACE_CLAIM_NAME -}}
+{{- if and (or .Values.fullEnvironment.routingEnabled .Values.fullEnvironment.taskAllowlist) (or (ne $workspaceClaim .Values.fullEnvironment.workspaceClaim) (ne .Values.WORKSPACE_ROOT .Values.fullEnvironment.workspaceRoot) (not (hasPrefix "/" .Values.fullEnvironment.workspaceRoot))) }}{{ fail "Routing requires consumer and runner to share the same workspace claim and absolute canonical workspace root" }}{{ end }}
 {{- if and .Values.LEGACY_WORKSPACE_RETAIN (eq $workspaceClaim (printf "%s-workspace" .Release.Name)) -}}
 {{- fail "LEGACY_WORKSPACE_RETAIN requires a different WORKSPACE_CLAIM_NAME" -}}
 {{- end -}}

@@ -42,3 +42,10 @@ external Secret automatically. Runner write credentials follow the existing
 Observation requires a `runnerSecretRevision` value. Increment it and upgrade
 Helm after rotating the observation token: both runner and consumer templates
 include this revision, so both processes reload the token.
+
+Routing requires the consumer and runner to mount the same workspace PVC at the
+same absolute canonical root (`WORKSPACE_CLAIM_NAME`/`WORKSPACE_ROOT` and
+`fullEnvironment.workspaceClaim`/`workspaceRoot`). Public origins use lowercase
+DNS hosts, matching the chart ingress deployment. IP-literal origins are not
+supported by this chart. Optional nondefault ports must be 1–65535; omit port
+443 and leading zeroes so the configured string matches the browser Origin.

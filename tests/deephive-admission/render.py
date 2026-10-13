@@ -93,6 +93,7 @@ plain = render()
 assert item(plain, 'NetworkPolicy', '-sessions')['spec']['ingress'] == []
 assert all(rule['ports'][0]['port'] != 3002 for rule in item(plain, 'NetworkPolicy', '-runner-control')['spec']['ingress'])
 phase3 = copy.deepcopy(values)
+phase3.update(WORKSPACE_CLAIM_NAME='workspace', WORKSPACE_ROOT='/workspace-root')
 phase3['fullEnvironment'].update(
     routingEnabled=True, observationEnabled=True, sourceSeedPath='/workspace/seed',
     sourceReader={'readerId': 'fresh-csi-fixture', 'command': ['/opt/bin/read-source']},
@@ -151,3 +152,16 @@ for key in ['ordinaryAdmissionCommand', 'ordinaryHandoffCommand']:
     missing['fullEnvironment'][key] = ['relative-command']
     rejected(missing, 'absolute executable paths')
 print('PASS observation-token rollout, exact protocols, compatible identities and ordinary-worker fencing')
+
+for origin in ['https://deephive.example:65536', 'https://deephive.example:99999', 'https://deephive.example:443', 'https://deephive.example:0', 'https://deephive.example:0443', 'https://[::::]', 'https://[a:b]']:
+    missing = copy.deepcopy(phase3)
+    missing['fullEnvironment']['publicOrigin'] = origin
+    rejected(missing, 'origin')
+valid_port = copy.deepcopy(phase3)
+valid_port['fullEnvironment']['publicOrigin'] = 'https://deephive.example:8443'
+render(config=valid_port)
+for key in ['WORKSPACE_CLAIM_NAME', 'WORKSPACE_ROOT']:
+    missing = copy.deepcopy(phase3)
+    missing[key] = 'different' if key.endswith('NAME') else '/different-root'
+    rejected(missing, 'share the same workspace claim')
+print('PASS canonical origin ports and shared workspace claim/root admission')
