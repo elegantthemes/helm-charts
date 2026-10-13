@@ -1,3 +1,6 @@
+{{- if and (or .Values.fullEnvironment.routingEnabled .Values.fullEnvironment.taskAllowlist .Values.fullEnvironment.observationEnabled) (not .Values.fullEnvironment.enabled) }}{{ fail "Routing or observation requires fullEnvironment.enabled" }}{{ end }}
+{{- if and (or .Values.fullEnvironment.routingEnabled .Values.fullEnvironment.taskAllowlist) (or (not .Values.fullEnvironment.sourceSeedPath) (not .Values.fullEnvironment.sourceReader.command) (not .Values.fullEnvironment.evidenceBucket) (not .Values.fullEnvironment.publicOrigin)) }}{{ fail "Routing requires source seed, fresh reader, private evidence bucket and stable origin" }}{{ end }}
+{{- if and .Values.fullEnvironment.evidenceBucket (not .Values.fullEnvironment.evidenceRegion) }}{{ fail "Private evidence bucket requires its region" }}{{ end }}
 {{- $workspaceClaim := default (printf "%s-workspace" .Release.Name) .Values.WORKSPACE_CLAIM_NAME -}}
 {{- if and .Values.LEGACY_WORKSPACE_RETAIN (eq $workspaceClaim (printf "%s-workspace" .Release.Name)) -}}
 {{- fail "LEGACY_WORKSPACE_RETAIN requires a different WORKSPACE_CLAIM_NAME" -}}
@@ -119,6 +122,45 @@ spec:
       containers:
         - name: {{ .Release.Name }}
           env:
+            - name: FULL_ENVIRONMENT_ROUTING
+              value: {{ ternary "1" "0" .Values.fullEnvironment.routingEnabled | quote }}
+            - name: FULL_ENVIRONMENT_TASK_ALLOWLIST
+              value: {{ .Values.fullEnvironment.taskAllowlist | quote }}
+            - name: FULL_ENVIRONMENT_SOURCE_SEED
+              value: {{ .Values.fullEnvironment.sourceSeedPath | quote }}
+            - name: FULL_ENVIRONMENT_ORDINARY_ADMISSION_COMMAND
+              value: {{ toJson .Values.fullEnvironment.ordinaryAdmissionCommand | quote }}
+            - name: FULL_ENVIRONMENT_ORDINARY_HANDOFF_COMMAND
+              value: {{ toJson .Values.fullEnvironment.ordinaryHandoffCommand | quote }}
+            - name: FULL_ENVIRONMENT_ORDINARY_SCRATCH_ROOT
+              value: {{ .Values.fullEnvironment.ordinaryScratchRoot | quote }}
+            - name: FULL_ENVIRONMENT_READER_CONFIG
+              value: {{ toJson .Values.fullEnvironment.sourceReader | quote }}
+{{- if or .Values.fullEnvironment.observationEnabled .Values.fullEnvironment.evidenceBucket }}
+            - name: BROWSER_PUBLIC_ORIGIN
+              value: {{ required "Stable HTTPS origin required" .Values.fullEnvironment.publicOrigin | quote }}
+{{- end }}
+{{- if .Values.fullEnvironment.observationEnabled }}
+            - name: BROWSER_OBSERVATION_RUNNER_URL
+              value: {{ printf "http://%s-runner:3002" .Release.Name | quote }}
+            - name: BROWSER_OBSERVATION_TOKEN
+              valueFrom:
+                secretKeyRef: { name: {{ .Values.fullEnvironment.runnerSecret | quote }}, key: observation-token }
+{{- end }}
+{{- if .Values.fullEnvironment.evidenceBucket }}
+            - name: BROWSER_EVIDENCE_BUCKET
+              value: {{ .Values.fullEnvironment.evidenceBucket | quote }}
+            - name: BROWSER_EVIDENCE_REGION
+              value: {{ .Values.fullEnvironment.evidenceRegion | quote }}
+            - name: BROWSER_EVIDENCE_ENDPOINT
+              value: {{ .Values.fullEnvironment.evidenceEndpoint | quote }}
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef: { name: {{ required "Evidence read-only Secret required" .Values.fullEnvironment.evidenceReadSecret | quote }}, key: AWS_ACCESS_KEY_ID }
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef: { name: {{ .Values.fullEnvironment.evidenceReadSecret | quote }}, key: AWS_SECRET_ACCESS_KEY }
+{{- end }}
             - name: NODE_NAME
               valueFrom:
                 fieldRef:
