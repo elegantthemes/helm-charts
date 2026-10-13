@@ -38,3 +38,7 @@ the external read Secret, increment this revision and upgrade Helm to restart
 consumers before revoking the old credential. The chart does not watch that
 external Secret automatically. Runner write credentials follow the existing
 `runnerSecretRevision` rotation procedure.
+
+Observation requires a `runnerSecretRevision` value. Increment it and upgrade
+Helm after rotating the observation token: both runner and consumer templates
+include this revision, so both processes reload the token.

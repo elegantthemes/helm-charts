@@ -98,7 +98,9 @@ phase3['fullEnvironment'].update(
     sourceReader={'readerId': 'fresh-csi-fixture', 'command': ['/opt/bin/read-source']},
     evidenceBucket='private-fixture', evidenceRegion='us-east-1',
     evidenceReadSecret='evidence-read', evidenceReadSecretRevision='1',
-    publicOrigin='https://deephive.example')
+    publicOrigin='https://deephive.example', runnerSecretRevision='1',
+    ordinaryAdmissionCommand=['/opt/bin/admit'], ordinaryHandoffCommand=['/opt/bin/stop-proof'],
+    ordinaryScratchRoot='/scratch/ordinary')
 phase3_docs = render(config=phase3)
 assert item(phase3_docs, 'NetworkPolicy', '-sessions')['spec']['ingress'][0]['ports'][0]['port'] == 5901
 assert any(rule['ports'][0]['port'] == 3002 for rule in item(phase3_docs, 'NetworkPolicy', '-runner-control')['spec']['ingress'])
@@ -129,3 +131,23 @@ for origin in ['http://deephive.example', 'https://deephive.example/', 'https://
     missing['fullEnvironment']['publicOrigin'] = origin
     rejected(missing, 'exact HTTPS origin')
 print('PASS reader identity, bootstrap migration, rotation revision and HTTPS origin validation')
+
+rotated = copy.deepcopy(phase3)
+rotated['fullEnvironment']['runnerSecretRevision'] = '2'
+rotated_docs = render(config=rotated)
+assert consumer_template(phase3_docs)['metadata']['annotations'] != consumer_template(rotated_docs)['metadata']['annotations']
+assert item(phase3_docs, 'Deployment', '-runner')['spec']['template']['metadata']['annotations'] != item(rotated_docs, 'Deployment', '-runner')['spec']['template']['metadata']['annotations']
+for protocol in [3.7, 2.1, '3', True]:
+    missing = copy.deepcopy(phase3)
+    missing['fullEnvironment']['sessionProtocol'] = protocol
+    rejected(missing, 'Session protocol must be 2 or 3')
+missing = copy.deepcopy(phase3)
+del missing['fullEnvironment']['approvedBootstraps'][missing['fullEnvironment']['compatibleSessionImages'][0]]
+rejected(missing, 'approved bootstrap/runtime identity')
+for key in ['ordinaryAdmissionCommand', 'ordinaryHandoffCommand']:
+    missing = copy.deepcopy(phase3)
+    missing['fullEnvironment'][key] = []
+    rejected(missing, 'Routing requires')
+    missing['fullEnvironment'][key] = ['relative-command']
+    rejected(missing, 'absolute executable paths')
+print('PASS observation-token rollout, exact protocols, compatible identities and ordinary-worker fencing')

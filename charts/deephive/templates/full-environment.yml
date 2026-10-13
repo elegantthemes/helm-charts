@@ -10,9 +10,11 @@
 {{- if not $f.pressureCommand }}{{ fail "Node-wide active-writer pressure fencing must be configured" }}{{ end }}
 {{- if not $f.approvedEgressDomains }}{{ fail "Explicit approved package/model/test domains required" }}{{ end }}
 {{- if and $f.observationEnabled (not $f.publicOrigin) }}{{ fail "Exact public observation origin required" }}{{ end }}
-{{- if not (has (int $f.sessionProtocol) (list 2 3)) }}{{ fail "Session protocol must be 2 or 3" }}{{ end }}
+{{- if not (has (toJson $f.sessionProtocol) (list "2" "3")) }}{{ fail "Session protocol must be 2 or 3" }}{{ end }}
 {{- if and (or $f.routingEnabled $f.taskAllowlist) (ne (int $f.sessionProtocol) 3) }}{{ fail "Phase 3 routing requires session protocol 3" }}{{ end }}
-{{- if not (index $f.approvedBootstraps $f.sessionImage) }}{{ fail "Pinned session image requires its approved bootstrap/runtime identity" }}{{ end }}
+{{- range $image := append $f.compatibleSessionImages $f.sessionImage }}
+{{- if not (regexMatch "^[a-f0-9]{64}$" (index $f.approvedBootstraps $image | default "")) }}{{ fail "Every pinned and compatible session image requires its approved bootstrap/runtime identity" }}{{ end }}
+{{- end }}
 apiVersion: v1
 kind: ServiceAccount
 metadata:
