@@ -22,6 +22,10 @@
     ],
     "compatibleSessionImages": [
       "ghcr.io/elegantthemes/session@sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
-    ]
+    ],
+    "approvedBootstraps": {
+      "ghcr.io/elegantthemes/session@sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "ghcr.io/elegantthemes/session@sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+    }
   }
 }

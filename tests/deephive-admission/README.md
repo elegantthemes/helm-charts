@@ -25,3 +25,16 @@ Session pods must carry the chart's `app.kubernetes.io/instance` release label.
 Before upgrading an older runner/chart that created unlabeled pods, drain those
 sessions while the old policy still permits cleanup; do not strand them behind
 the new release-scoped admission policy. This is a Phase 4 rollout gate.
+
+Phase 3 runner upgrades require `fullEnvironment.approvedBootstraps` entries for
+the pinned session image and every retained active/compatible image. Use each
+reviewed image manifest's actual bootstrap/runtime identity; fixture hashes in
+`values.json` are synthetic. Drain sessions whose approved identity cannot be
+retained before upgrading. Protocol 2 is available for an explicit drain, but
+Phase 3 routing requires protocol 3.
+
+When private evidence is configured, supply `evidenceReadSecretRevision`. Rotate
+the external read Secret, increment this revision and upgrade Helm to restart
+consumers before revoking the old credential. The chart does not watch that
+external Secret automatically. Runner write credentials follow the existing
+`runnerSecretRevision` rotation procedure.

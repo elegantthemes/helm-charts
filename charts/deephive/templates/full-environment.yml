@@ -152,11 +152,15 @@ spec:
   podSelector:
     matchLabels: { app.kubernetes.io/name: deephive-session, app.kubernetes.io/instance: {{ .Release.Name | quote }} }
   policyTypes: [Ingress, Egress]
+{{- if $f.observationEnabled }}
   ingress:
     - from:
         - podSelector:
             matchLabels: { app: {{ .Release.Name }}-runner }
       ports: [{ protocol: TCP, port: 5901 }]
+{{- else }}
+  ingress: []
+{{- end }}
   egress:
     - to:
         - namespaceSelector:
@@ -182,10 +186,12 @@ spec:
     matchLabels: { app: {{ .Release.Name }}-runner }
   policyTypes: [Ingress]
   ingress:
+{{- if $f.observationEnabled }}
     - from:
         - podSelector:
             matchLabels: { app: {{ .Release.Name }} }
       ports: [{ protocol: TCP, port: 3002 }]
+{{- end }}
     - from:
         - podSelector:
             matchLabels: { app.kubernetes.io/name: deephive-session, app.kubernetes.io/instance: {{ .Release.Name | quote }} }

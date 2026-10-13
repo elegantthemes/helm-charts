@@ -87,3 +87,45 @@ assert rotated['spec']['template']['metadata']['annotations'] != consumer['spec'
 runner_role = next(p for p in mysql_docs if p['kind'] == 'Role' and p['metadata']['name'] == 'review-runner')
 assert all('secrets' not in rule['resources'] and 'list' not in rule['verbs'] for rule in runner_role['rules'])
 print('PASS consumer MySQL credential references, rotation and runner read permissions')
+
+# Phase 3 feature-off boundaries and fresh-reader admission.
+plain = render()
+assert item(plain, 'NetworkPolicy', '-sessions')['spec']['ingress'] == []
+assert all(rule['ports'][0]['port'] != 3002 for rule in item(plain, 'NetworkPolicy', '-runner-control')['spec']['ingress'])
+phase3 = copy.deepcopy(values)
+phase3['fullEnvironment'].update(
+    routingEnabled=True, observationEnabled=True, sourceSeedPath='/workspace/seed',
+    sourceReader={'readerId': 'fresh-csi-fixture', 'command': ['/opt/bin/read-source']},
+    evidenceBucket='private-fixture', evidenceRegion='us-east-1',
+    evidenceReadSecret='evidence-read', evidenceReadSecretRevision='1',
+    publicOrigin='https://deephive.example')
+phase3_docs = render(config=phase3)
+assert item(phase3_docs, 'NetworkPolicy', '-sessions')['spec']['ingress'][0]['ports'][0]['port'] == 5901
+assert any(rule['ports'][0]['port'] == 3002 for rule in item(phase3_docs, 'NetworkPolicy', '-runner-control')['spec']['ingress'])
+def consumer_template(docs):
+    return next(p for p in docs if p['kind'] == 'Deployment' and p['metadata']['name'] == 'review')['spec']['template']
+before = consumer_template(phase3_docs)
+rotated = copy.deepcopy(phase3)
+rotated['fullEnvironment']['evidenceReadSecretRevision'] = '2'
+assert before['metadata']['annotations'] != consumer_template(render(config=rotated))['metadata']['annotations']
+print('PASS observation-off isolation and evidence credential rotation')
+
+def rejected(config, expected):
+    result = subprocess.run(['helm', 'template', 'review', str(root.parent.parent / 'charts/deephive'), '-f', '-'], input=json.dumps(config), text=True, capture_output=True)
+    assert result.returncode != 0 and expected in result.stderr, result.stderr
+missing = copy.deepcopy(phase3)
+missing['fullEnvironment']['sourceReader']['readerId'] = ''
+rejected(missing, 'fresh reader')
+missing['fullEnvironment']['sourceReader']['readerId'] = '  '
+rejected(missing, 'fresh reader')
+missing = copy.deepcopy(phase3)
+missing['fullEnvironment']['approvedBootstraps'] = {}
+rejected(missing, 'approved bootstrap/runtime identity')
+missing = copy.deepcopy(phase3)
+missing['fullEnvironment']['evidenceReadSecretRevision'] = ''
+rejected(missing, 'Evidence read Secret revision required')
+for origin in ['http://deephive.example', 'https://deephive.example/', 'https://deephive.example/path', 'https://deephive.example?x=1', 'https://deephive.example#fragment', 'https://user@deephive.example', 'arbitrary text']:
+    missing = copy.deepcopy(phase3)
+    missing['fullEnvironment']['publicOrigin'] = origin
+    rejected(missing, 'exact HTTPS origin')
+print('PASS reader identity, bootstrap migration, rotation revision and HTTPS origin validation')
