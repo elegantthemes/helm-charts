@@ -18,10 +18,10 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ .Release.Name }}-consumer
+  name: {{ .Release.Name }}-consumer-sa
   namespace: {{ .Release.Namespace }}
   labels:
-    app: {{ .Release.Name }}-consumer
+    app: {{ .Release.Name }}-consumer-sa
 spec:
   selector:
     app: {{ .Release.Name }}
@@ -90,6 +90,10 @@ spec:
         deephive/role: consumer
         redis-client: 'true'
     spec:
+{{- if .Values.CODEX_AUTH_SECRET_NAME }}
+      # Lets DeepHive read/update the Codex login Secret (see codex-auth.yml).
+      serviceAccountName: {{ .Release.Name }}-consumer-sa
+{{- end }}
       terminationGracePeriodSeconds: {{ .Values.CONSUMER_TERMINATION_GRACE_SECONDS | default 120 }}
       affinity:
         podAntiAffinity:

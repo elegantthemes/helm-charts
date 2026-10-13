@@ -1,0 +1,51 @@
+{{- if .Values.CODEX_AUTH_SECRET_NAME }}
+{{- $secretName := .Values.CODEX_AUTH_SECRET_NAME }}
+{{- $existing := lookup "v1" "Secret" .Release.Namespace $secretName }}
+# Holds the Codex CLI ChatGPT login (auth.json). DeepHive updates it as Codex refreshes
+# tokens, so Helm must never overwrite or delete it: existing data is carried over on
+# every upgrade and the Secret is kept on uninstall.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ $secretName }}
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    helm.sh/resource-policy: keep
+type: Opaque
+{{- if and $existing $existing.data }}
+data:
+{{ toYaml $existing.data | indent 2 }}
+{{- end }}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ .Release.Name }}-consumer-sa
+  namespace: {{ .Release.Namespace }}
+---
+# Least privilege: read and patch only this one Secret (no list/watch/create/delete).
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ .Release.Name }}-codex-auth
+  namespace: {{ .Release.Namespace }}
+rules:
+  - apiGroups: [""]
+    resources: ["secrets"]
+    resourceNames: [{{ $secretName | quote }}]
+    verbs: ["get", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ .Release.Name }}-codex-auth
+  namespace: {{ .Release.Namespace }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ .Release.Name }}-consumer-sa
+    namespace: {{ .Release.Namespace }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ .Release.Name }}-codex-auth
+{{- end }}

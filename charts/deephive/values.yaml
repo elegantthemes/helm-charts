@@ -18,6 +18,12 @@ WORKSPACE_CLAIM_NAME:
 WORKSPACE_STORAGE_CLASS_NAME: linode-block-storage
 WORKSPACE_STORAGE_SIZE: 250Gi
 
+# Optional: name of a Secret that holds the Codex CLI ChatGPT login (auth.json). When set the
+# chart creates it (never overwriting existing data), a ServiceAccount for the consumer pod, and
+# a Role allowing get/patch on only that Secret. Set the same name as CODEX_AUTH_SECRET_NAME in
+# the DeepHive env file. Empty = disabled.
+CODEX_AUTH_SECRET_NAME: ""
+
 # Preserve the original workspace PVC during a cutover to a different claim.
 LEGACY_WORKSPACE_RETAIN: false
 LEGACY_WORKSPACE_STORAGE_CLASS_NAME: linode-block-storage
