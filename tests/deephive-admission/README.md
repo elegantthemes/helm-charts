@@ -54,3 +54,10 @@ The trusted credential-free source seed must be a canonical descendant of that
 shared workspace mount, for example `/workspace-root/seed`. Rendering rejects
 outside paths and lexical traversal/aliases. Phase 4 still verifies the actual
 seed contents and fresh CSI mount; Helm cannot establish filesystem freshness.
+
+Routing participants share a ReadWriteMany claim because consumers and the
+pinned runner can occupy different nodes. Ordinary scratch must be canonical
+and outside the entire shared candidate workspace. The public-origin hostname
+must match `VIRTUAL_HOST`. Evidence reader credentials use a dedicated Secret,
+separate from runner, agent/integration and ordinary consumer Secrets; Phase 4
+verifies actual read-only IAM permissions and RWX CSI behavior.

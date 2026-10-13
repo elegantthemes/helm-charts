@@ -93,7 +93,7 @@ plain = render()
 assert item(plain, 'NetworkPolicy', '-sessions')['spec']['ingress'] == []
 assert all(rule['ports'][0]['port'] != 3002 for rule in item(plain, 'NetworkPolicy', '-runner-control')['spec']['ingress'])
 phase3 = copy.deepcopy(values)
-phase3.update(WORKSPACE_CLAIM_NAME='workspace', WORKSPACE_ROOT='/workspace-root')
+phase3.update(WORKSPACE_CLAIM_NAME='workspace', WORKSPACE_ROOT='/workspace-root', WORKSPACE_ACCESS_MODES=['ReadWriteMany'], VIRTUAL_HOST='deephive.example')
 phase3['fullEnvironment'].update(
     routingEnabled=True, observationEnabled=True, sourceSeedPath='/workspace-root/seed',
     sourceReader={'readerId': 'fresh-csi-fixture', 'command': ['/opt/bin/read-source']},
@@ -175,3 +175,19 @@ print('PASS canonical shared source seed admission')
 consumer_env = consumer_template(phase3_docs)['spec']['containers'][0]['env']
 assert next(e['value'] for e in consumer_env if e['name'] == 'WORKSPACE_ROOT') == phase3['WORKSPACE_ROOT']
 print('PASS routing consumer uses the configured canonical workspace root')
+
+for scratch in ['/workspace-root/seed/scratch', '/workspace-root', '/', '/scratch/../scratch']:
+    missing = copy.deepcopy(phase3)
+    missing['fullEnvironment']['ordinaryScratchRoot'] = scratch
+    rejected(missing, 'scratch must be canonical and disjoint')
+missing = copy.deepcopy(phase3)
+missing['fullEnvironment']['publicOrigin'] = 'https://other.example'
+rejected(missing, 'hostname must match')
+missing = copy.deepcopy(phase3)
+missing['WORKSPACE_ACCESS_MODES'] = ['ReadWriteOnce']
+rejected(missing, 'ReadWriteMany')
+for secret in ['runner', 'agent', 'integration', 'secrets']:
+    missing = copy.deepcopy(phase3)
+    missing['fullEnvironment']['evidenceReadSecret'] = secret
+    rejected(missing, 'dedicated read-only Secret')
+print('PASS disjoint scratch, ingress host, multi-node claim and reader credential boundaries')
