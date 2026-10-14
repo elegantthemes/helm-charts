@@ -49,6 +49,26 @@ DB_PASSWORD:
 # Phase 2 preparation only. Routing and workload creation remain disabled.
 fullEnvironment:
   enabled: false
+  observationEnabled: false
+  routingEnabled: false
+  taskAllowlist: "" # comma-separated explicit staging issue numbers
+  sourceSeedPath: "" # trusted credential-free /opt/divi-seed export on the shared PVC
+  legacyProtocol2Images: [] # explicit drain-only exceptions; never permits protocol 3 validation
+  approvedBootstraps: {} # immutable session digest -> bootstrap/runtime identity
+  sessionProtocol: 3
+  ordinaryAdmissionCommand: [] # trusted command reserves existing ordinary worker capacity
+  ordinaryInstallCommand: [] # audited isolated installer; no consumer credentials or worker mounts
+  ordinaryHandoffCommand: [] # proves task source writers stopped and reservation released
+  ordinaryScratchRoot: "" # outside candidate source
+  sourceReader:
+    readerId: "" # fresh CSI mount/cache identity, never the writer's staging cache
+    command: [] # trusted executable returns a complete SourceManifest as JSON
+  publicOrigin: "" # https://<DeepHive host>, exact browser Origin
+  evidenceBucket: "" # dedicated private bucket provisioned in Phase 4
+  evidenceRegion: ""
+  evidenceEndpoint: "" # optional S3-compatible service endpoint
+  evidenceReadSecret: "" # read-only AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY
+  evidenceReadSecretRevision: "" # required with evidence; increment and upgrade on credential rotation
   nodeName: ""
   runnerImage: "" # immutable ghcr.io/...@sha256:...
   sessionImage: ""

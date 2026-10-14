@@ -1,4 +1,30 @@
+{{- if and (or .Values.fullEnvironment.routingEnabled .Values.fullEnvironment.taskAllowlist .Values.fullEnvironment.observationEnabled) (not .Values.fullEnvironment.enabled) }}{{ fail "Routing or observation requires fullEnvironment.enabled" }}{{ end }}
+{{- if and (or .Values.fullEnvironment.routingEnabled .Values.fullEnvironment.taskAllowlist) (or (not .Values.fullEnvironment.sourceSeedPath) (not (hasPrefix "/" .Values.fullEnvironment.sourceSeedPath)) (not .Values.fullEnvironment.ordinaryAdmissionCommand) (not .Values.fullEnvironment.ordinaryHandoffCommand) (not .Values.fullEnvironment.ordinaryInstallCommand) (not (hasPrefix "/" .Values.fullEnvironment.ordinaryScratchRoot)) (not .Values.fullEnvironment.sourceReader.command) (not (.Values.fullEnvironment.sourceReader.readerId | trim)) (not .Values.fullEnvironment.evidenceBucket) (not .Values.fullEnvironment.publicOrigin)) }}{{ fail "Routing requires source seed, fresh reader, private evidence bucket and stable origin" }}{{ end }}
+{{- if or .Values.fullEnvironment.routingEnabled .Values.fullEnvironment.taskAllowlist }}
+{{- range $command := list .Values.fullEnvironment.sourceReader.command .Values.fullEnvironment.ordinaryAdmissionCommand .Values.fullEnvironment.ordinaryHandoffCommand .Values.fullEnvironment.ordinaryInstallCommand }}
+{{- if not (hasPrefix "/" (index $command 0)) }}{{ fail "Source reader and ordinary-worker fencing commands must use absolute executable paths" }}{{ end }}
+{{- end }}
+{{- end }}
+{{- if and .Values.fullEnvironment.evidenceBucket (not .Values.fullEnvironment.evidenceRegion) }}{{ fail "Private evidence bucket requires its region" }}{{ end }}
+{{- if or .Values.fullEnvironment.routingEnabled .Values.fullEnvironment.taskAllowlist .Values.fullEnvironment.observationEnabled .Values.fullEnvironment.evidenceBucket }}
+{{- if not (regexMatch "^https://([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\\.)*[a-z]([a-z0-9-]{0,61}[a-z0-9])?(:[1-9][0-9]{0,4})?$" .Values.fullEnvironment.publicOrigin) }}{{ fail "Stable public origin must be an exact HTTPS origin using a lowercase DNS host without userinfo, path, query or fragment" }}{{ end }}
+{{- $port := trimPrefix ":" (regexFind ":[0-9]+$" .Values.fullEnvironment.publicOrigin) }}
+{{- if and $port (or (gt (int $port) 65535) (eq (int $port) 443)) }}{{ fail "Public origin port must be at most 65535; omit the default HTTPS port 443" }}{{ end }}
+{{- end }}
+{{- if or .Values.fullEnvironment.observationEnabled .Values.fullEnvironment.evidenceBucket }}
+{{- $host := regexReplaceAll ":[0-9]+$" (trimPrefix "https://" .Values.fullEnvironment.publicOrigin) "" }}
+{{- if ne $host .Values.VIRTUAL_HOST }}{{ fail "Public origin hostname must match the configured ingress VIRTUAL_HOST" }}{{ end }}
+{{- end }}
+{{- if and .Values.fullEnvironment.evidenceBucket (has .Values.fullEnvironment.evidenceReadSecret (list "secrets" .Values.fullEnvironment.runnerSecret .Values.fullEnvironment.agentSecret (.Values.fullEnvironment.integrationSecret | default ""))) }}{{ fail "Evidence requires a dedicated read-only Secret separate from runner, agent and consumer credentials" }}{{ end }}
+{{- if or .Values.fullEnvironment.routingEnabled .Values.fullEnvironment.taskAllowlist }}
+{{- if not (has "ReadWriteMany" .Values.WORKSPACE_ACCESS_MODES) }}{{ fail "Routing requires a ReadWriteMany shared workspace claim" }}{{ end }}
+{{- $scratch := .Values.fullEnvironment.ordinaryScratchRoot }}
+{{- $source := .Values.fullEnvironment.workspaceRoot }}
+{{- if or (eq $scratch "/") (ne (clean $scratch) $scratch) (eq $scratch $source) (hasPrefix (printf "%s/" $source) $scratch) (hasPrefix (printf "%s/" $scratch) $source) }}{{ fail "Ordinary scratch must be canonical and disjoint from the shared candidate source workspace" }}{{ end }}
+{{- end }}
 {{- $workspaceClaim := default (printf "%s-workspace" .Release.Name) .Values.WORKSPACE_CLAIM_NAME -}}
+{{- if and (or .Values.fullEnvironment.routingEnabled .Values.fullEnvironment.taskAllowlist) (or (ne $workspaceClaim .Values.fullEnvironment.workspaceClaim) (ne .Values.WORKSPACE_ROOT .Values.fullEnvironment.workspaceRoot) (not (hasPrefix "/" .Values.fullEnvironment.workspaceRoot))) }}{{ fail "Routing requires consumer and runner to share the same workspace claim and absolute canonical workspace root" }}{{ end }}
+{{- if and (or .Values.fullEnvironment.routingEnabled .Values.fullEnvironment.taskAllowlist) (or (ne (clean .Values.fullEnvironment.sourceSeedPath) .Values.fullEnvironment.sourceSeedPath) (ne (clean .Values.fullEnvironment.workspaceRoot) .Values.fullEnvironment.workspaceRoot) (not (hasPrefix (printf "%s/" .Values.fullEnvironment.workspaceRoot) .Values.fullEnvironment.sourceSeedPath))) }}{{ fail "Routing source seed must be a canonical descendant of the shared workspace root" }}{{ end }}
 {{- if and .Values.LEGACY_WORKSPACE_RETAIN (eq $workspaceClaim (printf "%s-workspace" .Release.Name)) -}}
 {{- fail "LEGACY_WORKSPACE_RETAIN requires a different WORKSPACE_CLAIM_NAME" -}}
 {{- end -}}
@@ -81,6 +107,12 @@ spec:
   template:
     metadata:
       annotations:
+{{- if .Values.fullEnvironment.observationEnabled }}
+        observation-secret-revision: {{ required "Runner Secret revision required with observation; increment it after token rotation" .Values.fullEnvironment.runnerSecretRevision | quote }}
+{{- end }}
+{{- if .Values.fullEnvironment.evidenceBucket }}
+        evidence-secret-revision: {{ required "Evidence read Secret revision required; increment it after credential rotation" .Values.fullEnvironment.evidenceReadSecretRevision | quote }}
+{{- end }}
         checksum/env-file: {{ required "ENV_FILE is required" .Values.ENV_FILE | sha256sum | quote }}
 {{- if .Values.MYSQL_ENABLED }}
         checksum/mysql-credentials: {{ list .Values.MYSQL_PASSWORD .Values.MYSQL_ROOT_PASSWORD | toJson | sha256sum | quote }}
@@ -119,6 +151,51 @@ spec:
       containers:
         - name: {{ .Release.Name }}
           env:
+{{- if or .Values.fullEnvironment.routingEnabled .Values.fullEnvironment.taskAllowlist }}
+            - name: WORKSPACE_ROOT
+              value: {{ .Values.WORKSPACE_ROOT | quote }}
+{{- end }}
+            - name: FULL_ENVIRONMENT_ROUTING
+              value: {{ ternary "1" "0" .Values.fullEnvironment.routingEnabled | quote }}
+            - name: FULL_ENVIRONMENT_TASK_ALLOWLIST
+              value: {{ .Values.fullEnvironment.taskAllowlist | quote }}
+            - name: FULL_ENVIRONMENT_SOURCE_SEED
+              value: {{ .Values.fullEnvironment.sourceSeedPath | quote }}
+            - name: FULL_ENVIRONMENT_ORDINARY_ADMISSION_COMMAND
+              value: {{ toJson .Values.fullEnvironment.ordinaryAdmissionCommand | quote }}
+            - name: FULL_ENVIRONMENT_ORDINARY_INSTALL_COMMAND
+              value: {{ toJson .Values.fullEnvironment.ordinaryInstallCommand | quote }}
+            - name: FULL_ENVIRONMENT_ORDINARY_HANDOFF_COMMAND
+              value: {{ toJson .Values.fullEnvironment.ordinaryHandoffCommand | quote }}
+            - name: FULL_ENVIRONMENT_ORDINARY_SCRATCH_ROOT
+              value: {{ .Values.fullEnvironment.ordinaryScratchRoot | quote }}
+            - name: FULL_ENVIRONMENT_READER_CONFIG
+              value: {{ toJson .Values.fullEnvironment.sourceReader | quote }}
+{{- if or .Values.fullEnvironment.observationEnabled .Values.fullEnvironment.evidenceBucket }}
+            - name: BROWSER_PUBLIC_ORIGIN
+              value: {{ required "Stable HTTPS origin required" .Values.fullEnvironment.publicOrigin | quote }}
+{{- end }}
+{{- if .Values.fullEnvironment.observationEnabled }}
+            - name: BROWSER_OBSERVATION_RUNNER_URL
+              value: {{ printf "http://%s-runner:3002" .Release.Name | quote }}
+            - name: BROWSER_OBSERVATION_TOKEN
+              valueFrom:
+                secretKeyRef: { name: {{ .Values.fullEnvironment.runnerSecret | quote }}, key: observation-token }
+{{- end }}
+{{- if .Values.fullEnvironment.evidenceBucket }}
+            - name: BROWSER_EVIDENCE_BUCKET
+              value: {{ .Values.fullEnvironment.evidenceBucket | quote }}
+            - name: BROWSER_EVIDENCE_REGION
+              value: {{ .Values.fullEnvironment.evidenceRegion | quote }}
+            - name: BROWSER_EVIDENCE_ENDPOINT
+              value: {{ .Values.fullEnvironment.evidenceEndpoint | quote }}
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef: { name: {{ required "Evidence read-only Secret required" .Values.fullEnvironment.evidenceReadSecret | quote }}, key: AWS_ACCESS_KEY_ID }
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef: { name: {{ .Values.fullEnvironment.evidenceReadSecret | quote }}, key: AWS_SECRET_ACCESS_KEY }
+{{- end }}
             - name: NODE_NAME
               valueFrom:
                 fieldRef:

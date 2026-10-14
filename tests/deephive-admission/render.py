@@ -87,3 +87,121 @@ assert rotated['spec']['template']['metadata']['annotations'] != consumer['spec'
 runner_role = next(p for p in mysql_docs if p['kind'] == 'Role' and p['metadata']['name'] == 'review-runner')
 assert all('secrets' not in rule['resources'] and 'list' not in rule['verbs'] for rule in runner_role['rules'])
 print('PASS consumer MySQL credential references, rotation and runner read permissions')
+
+# Phase 3 feature-off boundaries and fresh-reader admission.
+plain = render()
+assert item(plain, 'NetworkPolicy', '-sessions')['spec']['ingress'] == []
+assert all(rule['ports'][0]['port'] != 3002 for rule in item(plain, 'NetworkPolicy', '-runner-control')['spec']['ingress'])
+phase3 = copy.deepcopy(values)
+phase3.update(WORKSPACE_CLAIM_NAME='workspace', WORKSPACE_ROOT='/workspace-root', WORKSPACE_ACCESS_MODES=['ReadWriteMany'], VIRTUAL_HOST='deephive.example')
+phase3['fullEnvironment'].update(
+    routingEnabled=True, observationEnabled=True, sourceSeedPath='/workspace-root/seed',
+    sourceReader={'readerId': 'fresh-csi-fixture', 'command': ['/opt/bin/read-source']},
+    evidenceBucket='private-fixture', evidenceRegion='us-east-1',
+    evidenceReadSecret='evidence-read', evidenceReadSecretRevision='1',
+    publicOrigin='https://deephive.example', runnerSecretRevision='1',
+    ordinaryAdmissionCommand=['/opt/bin/admit'], ordinaryHandoffCommand=['/opt/bin/stop-proof'],
+    ordinaryScratchRoot='/scratch/ordinary')
+phase3_docs = render(config=phase3)
+assert item(phase3_docs, 'NetworkPolicy', '-sessions')['spec']['ingress'][0]['ports'][0]['port'] == 5901
+assert any(rule['ports'][0]['port'] == 3002 for rule in item(phase3_docs, 'NetworkPolicy', '-runner-control')['spec']['ingress'])
+def consumer_template(docs):
+    return next(p for p in docs if p['kind'] == 'Deployment' and p['metadata']['name'] == 'review')['spec']['template']
+before = consumer_template(phase3_docs)
+rotated = copy.deepcopy(phase3)
+rotated['fullEnvironment']['evidenceReadSecretRevision'] = '2'
+assert before['metadata']['annotations'] != consumer_template(render(config=rotated))['metadata']['annotations']
+print('PASS observation-off isolation and evidence credential rotation')
+
+def rejected(config, expected):
+    result = subprocess.run(['helm', 'template', 'review', str(root.parent.parent / 'charts/deephive'), '-f', '-'], input=json.dumps(config), text=True, capture_output=True)
+    assert result.returncode != 0 and expected in result.stderr, result.stderr
+missing = copy.deepcopy(phase3)
+missing['fullEnvironment']['sourceReader']['readerId'] = ''
+rejected(missing, 'fresh reader')
+missing['fullEnvironment']['sourceReader']['readerId'] = '  '
+rejected(missing, 'fresh reader')
+missing = copy.deepcopy(phase3)
+missing['fullEnvironment']['approvedBootstraps'] = {}
+rejected(missing, 'approved bootstrap/runtime identity')
+missing = copy.deepcopy(phase3)
+missing['fullEnvironment']['evidenceReadSecretRevision'] = ''
+rejected(missing, 'Evidence read Secret revision required')
+for origin in ['http://deephive.example', 'https://deephive.example/', 'https://deephive.example/path', 'https://deephive.example?x=1', 'https://deephive.example#fragment', 'https://user@deephive.example', 'arbitrary text']:
+    missing = copy.deepcopy(phase3)
+    missing['fullEnvironment']['publicOrigin'] = origin
+    rejected(missing, 'exact HTTPS origin')
+print('PASS reader identity, bootstrap migration, rotation revision and HTTPS origin validation')
+
+rotated = copy.deepcopy(phase3)
+rotated['fullEnvironment']['runnerSecretRevision'] = '2'
+rotated_docs = render(config=rotated)
+assert consumer_template(phase3_docs)['metadata']['annotations'] != consumer_template(rotated_docs)['metadata']['annotations']
+assert item(phase3_docs, 'Deployment', '-runner')['spec']['template']['metadata']['annotations'] != item(rotated_docs, 'Deployment', '-runner')['spec']['template']['metadata']['annotations']
+for protocol in [3.7, 2.1, '3', True]:
+    missing = copy.deepcopy(phase3)
+    missing['fullEnvironment']['sessionProtocol'] = protocol
+    rejected(missing, 'Session protocol must be 2 or 3')
+missing = copy.deepcopy(phase3)
+del missing['fullEnvironment']['approvedBootstraps'][missing['fullEnvironment']['compatibleSessionImages'][0]]
+rejected(missing, 'approved bootstrap/runtime identity')
+for key in ['ordinaryAdmissionCommand', 'ordinaryHandoffCommand']:
+    missing = copy.deepcopy(phase3)
+    missing['fullEnvironment'][key] = []
+    rejected(missing, 'Routing requires')
+    missing['fullEnvironment'][key] = ['relative-command']
+    rejected(missing, 'absolute executable paths')
+print('PASS observation-token rollout, exact protocols, compatible identities and ordinary-worker fencing')
+
+for origin in ['https://deephive.example:65536', 'https://deephive.example:99999', 'https://deephive.example:443', 'https://deephive.example:0', 'https://deephive.example:0443', 'https://[::::]', 'https://[a:b]']:
+    missing = copy.deepcopy(phase3)
+    missing['fullEnvironment']['publicOrigin'] = origin
+    rejected(missing, 'origin')
+valid_port = copy.deepcopy(phase3)
+valid_port['fullEnvironment']['publicOrigin'] = 'https://deephive.example:8443'
+render(config=valid_port)
+for key in ['WORKSPACE_CLAIM_NAME', 'WORKSPACE_ROOT']:
+    missing = copy.deepcopy(phase3)
+    missing[key] = 'different' if key.endswith('NAME') else '/different-root'
+    rejected(missing, 'share the same workspace claim')
+print('PASS canonical origin ports and shared workspace claim/root admission')
+
+for seed in ['/workspace/seed', '/workspace-root', '/workspace-root/../seed', '/workspace-root//seed']:
+    missing = copy.deepcopy(phase3)
+    missing['fullEnvironment']['sourceSeedPath'] = seed
+    rejected(missing, 'canonical descendant')
+print('PASS canonical shared source seed admission')
+
+consumer_env = consumer_template(phase3_docs)['spec']['containers'][0]['env']
+assert next(e['value'] for e in consumer_env if e['name'] == 'WORKSPACE_ROOT') == phase3['WORKSPACE_ROOT']
+print('PASS routing consumer uses the configured canonical workspace root')
+
+for scratch in ['/workspace-root/seed/scratch', '/workspace-root', '/', '/scratch/../scratch']:
+    missing = copy.deepcopy(phase3)
+    missing['fullEnvironment']['ordinaryScratchRoot'] = scratch
+    rejected(missing, 'scratch must be canonical and disjoint')
+missing = copy.deepcopy(phase3)
+missing['fullEnvironment']['publicOrigin'] = 'https://other.example'
+rejected(missing, 'hostname must match')
+missing = copy.deepcopy(phase3)
+missing['WORKSPACE_ACCESS_MODES'] = ['ReadWriteOnce']
+rejected(missing, 'ReadWriteMany')
+for secret in ['runner', 'agent', 'integration', 'secrets']:
+    missing = copy.deepcopy(phase3)
+    missing['fullEnvironment']['evidenceReadSecret'] = secret
+    rejected(missing, 'dedicated read-only Secret')
+print('PASS disjoint scratch, ingress host, multi-node claim and reader credential boundaries')
+
+# Old protocol 2 manifests drain without invented bootstrap metadata.
+legacy = copy.deepcopy(values)
+image = legacy['fullEnvironment']['compatibleSessionImages'][0]
+legacy['fullEnvironment']['approvedBootstraps'].pop(image)
+legacy['fullEnvironment']['legacyProtocol2Images'] = [image]
+render(config=legacy)
+invalid = copy.deepcopy(legacy)
+invalid['fullEnvironment']['legacyProtocol2Images'].append(invalid['fullEnvironment']['sessionImage'])
+assert subprocess.run(['helm', 'template', 'review', str(root.parent.parent / 'charts/deephive'), '-f', '-'], input=json.dumps(invalid).encode(), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode != 0
+invalid = copy.deepcopy(phase3)
+invalid['fullEnvironment']['ordinaryInstallCommand'] = []
+assert subprocess.run(['helm', 'template', 'review', str(root.parent.parent / 'charts/deephive'), '-f', '-'], input=json.dumps(invalid).encode(), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode != 0
+print('PASS explicit protocol 2 drain exception and mandatory isolated installer')
