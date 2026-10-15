@@ -33,7 +33,7 @@ rules:
     resources: [pods]
     verbs: [get, list, create, patch, delete]
 ---
-{{- if $f.runnerEnabled }}
+{{- if or $f.runnerEnabled (lookup "rbac.authorization.k8s.io/v1" "RoleBinding" .Release.Namespace (printf "%s-runner" .Release.Name)) }}
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
@@ -143,7 +143,7 @@ spec:
       volumes:
 {{- if .Values.sourceReaderService.enabled }}
         - name: source-reader-token
-          secret: { secretName: {{ .Values.sourceReaderService.tokenSecret | quote }} }
+          secret: { secretName: {{ .Values.sourceReaderService.tokenSecret | quote }}, items: [{ key: token, path: token }] }
 {{- end }}
         - name: config
           configMap: { name: {{ .Release.Name }}-runner }

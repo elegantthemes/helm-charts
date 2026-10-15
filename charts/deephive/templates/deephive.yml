@@ -348,7 +348,7 @@ spec:
 {{- end }}
 {{- if .Values.sourceReaderService.enabled }}
         - name: source-reader-token
-          secret: { secretName: {{ .Values.sourceReaderService.tokenSecret | quote }} }
+          secret: { secretName: {{ .Values.sourceReaderService.tokenSecret | quote }}, items: [{ key: token, path: token }] }
 {{- end }}
 {{- if .Values.fullEnvironment.ordinaryCacheProbePath }}
         - name: ordinary-cache-probe

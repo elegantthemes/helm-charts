@@ -1,10 +1,13 @@
 {{- if .Values.sourceReaderService.enabled }}
 {{- $r := .Values.sourceReaderService }}
 {{- $f := .Values.fullEnvironment }}
-{{- $name := printf "%s-source-reader" .Release.Name }}
+{{- $readerNS := include "deephive.readerWorkloadNamespace" . }}
+{{- if and $r.workloadNamespace (ne $r.workloadNamespace $readerNS) }}{{ fail "Reader workload namespace must match the dedicated release identity" }}{{ end }}
+{{- $name := include "deephive.readerServiceName" . }}
 {{- $policy := printf "dph-reader-%s" (printf "%s/%s" .Release.Namespace .Release.Name | sha256sum | trunc 24) }}
 {{- if not $f.enabled }}{{ fail "Source reader requires fullEnvironment.enabled" }}{{ end }}
 {{- if or (not $r.tokenSecret) (not $r.tokenRevision) (not $r.nodeName) }}{{ fail "Source reader requires token Secret/revision and reader node" }}{{ end }}
+{{- if has $r.tokenSecret (list "secrets" $f.runnerSecret $f.agentSecret ($f.integrationSecret | default "") ($f.evidenceReadSecret | default "")) }}{{ fail "Reader token must use a dedicated Secret" }}{{ end }}
 {{- if $r.running }}
 {{- $installed := lookup "admissionregistration.k8s.io/v1" "ValidatingAdmissionPolicy" "" $policy }}
 {{- $binding := lookup "admissionregistration.k8s.io/v1" "ValidatingAdmissionPolicyBinding" "" $policy }}
@@ -40,7 +43,7 @@ spec:
   validations:
     - expression: {{ printf "has(variables.obj.metadata.labels) && variables.obj.metadata.labels['app.kubernetes.io/instance'] == '%s' && 'deephive/source-reader' in variables.obj.metadata.labels && variables.obj.metadata.name == 'dh-source-' + variables.obj.metadata.labels['deephive/source-reader']" .Release.Name | quote }}
       message: Only this release's named reader resources are permitted.
-    - expression: {{ printf "request.resource.resource == 'persistentvolumes' || request.namespace == '%s'" .Release.Namespace | quote }}
+    - expression: {{ printf "request.resource.resource == 'persistentvolumes' || request.namespace == '%s'" $readerNS | quote }}
       message: Reader workloads must stay in the configured namespace.
     - expression: >-
         request.resource.resource != 'pods' ||
@@ -65,12 +68,21 @@ spec:
          variables.obj.spec.containers.all(c,
            (request.operation == 'DELETE' || c.image == '{{ $f.runnerImage }}') &&
            !has(c.envFrom) && !has(c.env) &&
+           (!has(c.ports) || c.ports.all(p, !has(p.hostPort) || p.hostPort == 0)) &&
            has(c.securityContext) && !c.securityContext.allowPrivilegeEscalation &&
            (!has(c.securityContext.privileged) || !c.securityContext.privileged) &&
            c.securityContext.readOnlyRootFilesystem &&
            c.securityContext.capabilities.drop == ['ALL'] &&
            (!has(c.securityContext.capabilities.add) || c.securityContext.capabilities.add.size() == 0) &&
-           c.volumeMounts.size() == 1 && c.volumeMounts[0].readOnly))
+           c.volumeMounts.size() == 1 && c.volumeMounts[0].readOnly &&
+           (request.operation == 'DELETE' ||
+             (has(c.resources) && has(c.resources.requests) && has(c.resources.limits) &&
+              c.resources.requests.all(k, k in ['cpu', 'memory', 'ephemeral-storage']) &&
+              c.resources.limits.all(k, k in ['cpu', 'memory', 'ephemeral-storage']) &&
+              c.resources.requests['cpu'] == '100m' && c.resources.requests['memory'] == '128Mi' &&
+              c.resources.requests['ephemeral-storage'] == '16Mi' &&
+              c.resources.limits['cpu'] in ['1', '1000m'] && c.resources.limits['memory'] == '512Mi' &&
+              c.resources.limits['ephemeral-storage'] == '256Mi'))))
       message: Reader Pods may only read their own claim using the approved image without platform credentials or host access.
     - expression: >-
         request.resource.resource != 'persistentvolumeclaims' ||
@@ -82,7 +94,7 @@ spec:
         (variables.obj.spec.persistentVolumeReclaimPolicy == 'Retain' &&
          variables.obj.spec.storageClassName == '' && variables.obj.spec.accessModes == ['ReadOnlyMany'] &&
          variables.obj.spec.claimRef.name == variables.obj.metadata.name &&
-         variables.obj.spec.claimRef.namespace == '{{ .Release.Namespace }}' &&
+         variables.obj.spec.claimRef.namespace == '{{ $readerNS }}' &&
          variables.obj.spec.csi.driver == 'csi.juicefs.com' && variables.obj.spec.csi.readOnly &&
          variables.obj.spec.csi.volumeHandle == variables.obj.metadata.name &&
          (request.operation == 'DELETE' ||
@@ -103,12 +115,23 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
   name: {{ $name }}
+  namespace: {{ $readerNS }}
 rules:
   - apiGroups: [""]
     resources: [pods, persistentvolumeclaims]
     verbs: [get, list, create, delete]
   - apiGroups: [""]
     resources: [pods/log]
+    verbs: [get]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ $name }}-workspace
+rules:
+  - apiGroups: [""]
+    resources: [persistentvolumeclaims]
+    resourceNames: [{{ $f.workspaceClaim | quote }}]
     verbs: [get]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
@@ -120,15 +143,28 @@ rules:
     resources: [persistentvolumes]
     verbs: [get, list, create, delete]
 ---
-{{- if $r.running }}
+{{- if or $r.running (lookup "rbac.authorization.k8s.io/v1" "RoleBinding" $readerNS $name) }}
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
   name: {{ $name }}
+  namespace: {{ $readerNS }}
 subjects:
   - { kind: ServiceAccount, name: {{ $name }}, namespace: {{ .Release.Namespace }} }
 roleRef: { apiGroup: rbac.authorization.k8s.io, kind: Role, name: {{ $name }} }
 ---
+{{- end }}
+{{- if or $r.running (lookup "rbac.authorization.k8s.io/v1" "RoleBinding" .Release.Namespace (printf "%s-workspace" $name)) }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ $name }}-workspace
+subjects:
+  - { kind: ServiceAccount, name: {{ $name }}, namespace: {{ .Release.Namespace }} }
+roleRef: { apiGroup: rbac.authorization.k8s.io, kind: Role, name: {{ $name }}-workspace }
+---
+{{- end }}
+{{- if or $r.running (lookup "rbac.authorization.k8s.io/v1" "ClusterRoleBinding" "" $policy) }}
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
@@ -144,7 +180,7 @@ metadata:
   name: {{ $name }}
 data:
   reader.json: |
-    {{ dict "namespace" .Release.Namespace "workspaceNamespace" .Release.Namespace "workspaceClaim" $f.workspaceClaim "workspaceRoot" $f.workspaceRoot "nodeName" $r.nodeName "image" $f.runnerImage "imagePullSecret" $f.pullSecret "release" .Release.Name | toJson }}
+    {{ dict "namespace" $readerNS "workspaceNamespace" .Release.Namespace "workspaceClaim" $f.workspaceClaim "workspaceRoot" $f.workspaceRoot "nodeName" $r.nodeName "image" $f.runnerImage "imagePullSecret" $f.pullSecret "release" .Release.Name | toJson }}
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -180,7 +216,7 @@ spec:
         - name: config
           configMap: { name: {{ $name }} }
         - name: token
-          secret: { secretName: {{ $r.tokenSecret | quote }} }
+          secret: { secretName: {{ $r.tokenSecret | quote }}, items: [{ key: token, path: token }] }
 ---
 apiVersion: v1
 kind: Service
@@ -208,6 +244,7 @@ apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: {{ $name }}-workloads
+  namespace: {{ $readerNS }}
 spec:
   podSelector:
     matchLabels:

@@ -7,7 +7,7 @@
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: {{ .Release.Name }}-seed-{{ list .Chart.Version $f.sessionImage $f.sourceSeedPath $f.workspaceClaim $f.workspaceRoot $f.nodeName $f.pullSecret $f.prepullTolerations | toJson | sha256sum | trunc 10 }}
+  name: {{ .Release.Name | trunc 46 | trimSuffix "-" }}-seed-{{ list .Release.Namespace .Release.Name .Chart.Version $f.sessionImage $f.sourceSeedPath $f.workspaceClaim $f.workspaceRoot $f.nodeName $f.pullSecret $f.prepullTolerations | toJson | sha256sum | trunc 10 }}
 spec:
   backoffLimit: 0
   activeDeadlineSeconds: 3600

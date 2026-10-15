@@ -117,6 +117,7 @@ fullEnvironment:
 
 # Install reader admission protection before granting the broker identity.
 sourceReaderService:
+  workloadNamespace: "" # Terraform provisions the derived dph-reader-<release hash> namespace
   enabled: false
   running: false
   tokenSecret: "" # existing Secret with token key; platform processes only
