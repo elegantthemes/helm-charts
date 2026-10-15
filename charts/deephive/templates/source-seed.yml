@@ -2,6 +2,8 @@
 {{- if $f.sourceSeedExportEnabled }}
 {{- if or (not $f.enabled) $f.routingEnabled $f.taskAllowlist }}{{ fail "Export source seed with protections enabled and routing disabled" }}{{ end }}
 {{- if or (not (hasPrefix (printf "%s/" $f.workspaceRoot) $f.sourceSeedPath)) (ne (clean $f.sourceSeedPath) $f.sourceSeedPath) }}{{ fail "Source seed export requires a canonical workspace descendant" }}{{ end }}
+{{- $claim := default (printf "%s-workspace" .Release.Name) .Values.WORKSPACE_CLAIM_NAME }}
+{{- if or (ne $claim $f.workspaceClaim) (ne .Values.WORKSPACE_ROOT $f.workspaceRoot) }}{{ fail "Source seed export must share the active consumer workspace claim and root" }}{{ end }}
 apiVersion: batch/v1
 kind: Job
 metadata:
@@ -19,7 +21,11 @@ spec:
       automountServiceAccountToken: false
       nodeSelector:
         kubernetes.io/hostname: {{ $f.nodeName | quote }}
-      tolerations: {{ $f.prepullTolerations | toJson }}
+      tolerations:
+        - { key: deephive-execution, operator: Equal, value: "true", effect: NoSchedule }
+{{- with $f.prepullTolerations }}
+{{ toYaml . | indent 8 }}
+{{- end }}
       imagePullSecrets:
         - name: {{ $f.pullSecret | quote }}
       containers:

@@ -41,7 +41,7 @@ after_docs = render(config=changed)
 after = item(after_docs, 'Deployment', '-runner')['spec']['template']
 assert before['metadata']['annotations'] != after['metadata']['annotations']
 assert after['spec']['containers'][0]['readinessProbe']['tcpSocket']['port'] == 'control'
-assert item(after_docs, 'DaemonSet', '-session-prepull')['spec']['template']['spec']['tolerations'] == changed['fullEnvironment']['prepullTolerations']
+assert all(t in item(after_docs, 'DaemonSet', '-session-prepull')['spec']['template']['spec']['tolerations'] for t in changed['fullEnvironment']['prepullTolerations'])
 proxy = item(after_docs, 'ConfigMap', '-session-egress')['data']['squid.conf']
 assert 'acl approved dstdomain -n ' in proxy
 print('PASS secret rotation, readiness, taints and proxy lookup configuration')
@@ -257,6 +257,8 @@ invalid['fullEnvironment']['ordinaryHandoffCommand'] = ['/bin/true']
 rejected(invalid, 'not both')
 print('PASS built-in capacity config, commands, scratch and budget validation')
 seed = copy.deepcopy(values)
+seed['WORKSPACE_ROOT'] = seed['fullEnvironment'].get('workspaceRoot', '/workspace-root')
+seed['WORKSPACE_CLAIM_NAME'] = seed['fullEnvironment']['workspaceClaim']
 seed['fullEnvironment'].update(sourceSeedExportEnabled=True, sourceSeedPath='/workspace-root/seeds/candidate')
 docs = render(config=seed)
 job = next(p for p in docs if p['kind'] == 'Job' and '-seed-' in p['metadata']['name'])
@@ -277,3 +279,26 @@ for release in ['review', 'other']:
     assert deployment_rule['verbs'] == ['get']
     assert set(deployment_rule['resourceNames']) == {release + '-runner', release + '-source-reader'}
 print('PASS uninstall hook can read both drained deployment identities')
+
+# Source export is prepared against the same claim and root even with routing off.
+seed = copy.deepcopy(values)
+seed['WORKSPACE_ROOT'] = seed['fullEnvironment'].get('workspaceRoot', '/workspace-root')
+seed['WORKSPACE_CLAIM_NAME'] = seed['fullEnvironment']['workspaceClaim']
+seed['fullEnvironment'].update(sourceSeedExportEnabled=True, sourceSeedPath='/workspace-root/seeds/candidate')
+docs = render(config=seed)
+job = next(p for p in docs if p['kind'] == 'Job' and '-seed-' in p['metadata']['name'])
+assert {'key': 'deephive-execution', 'operator': 'Equal', 'value': 'true', 'effect': 'NoSchedule'} in job['spec']['template']['spec']['tolerations']
+for key in ['WORKSPACE_CLAIM_NAME', 'WORKSPACE_ROOT']:
+    invalid = copy.deepcopy(seed)
+    invalid[key] = 'other' if key == 'WORKSPACE_CLAIM_NAME' else '/other'
+    rejected(invalid, 'active consumer workspace')
+runner = item(docs, 'Deployment', '-runner')['spec']['template']['spec']
+assert all(v['hostPath']['type'] == 'Directory' for v in runner['volumes'] if 'hostPath' in v)
+hook = item(docs, 'Job', '-session-drain-check')
+role = item(docs, 'Role', '-session-drain-check')
+assert any('persistentvolumeclaims' in r['resources'] and r['verbs'] == ['list'] for r in role['rules'])
+cluster_role = next(p for p in docs if p['kind'] == 'ClusterRole' and p['metadata']['name'].startswith('dph-drain-'))
+assert cluster_role['rules'] == [{'apiGroups': [''], 'resources': ['persistentvolumes'], 'verbs': ['list']}]
+assert '/persistentvolumeclaims?labelSelector=' in hook['spec']['template']['spec']['containers'][0]['args'][0]
+assert '/persistentvolumes?labelSelector=' in hook['spec']['template']['spec']['containers'][0]['args'][0]
+print('PASS probe directories, seed workspace/taint and retained reader storage drain checks')

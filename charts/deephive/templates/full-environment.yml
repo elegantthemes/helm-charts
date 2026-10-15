@@ -152,9 +152,9 @@ spec:
         - name: workspace
           persistentVolumeClaim: { claimName: {{ required "Workspace claim required" $f.workspaceClaim | quote }} }
         - name: cache-probe
-          hostPath: { path: {{ required "Retained CSI cache path required" $f.cacheProbePath | quote }}, type: DirectoryOrCreate }
+          hostPath: { path: {{ required "Retained CSI cache path required" $f.cacheProbePath | quote }}, type: Directory }
         - name: scratch-probe
-          hostPath: { path: {{ required "Dedicated DeepHive scratch probe directory required" $f.scratchProbePath | quote }}, type: DirectoryOrCreate }
+          hostPath: { path: {{ required "Dedicated DeepHive scratch probe directory required" $f.scratchProbePath | quote }}, type: Directory }
 ---
 apiVersion: v1
 kind: Service
@@ -228,8 +228,9 @@ spec:
     metadata:
       labels: { app: {{ $prepull }} }
     spec:
-      {{- with $f.prepullTolerations }}
       tolerations:
+        - { key: deephive-execution, operator: Equal, value: "true", effect: NoSchedule }
+      {{- with $f.prepullTolerations }}
         {{- toYaml . | nindent 8 }}
       {{- end }}
       affinity:

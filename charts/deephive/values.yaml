@@ -80,6 +80,7 @@ fullEnvironment:
     scratchSize: 45Gi
   ordinaryAdmissionCommand: [] # trusted command reserves existing ordinary worker capacity
   ordinaryInstallCommand: [] # optional override; empty uses the built-in trusted worker installer
+  legacyRecoveryCommand: [] # operator-confirmed interrupted legacy writer recovery; not a capacity hook
   ordinaryHandoffCommand: [] # override capacity release/recovery hook
   ordinaryScratchRoot: /ordinary-scratch # mounted emptyDir when ordinaryCapacity.enabled
   ordinaryCacheProbePath: "" # actual retained CSI cache directory on each ordinary-worker node

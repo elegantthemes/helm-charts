@@ -44,7 +44,8 @@ spec:
       message: Reader workloads must stay in the configured namespace.
     - expression: >-
         request.resource.resource != 'pods' ||
-        (variables.obj.spec.containers.size() == 1 &&
+        ((request.operation == 'DELETE' || (has(variables.obj.spec.nodeName) && variables.obj.spec.nodeName == '{{ $r.nodeName }}')) &&
+         variables.obj.spec.containers.size() == 1 &&
          variables.obj.spec.serviceAccountName == 'default' &&
          variables.obj.metadata.labels['deephive/role'] == 'source-reader' &&
          (!has(variables.obj.spec.initContainers) || variables.obj.spec.initContainers.size() == 0) &&

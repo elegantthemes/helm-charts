@@ -23,7 +23,7 @@ for name in ['review', 'review-runner']:
 config = json.loads(next(d for d in docs if d['kind'] == 'ConfigMap' and d['metadata']['name'] == 'review-runner')['data']['runner.json'])
 assert config['sourceReader']['command'][-2:] == ['http://review-source-reader:3003', '/source-reader-token/token']
 meta = {'name': 'dh-source-test', 'labels': {'app.kubernetes.io/instance': 'review', 'deephive/source-reader': 'test', 'deephive/role': 'source-reader'}}
-pod = {'metadata': meta, 'spec': {'serviceAccountName': 'default', 'automountServiceAccountToken': False, 'containers': [{'name': 'reader', 'image': values['fullEnvironment']['runnerImage'], 'securityContext': {'allowPrivilegeEscalation': False, 'readOnlyRootFilesystem': True, 'capabilities': {'drop': ['ALL']}}, 'volumeMounts': [{'name': 'source', 'mountPath': '/workspace-root/task', 'readOnly': True}]}], 'volumes': [{'name': 'source', 'persistentVolumeClaim': {'claimName': 'dh-source-test', 'readOnly': True}}]}}
+pod = {'metadata': meta, 'spec': {'nodeName': 'reader-node', 'serviceAccountName': 'default', 'automountServiceAccountToken': False, 'containers': [{'name': 'reader', 'image': values['fullEnvironment']['runnerImage'], 'securityContext': {'allowPrivilegeEscalation': False, 'readOnlyRootFilesystem': True, 'capabilities': {'drop': ['ALL']}}, 'volumeMounts': [{'name': 'source', 'mountPath': '/workspace-root/task', 'readOnly': True}]}], 'volumes': [{'name': 'source', 'persistentVolumeClaim': {'claimName': 'dh-source-test', 'readOnly': True}}]}}
 pvc = {'metadata': meta, 'spec': {'volumeName': 'dh-source-test', 'storageClassName': '', 'accessModes': ['ReadOnlyMany']}}
 pv = {'metadata': meta, 'spec': {'persistentVolumeReclaimPolicy': 'Retain', 'storageClassName': '', 'accessModes': ['ReadOnlyMany'], 'claimRef': {'name': 'dh-source-test', 'namespace': 'dph-app'}, 'csi': {'driver': 'csi.juicefs.com', 'readOnly': True, 'volumeHandle': 'dh-source-test', 'nodePublishSecretRef': {'name': 'juicefs-deephive-workspace', 'namespace': 'kube-system'}}, 'mountOptions': ['ro', 'cache-size=0', 'open-cache=0', 'attr-cache=0', 'entry-cache=0', 'buffer-size=64']}}
 cases = []
@@ -32,6 +32,10 @@ def case(name, obj, resource, expected=True, mutate=None):
  if mutate: mutate(obj)
  cases.append({'Name': name, 'Expect': expected, 'Activation': {'variables': {'obj': obj}, 'object': obj, 'oldObject': obj, 'request': {'namespace': 'dph-app' if resource != 'persistentvolumes' else '', 'resource': {'resource': resource}, 'operation': 'CREATE'}}})
 case('reader Pod', pod, 'pods')
+case('reject writer node', pod, 'pods', False, lambda p: p['spec'].update(nodeName='writer-node'))
+case('reject unspecified node', pod, 'pods', False, lambda p: p['spec'].pop('nodeName'))
+case('old reader node cleanup', pod, 'pods', True, lambda p: p['spec'].update(nodeName='old-reader'))
+cases[-1]['Activation']['request']['operation'] = 'DELETE'
 case('reader PVC', pvc, 'persistentvolumeclaims')
 case('reader PV', pv, 'persistentvolumes')
 case('reject writer claim', pod, 'pods', False, lambda p: p['spec']['volumes'][0]['persistentVolumeClaim'].update(claimName='workspace'))

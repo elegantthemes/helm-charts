@@ -180,6 +180,8 @@ spec:
               value: {{ toJson $ordinary.admit | quote }}
             - name: FULL_ENVIRONMENT_ORDINARY_INSTALL_COMMAND
               value: {{ toJson .Values.fullEnvironment.ordinaryInstallCommand | quote }}
+            - name: FULL_ENVIRONMENT_LEGACY_RECOVERY_COMMAND
+              value: {{ toJson .Values.fullEnvironment.legacyRecoveryCommand | quote }}
             - name: FULL_ENVIRONMENT_ORDINARY_HANDOFF_COMMAND
               value: {{ toJson $ordinary.release | quote }}
             - name: FULL_ENVIRONMENT_ORDINARY_SCRATCH_ROOT
