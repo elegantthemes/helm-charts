@@ -31,7 +31,7 @@ metadata:
 rules:
   - apiGroups: [""]
     resources: [pods]
-    verbs: [get, create, patch, delete]
+    verbs: [get, list, create, patch, delete]
 ---
 {{- if $f.runnerEnabled }}
 apiVersion: rbac.authorization.k8s.io/v1

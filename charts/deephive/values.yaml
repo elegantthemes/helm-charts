@@ -66,14 +66,22 @@ fullEnvironment:
   observationEnabled: false
   routingEnabled: false
   taskAllowlist: "" # comma-separated explicit staging issue numbers
+  sourceSeedExportEnabled: false # one-time immutable seed export; enable before routing
   sourceSeedPath: "" # trusted credential-free /opt/divi-seed export on the shared PVC
   legacyProtocol2Images: [] # explicit drain-only exceptions; never permits protocol 3 validation
   approvedBootstraps: {} # immutable session digest -> bootstrap/runtime identity
   sessionProtocol: 3
+  ordinaryCapacity:
+    enabled: false # generate built-in admission/release commands and mount config
+    pool: "" # stable shared budget identity, e.g. staging-ordinary; survives rollout
+    slots: 1
+    memoryMiB: 4096
+    taskMiB: 4096
+    scratchSize: 45Gi
   ordinaryAdmissionCommand: [] # trusted command reserves existing ordinary worker capacity
   ordinaryInstallCommand: [] # optional override; empty uses the built-in trusted worker installer
-  ordinaryHandoffCommand: [] # proves task source writers stopped and reservation released
-  ordinaryScratchRoot: "" # outside candidate source
+  ordinaryHandoffCommand: [] # override capacity release/recovery hook
+  ordinaryScratchRoot: /ordinary-scratch # mounted emptyDir when ordinaryCapacity.enabled
   ordinaryCacheProbePath: "" # actual retained CSI cache directory on each ordinary-worker node
   sourceReader:
     readerId: "" # fresh CSI mount/cache identity, never the writer's staging cache

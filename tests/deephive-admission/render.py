@@ -85,7 +85,8 @@ mysql['MYSQL_PASSWORD'] = 'rotated-fixture-password'
 rotated = next(p for p in render(config=mysql) if p['kind'] == 'Deployment' and p['metadata']['name'] == 'review')
 assert rotated['spec']['template']['metadata']['annotations'] != consumer['spec']['template']['metadata']['annotations']
 runner_role = next(p for p in mysql_docs if p['kind'] == 'Role' and p['metadata']['name'] == 'review-runner')
-assert all('secrets' not in rule['resources'] and 'list' not in rule['verbs'] for rule in runner_role['rules'])
+assert all('secrets' not in rule['resources'] and ('list' not in rule['verbs'] or rule['resources'] == ['pods']) for rule in runner_role['rules'])
+assert any(rule['resources'] == ['pods'] and 'list' in rule['verbs'] for rule in runner_role['rules'])
 print('PASS consumer MySQL credential references, rotation and runner read permissions')
 
 # Phase 3 feature-off boundaries and fresh-reader admission.
@@ -233,3 +234,37 @@ mount = next(v for v in consumer['containers'][0]['volumeMounts'] if v['name'] =
 assert mount['readOnly'] is True
 assert next(e for e in consumer['containers'][0]['env'] if e['name'] == 'FULL_ENVIRONMENT_ORDINARY_CACHE_ROOT')['value'] == '/ordinary-cache-probe'
 print('PASS local pressure probe and optional infrastructure hook')
+
+# Built-in hooks receive the exact config consumed by the compiled CLI.
+builtin = copy.deepcopy(phase3)
+builtin['fullEnvironment'].update(ordinaryAdmissionCommand=[], ordinaryHandoffCommand=[], ordinaryCapacity={'enabled': True, 'pool': 'stage-ordinary', 'slots': 1, 'memoryMiB': 4096, 'taskMiB': 4096})
+docs = render(config=builtin)
+capacity = json.loads(item(docs, 'ConfigMap', '-ordinary-capacity')['data']['capacity.json'])
+assert capacity == {'pool': 'stage-ordinary', 'workspaceRoot': phase3['WORKSPACE_ROOT'], 'slots': 1, 'memoryMiB': 4096, 'taskMiB': 4096}
+consumer = consumer_template(docs)['spec']
+env = {e['name']: e.get('value') for e in consumer['containers'][0]['env']}
+for name, action in [('FULL_ENVIRONMENT_ORDINARY_ADMISSION_COMMAND', 'admit'), ('FULL_ENVIRONMENT_ORDINARY_HANDOFF_COMMAND', 'release')]:
+    command = json.loads(env[name])
+    assert command[-2:] == ['/ordinary-config/capacity.json', action]
+    assert command[2].endswith('/dist/scripts/environment/ordinary-capacity.js')
+assert any(v.get('configMap', {}).get('name') == 'review-ordinary-capacity' for v in consumer['volumes'])
+assert any('emptyDir' in v for v in consumer['volumes'])
+invalid = copy.deepcopy(builtin)
+invalid['fullEnvironment']['ordinaryCapacity']['taskMiB'] = 8192
+rejected(invalid, 'positive slot and memory budgets')
+invalid = copy.deepcopy(builtin)
+invalid['fullEnvironment']['ordinaryHandoffCommand'] = ['/bin/true']
+rejected(invalid, 'not both')
+print('PASS built-in capacity config, commands, scratch and budget validation')
+seed = copy.deepcopy(values)
+seed['fullEnvironment'].update(sourceSeedExportEnabled=True, sourceSeedPath='/workspace-root/seeds/candidate')
+docs = render(config=seed)
+job = next(p for p in docs if p['kind'] == 'Job' and '-seed-' in p['metadata']['name'])
+assert job['spec']['backoffLimit'] == 0
+pod = job['spec']['template']['spec']
+assert pod['automountServiceAccountToken'] is False
+assert pod['containers'][0]['command'][-1].endswith('/export-source-seed.js')
+assert 'envFrom' not in pod['containers'][0]
+seed['fullEnvironment']['sourceSeedPath'] = '/outside'
+rejected(seed, 'canonical workspace descendant')
+print('PASS credential-free, explicit source seed export')
