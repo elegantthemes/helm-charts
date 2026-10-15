@@ -59,6 +59,10 @@ DB_PASSWORD:
 # Phase 2 preparation only. Routing and workload creation remain disabled.
 fullEnvironment:
   enabled: false
+  runnerEnabled: false # install and verify protections first
+  draining: false # stop admission while existing sessions finish
+  validationTimeoutMs: 3600000 # capped by each session original deadline
+  writebackEnabled: false # label only this PVC for scoped CSI configuration
   observationEnabled: false
   routingEnabled: false
   taskAllowlist: "" # comma-separated explicit staging issue numbers
@@ -70,6 +74,7 @@ fullEnvironment:
   ordinaryInstallCommand: [] # audited isolated installer; no consumer credentials or worker mounts
   ordinaryHandoffCommand: [] # proves task source writers stopped and reservation released
   ordinaryScratchRoot: "" # outside candidate source
+  ordinaryCacheProbePath: "" # actual retained CSI cache directory on each ordinary-worker node
   sourceReader:
     readerId: "" # fresh CSI mount/cache identity, never the writer's staging cache
     command: [] # trusted executable returns a complete SourceManifest as JSON
@@ -98,5 +103,5 @@ fullEnvironment:
   scratchProbePath: "" # dedicated DeepHive scratch directory on the kubelet filesystem
   cacheProbePath: "" # retained JuiceFS staging/cache filesystem; must be real node path
   approvedEgressDomains: []
-  # Infrastructure-supplied trusted command fences ordinary AND full writers.
+  # Optional infrastructure pressure notification/cancellation hook; not termination proof.
   pressureCommand: []

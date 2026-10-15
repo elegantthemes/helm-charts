@@ -18,6 +18,7 @@
 {{- if and .Values.fullEnvironment.evidenceBucket (has .Values.fullEnvironment.evidenceReadSecret (list "secrets" .Values.fullEnvironment.runnerSecret .Values.fullEnvironment.agentSecret (.Values.fullEnvironment.integrationSecret | default ""))) }}{{ fail "Evidence requires a dedicated read-only Secret separate from runner, agent and consumer credentials" }}{{ end }}
 {{- if or .Values.fullEnvironment.routingEnabled .Values.fullEnvironment.taskAllowlist }}
 {{- if not (has "ReadWriteMany" .Values.WORKSPACE_ACCESS_MODES) }}{{ fail "Routing requires a ReadWriteMany shared workspace claim" }}{{ end }}
+{{- if or (not (hasPrefix "/" .Values.fullEnvironment.ordinaryCacheProbePath)) (eq .Values.fullEnvironment.ordinaryCacheProbePath "/") }}{{ fail "Routing requires an actual ordinary-worker retained-cache probe directory" }}{{ end }}
 {{- $scratch := .Values.fullEnvironment.ordinaryScratchRoot }}
 {{- $source := .Values.fullEnvironment.workspaceRoot }}
 {{- if or (eq $scratch "/") (ne (clean $scratch) $scratch) (eq $scratch $source) (hasPrefix (printf "%s/" $source) $scratch) (hasPrefix (printf "%s/" $scratch) $source) }}{{ fail "Ordinary scratch must be canonical and disjoint from the shared candidate source workspace" }}{{ end }}
@@ -62,6 +63,10 @@ kind: PersistentVolumeClaim
 metadata:
   name: {{ $workspaceClaim }}
   namespace: {{ .Release.Namespace }}
+{{- if .Values.fullEnvironment.writebackEnabled }}
+  labels:
+    deephive.elegantthemes.com/writeback: enabled
+{{- end }}
 spec:
   accessModes:
 {{ toYaml .Values.WORKSPACE_ACCESS_MODES | indent 4 }}
@@ -173,6 +178,8 @@ spec:
               value: {{ toJson .Values.fullEnvironment.ordinaryHandoffCommand | quote }}
             - name: FULL_ENVIRONMENT_ORDINARY_SCRATCH_ROOT
               value: {{ .Values.fullEnvironment.ordinaryScratchRoot | quote }}
+            - name: FULL_ENVIRONMENT_ORDINARY_CACHE_ROOT
+              value: {{ ternary "/ordinary-cache-probe" "" (not (empty .Values.fullEnvironment.ordinaryCacheProbePath)) | quote }}
             - name: FULL_ENVIRONMENT_READER_CONFIG
               value: {{ toJson .Values.fullEnvironment.sourceReader | quote }}
 {{- if or .Values.fullEnvironment.observationEnabled .Values.fullEnvironment.evidenceBucket }}
@@ -256,9 +263,15 @@ spec:
             periodSeconds: 5
             timeoutSeconds: 3
           volumeMounts:
+{{- if .Values.fullEnvironment.ordinaryCacheProbePath }}
+            - name: ordinary-cache-probe
+              mountPath: /ordinary-cache-probe
+              readOnly: true
+{{- end }}
             - name: wordpress
               mountPath: /srv
             - name: workspace
+              mountPropagation: HostToContainer
               mountPath: {{ .Values.WORKSPACE_ROOT | squote }}
             - name: config
               mountPath: /config
@@ -305,6 +318,10 @@ spec:
           operator: Exists
           effect: NoSchedule
       volumes:
+{{- if .Values.fullEnvironment.ordinaryCacheProbePath }}
+        - name: ordinary-cache-probe
+          hostPath: { path: {{ .Values.fullEnvironment.ordinaryCacheProbePath | quote }}, type: Directory }
+{{- end }}
         - name: wordpress
           emptyDir: {}
         - name: workspace

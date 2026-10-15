@@ -205,3 +205,29 @@ invalid = copy.deepcopy(phase3)
 invalid['fullEnvironment']['ordinaryInstallCommand'] = []
 assert subprocess.run(['helm', 'template', 'review', str(root.parent.parent / 'charts/deephive'), '-f', '-'], input=json.dumps(invalid).encode(), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode != 0
 print('PASS explicit protocol 2 drain exception and mandatory isolated installer')
+
+# Protection installation must not grant a runner admission identity prematurely.
+docs = render()
+assert item(docs, 'Deployment', '-runner')['spec']['replicas'] == 0
+assert not any(p['kind'] == 'RoleBinding' and p['metadata']['name'].endswith('-runner') for p in docs)
+hook = item(docs, 'Job', '-session-drain-check')
+assert hook['metadata']['annotations']['helm.sh/hook'] == 'pre-delete'
+assert hook['spec']['activeDeadlineSeconds'] == 120
+assert 'Runner pods remain' in hook['spec']['template']['spec']['containers'][0]['args'][0]
+changed = copy.deepcopy(values)
+changed['fullEnvironment']['runnerEnabled'] = True
+attempt = subprocess.run(['helm', 'template', 'review', str(root.parent.parent / 'charts/deephive'), '-n', 'dph-app', '-f', '-'], input=json.dumps(changed).encode(), capture_output=True)
+assert attempt.returncode != 0 and b'runnerEnabled=false' in attempt.stderr
+print('PASS protection-first install and drain-before-uninstall gate')
+
+# Local task cancellation does not require a privileged node-wide fence command.
+changed = copy.deepcopy(values)
+changed['fullEnvironment']['pressureCommand'] = []
+docs = render(config=changed)
+consumer = next(p for p in docs if p['kind'] == 'Deployment' and p['metadata']['name'] == 'review')['spec']['template']['spec']
+probe = next(v for v in consumer['volumes'] if v['name'] == 'ordinary-cache-probe')
+assert probe['hostPath'] == {'path': '/var/lib/deephive/cache', 'type': 'Directory'}
+mount = next(v for v in consumer['containers'][0]['volumeMounts'] if v['name'] == 'ordinary-cache-probe')
+assert mount['readOnly'] is True
+assert next(e for e in consumer['containers'][0]['env'] if e['name'] == 'FULL_ENVIRONMENT_ORDINARY_CACHE_ROOT')['value'] == '/ordinary-cache-probe'
+print('PASS local pressure probe and optional infrastructure hook')
