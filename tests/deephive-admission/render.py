@@ -268,3 +268,12 @@ assert 'envFrom' not in pod['containers'][0]
 seed['fullEnvironment']['sourceSeedPath'] = '/outside'
 rejected(seed, 'canonical workspace descendant')
 print('PASS credential-free, explicit source seed export')
+
+# The uninstall hook reads both Deployments even when the reader was disabled.
+for release in ['review', 'other']:
+    docs = render(release=release)
+    role = item(docs, 'Role', '-session-drain-check')
+    deployment_rule = next(r for r in role['rules'] if r['resources'] == ['deployments'])
+    assert deployment_rule['verbs'] == ['get']
+    assert set(deployment_rule['resourceNames']) == {release + '-runner', release + '-source-reader'}
+print('PASS uninstall hook can read both drained deployment identities')
