@@ -1,3 +1,4 @@
+{{- $reader := include "deephive.sourceReader" (dict "context" . "codeRoot" "/opt/deephive") | fromJson }}
 {{- if .Values.fullEnvironment.enabled }}
 {{- $f := .Values.fullEnvironment }}
 {{- $nodeRole := printf "%s-%s" (printf "%s-%s-execution-node" .Release.Namespace .Release.Name | trunc 50 | trimSuffix "-") ((list .Release.Namespace .Release.Name "execution-node") | toJson | sha256sum | trunc 12) }}
@@ -75,7 +76,7 @@ metadata:
   name: {{ .Release.Name }}-runner
 data:
   runner.json: |
-    {{ dict "namespace" .Release.Namespace "release" .Release.Name "nodeName" $f.nodeName "image" $f.sessionImage "databaseImage" $f.databaseImage "imagePullSecret" $f.pullSecret "agentSecret" (required "Session agent Secret required" $f.agentSecret) "integrationSecret" ($f.integrationSecret | default "") "workspaceClaim" $f.workspaceClaim "workspaceRoot" $f.workspaceRoot "scratchRoot" "/node-scratch" "cacheRoot" "/node-cache" "runnerUrl" (printf "http://%s-runner:3001" .Release.Name) "proxyUrl" (printf "http://%s:3128" $egress) "pressureCommand" $f.pressureCommand "signingKeyFile" "/runner-secret/signing-key" "controlPort" 3001 "observationPort" (ternary 3002 0 $f.observationEnabled) "observationTokenFile" "/runner-secret/observation-token" "approvedBootstraps" $f.approvedBootstraps "sourceReader" $f.sourceReader "sessionProtocol" $f.sessionProtocol "draining" $f.draining "validationTimeoutMs" $f.validationTimeoutMs | toJson }}
+    {{ dict "namespace" .Release.Namespace "release" .Release.Name "nodeName" $f.nodeName "image" $f.sessionImage "databaseImage" $f.databaseImage "imagePullSecret" $f.pullSecret "agentSecret" (required "Session agent Secret required" $f.agentSecret) "integrationSecret" ($f.integrationSecret | default "") "workspaceClaim" $f.workspaceClaim "workspaceRoot" $f.workspaceRoot "scratchRoot" "/node-scratch" "cacheRoot" "/node-cache" "runnerUrl" (printf "http://%s-runner:3001" .Release.Name) "proxyUrl" (printf "http://%s:3128" $egress) "pressureCommand" $f.pressureCommand "signingKeyFile" "/runner-secret/signing-key" "controlPort" 3001 "observationPort" (ternary 3002 0 $f.observationEnabled) "observationTokenFile" "/runner-secret/observation-token" "approvedBootstraps" $f.approvedBootstraps "sourceReader" $reader "sessionProtocol" $f.sessionProtocol "draining" $f.draining "validationTimeoutMs" $f.validationTimeoutMs | toJson }}
 {{/* The config contains no credentials; signing key is read from runner-only Secret. */}}
 ---
 apiVersion: apps/v1
@@ -89,6 +90,9 @@ spec:
   template:
     metadata:
       annotations:
+{{- if .Values.sourceReaderService.enabled }}
+        source-reader-token-revision: {{ .Values.sourceReaderService.tokenRevision | quote }}
+{{- end }}
         checksum/runner-config: {{ toJson $f | sha256sum | quote }}
       labels: { app: {{ .Release.Name }}-runner, redis-client: "true" }
     spec:
@@ -128,12 +132,19 @@ spec:
             timeoutSeconds: 2
             failureThreshold: 2
           volumeMounts:
+{{- if .Values.sourceReaderService.enabled }}
+            - { name: source-reader-token, mountPath: /source-reader-token, readOnly: true }
+{{- end }}
             - { name: config, mountPath: /runner-config, readOnly: true }
             - { name: secret, mountPath: /runner-secret, readOnly: true }
             - { name: workspace, mountPath: {{ $f.workspaceRoot | quote }}, mountPropagation: HostToContainer }
             - { name: cache-probe, mountPath: /node-cache, readOnly: true }
             - { name: scratch-probe, mountPath: /node-scratch, readOnly: true }
       volumes:
+{{- if .Values.sourceReaderService.enabled }}
+        - name: source-reader-token
+          secret: { secretName: {{ .Values.sourceReaderService.tokenSecret | quote }} }
+{{- end }}
         - name: config
           configMap: { name: {{ .Release.Name }}-runner }
         - name: secret

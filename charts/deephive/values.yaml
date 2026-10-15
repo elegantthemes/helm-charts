@@ -105,3 +105,13 @@ fullEnvironment:
   approvedEgressDomains: []
   # Optional infrastructure pressure notification/cancellation hook; not termination proof.
   pressureCommand: []
+
+# Install reader admission protection before granting the broker identity.
+sourceReaderService:
+  enabled: false
+  running: false
+  tokenSecret: "" # existing Secret with token key; platform processes only
+  tokenRevision: "" # increment on Secret rotation
+  nodeName: "" # independent reader node
+  filesystemSecretName: juicefs-deephive-workspace
+  filesystemSecretNamespace: kube-system

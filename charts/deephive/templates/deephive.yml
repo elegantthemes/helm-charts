@@ -1,7 +1,8 @@
+{{- $reader := include "deephive.sourceReader" (dict "context" . "codeRoot" "/srv/deephive") | fromJson }}
 {{- if and (or .Values.fullEnvironment.routingEnabled .Values.fullEnvironment.taskAllowlist .Values.fullEnvironment.observationEnabled) (not .Values.fullEnvironment.enabled) }}{{ fail "Routing or observation requires fullEnvironment.enabled" }}{{ end }}
-{{- if and (or .Values.fullEnvironment.routingEnabled .Values.fullEnvironment.taskAllowlist) (or (not .Values.fullEnvironment.sourceSeedPath) (not (hasPrefix "/" .Values.fullEnvironment.sourceSeedPath)) (not .Values.fullEnvironment.ordinaryAdmissionCommand) (not .Values.fullEnvironment.ordinaryHandoffCommand) (not .Values.fullEnvironment.ordinaryInstallCommand) (not (hasPrefix "/" .Values.fullEnvironment.ordinaryScratchRoot)) (not .Values.fullEnvironment.sourceReader.command) (not (.Values.fullEnvironment.sourceReader.readerId | trim)) (not .Values.fullEnvironment.evidenceBucket) (not .Values.fullEnvironment.publicOrigin)) }}{{ fail "Routing requires source seed, fresh reader, private evidence bucket and stable origin" }}{{ end }}
+{{- if and (or .Values.fullEnvironment.routingEnabled .Values.fullEnvironment.taskAllowlist) (or (not .Values.fullEnvironment.sourceSeedPath) (not (hasPrefix "/" .Values.fullEnvironment.sourceSeedPath)) (not .Values.fullEnvironment.ordinaryAdmissionCommand) (not .Values.fullEnvironment.ordinaryHandoffCommand) (not .Values.fullEnvironment.ordinaryInstallCommand) (not (hasPrefix "/" .Values.fullEnvironment.ordinaryScratchRoot)) (not $reader.command) (not ($reader.readerId | trim)) (not .Values.fullEnvironment.evidenceBucket) (not .Values.fullEnvironment.publicOrigin)) }}{{ fail "Routing requires source seed, fresh reader, private evidence bucket and stable origin" }}{{ end }}
 {{- if or .Values.fullEnvironment.routingEnabled .Values.fullEnvironment.taskAllowlist }}
-{{- range $command := list .Values.fullEnvironment.sourceReader.command .Values.fullEnvironment.ordinaryAdmissionCommand .Values.fullEnvironment.ordinaryHandoffCommand .Values.fullEnvironment.ordinaryInstallCommand }}
+{{- range $command := list $reader.command .Values.fullEnvironment.ordinaryAdmissionCommand .Values.fullEnvironment.ordinaryHandoffCommand .Values.fullEnvironment.ordinaryInstallCommand }}
 {{- if not (hasPrefix "/" (index $command 0)) }}{{ fail "Source reader and ordinary-worker fencing commands must use absolute executable paths" }}{{ end }}
 {{- end }}
 {{- end }}
@@ -112,6 +113,9 @@ spec:
   template:
     metadata:
       annotations:
+{{- if .Values.sourceReaderService.enabled }}
+        source-reader-token-revision: {{ .Values.sourceReaderService.tokenRevision | quote }}
+{{- end }}
 {{- if .Values.fullEnvironment.observationEnabled }}
         observation-secret-revision: {{ required "Runner Secret revision required with observation; increment it after token rotation" .Values.fullEnvironment.runnerSecretRevision | quote }}
 {{- end }}
@@ -181,7 +185,7 @@ spec:
             - name: FULL_ENVIRONMENT_ORDINARY_CACHE_ROOT
               value: {{ ternary "/ordinary-cache-probe" "" (not (empty .Values.fullEnvironment.ordinaryCacheProbePath)) | quote }}
             - name: FULL_ENVIRONMENT_READER_CONFIG
-              value: {{ toJson .Values.fullEnvironment.sourceReader | quote }}
+              value: {{ toJson $reader | quote }}
 {{- if or .Values.fullEnvironment.observationEnabled .Values.fullEnvironment.evidenceBucket }}
             - name: BROWSER_PUBLIC_ORIGIN
               value: {{ required "Stable HTTPS origin required" .Values.fullEnvironment.publicOrigin | quote }}
@@ -263,6 +267,9 @@ spec:
             periodSeconds: 5
             timeoutSeconds: 3
           volumeMounts:
+{{- if .Values.sourceReaderService.enabled }}
+            - { name: source-reader-token, mountPath: /source-reader-token, readOnly: true }
+{{- end }}
 {{- if .Values.fullEnvironment.ordinaryCacheProbePath }}
             - name: ordinary-cache-probe
               mountPath: /ordinary-cache-probe
@@ -318,6 +325,10 @@ spec:
           operator: Exists
           effect: NoSchedule
       volumes:
+{{- if .Values.sourceReaderService.enabled }}
+        - name: source-reader-token
+          secret: { secretName: {{ .Values.sourceReaderService.tokenSecret | quote }} }
+{{- end }}
 {{- if .Values.fullEnvironment.ordinaryCacheProbePath }}
         - name: ordinary-cache-probe
           hostPath: { path: {{ .Values.fullEnvironment.ordinaryCacheProbePath | quote }}, type: Directory }

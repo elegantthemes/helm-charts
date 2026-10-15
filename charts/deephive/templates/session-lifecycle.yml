@@ -1,3 +1,10 @@
+{{- if and .Release.IsUpgrade (not .Values.sourceReaderService.enabled) }}
+{{- $broker := lookup "apps/v1" "Deployment" .Release.Namespace (printf "%s-source-reader" .Release.Name) }}
+{{- if and $broker (or (ne (int $broker.spec.replicas) 0) (gt (int ($broker.status.replicas | default 0)) 0)) }}{{ fail "Drain and scale the source reader to zero before removing its protection" }}{{ end }}
+{{- range $pod := (lookup "v1" "Pod" .Release.Namespace "").items }}
+{{- if or (eq (index ($pod.metadata.labels | default dict) "app") (printf "%s-source-reader" $.Release.Name)) (and (eq (index ($pod.metadata.labels | default dict) "deephive/role") "source-reader") (eq (index ($pod.metadata.labels | default dict) "app.kubernetes.io/instance") $.Release.Name)) }}{{ fail "Reader pods remain; retain reader protection until cleanup completes" }}{{ end }}
+{{- end }}
+{{- end }}
 {{- $f := .Values.fullEnvironment }}
 {{- $identity := printf "%s-%s-session-admission" .Release.Namespace .Release.Name }}
 {{- $policyName := printf "%s-%s" ($identity | trunc 50 | trimSuffix "-") ((list .Release.Namespace .Release.Name "session-admission") | toJson | sha256sum | trunc 12) }}
@@ -96,6 +103,12 @@ spec:
               const runners = await api.call('GET', '/api/v1/namespaces/' + {{ .Release.Namespace | toJson }} + '/pods?labelSelector=' + encodeURIComponent('app=' + {{ printf "%s-runner" .Release.Name | toJson }}));
               if (!runners || runners.items.length) throw new Error('Runner pods remain; admission may still create sessions');
               if (!pods || pods.items.length) throw new Error('Session drain incomplete; retain admission, proxy and network isolation');
+              const reader = await api.call('GET', '/apis/apps/v1/namespaces/' + {{ .Release.Namespace | toJson }} + '/deployments/' + {{ printf "%s-source-reader" .Release.Name | toJson }});
+              if (reader && (reader.spec.replicas !== 0 || (reader.status.replicas ?? 0) !== 0)) throw new Error('Drain and scale the source reader to zero before uninstall');
+              for (const selector of ['app=' + {{ printf "%s-source-reader" .Release.Name | toJson }}, 'deephive/role=source-reader,app.kubernetes.io/instance=' + {{ .Release.Name | toJson }}]) {
+                const remaining = await api.call('GET', '/api/v1/namespaces/' + {{ .Release.Namespace | toJson }} + '/pods?labelSelector=' + encodeURIComponent(selector));
+                if (!remaining || remaining.items.length) throw new Error('Reader pods remain; retain source-reader admission');
+              }
           resources:
             requests: { cpu: 50m, memory: 64Mi }
             limits: { cpu: 250m, memory: 256Mi }

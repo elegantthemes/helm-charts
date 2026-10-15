@@ -1,0 +1,213 @@
+{{- if .Values.sourceReaderService.enabled }}
+{{- $r := .Values.sourceReaderService }}
+{{- $f := .Values.fullEnvironment }}
+{{- $name := printf "%s-source-reader" .Release.Name }}
+{{- $policy := printf "dph-reader-%s" (printf "%s/%s" .Release.Namespace .Release.Name | sha256sum | trunc 24) }}
+{{- if not $f.enabled }}{{ fail "Source reader requires fullEnvironment.enabled" }}{{ end }}
+{{- if or (not $r.tokenSecret) (not $r.tokenRevision) (not $r.nodeName) }}{{ fail "Source reader requires token Secret/revision and reader node" }}{{ end }}
+{{- if $r.running }}
+{{- $installed := lookup "admissionregistration.k8s.io/v1" "ValidatingAdmissionPolicy" "" $policy }}
+{{- $binding := lookup "admissionregistration.k8s.io/v1" "ValidatingAdmissionPolicyBinding" "" $policy }}
+{{- if or (not $installed) (not $binding) }}{{ fail "Install sourceReaderService with running=false and verify admission before enabling running" }}{{ end }}
+{{- if or (ne $installed.spec.failurePolicy "Fail") (ne $binding.spec.policyName $policy) (not (has "Deny" $binding.spec.validationActions)) }}{{ fail "Reader admission must enforce fail-closed Deny" }}{{ end }}
+{{- if not (hasKey $installed "status") }}{{ fail "Wait for reader admission type checking" }}{{ end }}
+{{- if ne (int64 ($installed.status.observedGeneration | default 0)) (int64 $installed.metadata.generation) }}{{ fail "Wait for reader admission to observe its installed generation" }}{{ end }}
+{{- if $installed.status.typeChecking.expressionWarnings }}{{ fail "Resolve reader admission expression warnings" }}{{ end }}
+{{- end }}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ $name }}
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: {{ $policy }}
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    resourceRules:
+      - apiGroups: [""]
+        apiVersions: [v1]
+        operations: [CREATE, DELETE]
+        resources: [pods, persistentvolumeclaims, persistentvolumes]
+  matchConditions:
+    - name: reader-identity
+      expression: {{ printf "request.userInfo.username == 'system:serviceaccount:%s:%s'" .Release.Namespace $name | quote }}
+  variables:
+    - name: obj
+      expression: "request.operation == 'DELETE' ? oldObject : object"
+  validations:
+    - expression: {{ printf "has(variables.obj.metadata.labels) && variables.obj.metadata.labels['app.kubernetes.io/instance'] == '%s' && 'deephive/source-reader' in variables.obj.metadata.labels && variables.obj.metadata.name == 'dh-source-' + variables.obj.metadata.labels['deephive/source-reader']" .Release.Name | quote }}
+      message: Only this release's named reader resources are permitted.
+    - expression: {{ printf "request.resource.resource == 'persistentvolumes' || request.namespace == '%s'" .Release.Namespace | quote }}
+      message: Reader workloads must stay in the configured namespace.
+    - expression: >-
+        request.resource.resource != 'pods' ||
+        (variables.obj.spec.containers.size() == 1 &&
+         variables.obj.spec.serviceAccountName == 'default' &&
+         variables.obj.metadata.labels['deephive/role'] == 'source-reader' &&
+         (!has(variables.obj.spec.initContainers) || variables.obj.spec.initContainers.size() == 0) &&
+         (!has(variables.obj.spec.ephemeralContainers) || variables.obj.spec.ephemeralContainers.size() == 0) &&
+         (!has(variables.obj.spec.hostNetwork) || !variables.obj.spec.hostNetwork) &&
+         (!has(variables.obj.spec.hostPID) || !variables.obj.spec.hostPID) &&
+         (!has(variables.obj.spec.hostIPC) || !variables.obj.spec.hostIPC) &&
+         has(variables.obj.spec.automountServiceAccountToken) && !variables.obj.spec.automountServiceAccountToken &&
+         variables.obj.spec.volumes.size() == 1 &&
+         has(variables.obj.spec.volumes[0].persistentVolumeClaim) &&
+         variables.obj.spec.volumes[0].persistentVolumeClaim.claimName == variables.obj.metadata.name &&
+         variables.obj.spec.volumes[0].persistentVolumeClaim.readOnly &&
+         variables.obj.spec.containers.all(c,
+           (request.operation == 'DELETE' || c.image == '{{ $f.runnerImage }}') &&
+           !has(c.envFrom) && !has(c.env) &&
+           has(c.securityContext) && !c.securityContext.allowPrivilegeEscalation &&
+           (!has(c.securityContext.privileged) || !c.securityContext.privileged) &&
+           c.securityContext.readOnlyRootFilesystem &&
+           c.securityContext.capabilities.drop == ['ALL'] &&
+           (!has(c.securityContext.capabilities.add) || c.securityContext.capabilities.add.size() == 0) &&
+           c.volumeMounts.size() == 1 && c.volumeMounts[0].readOnly))
+      message: Reader Pods may only read their own claim using the approved image without platform credentials or host access.
+    - expression: >-
+        request.resource.resource != 'persistentvolumeclaims' ||
+        (variables.obj.spec.volumeName == variables.obj.metadata.name &&
+         variables.obj.spec.storageClassName == '' && variables.obj.spec.accessModes == ['ReadOnlyMany'])
+      message: Reader claims must bind only their named static read-only volume.
+    - expression: >-
+        request.resource.resource != 'persistentvolumes' ||
+        (variables.obj.spec.persistentVolumeReclaimPolicy == 'Retain' &&
+         variables.obj.spec.storageClassName == '' && variables.obj.spec.accessModes == ['ReadOnlyMany'] &&
+         variables.obj.spec.claimRef.name == variables.obj.metadata.name &&
+         variables.obj.spec.claimRef.namespace == '{{ .Release.Namespace }}' &&
+         variables.obj.spec.csi.driver == 'csi.juicefs.com' && variables.obj.spec.csi.readOnly &&
+         variables.obj.spec.csi.volumeHandle == variables.obj.metadata.name &&
+         variables.obj.spec.csi.nodePublishSecretRef.name == '{{ $r.filesystemSecretName }}' &&
+         variables.obj.spec.csi.nodePublishSecretRef.namespace == '{{ $r.filesystemSecretNamespace }}' &&
+         variables.obj.spec.mountOptions == ['ro', 'cache-size=0', 'open-cache=0', 'attr-cache=0', 'entry-cache=0', 'buffer-size=64'])
+      message: Reader volumes must retain data and use independent read-only JuiceFS handles and approved CSI credentials.
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: {{ $policy }}
+spec:
+  policyName: {{ $policy }}
+  validationActions: [Deny]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ $name }}
+rules:
+  - apiGroups: [""]
+    resources: [pods, persistentvolumeclaims]
+    verbs: [get, list, create, delete]
+  - apiGroups: [""]
+    resources: [pods/log]
+    verbs: [get]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ $policy }}
+rules:
+  - apiGroups: [""]
+    resources: [persistentvolumes]
+    verbs: [get, list, create, delete]
+---
+{{- if $r.running }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ $name }}
+subjects:
+  - { kind: ServiceAccount, name: {{ $name }}, namespace: {{ .Release.Namespace }} }
+roleRef: { apiGroup: rbac.authorization.k8s.io, kind: Role, name: {{ $name }} }
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ $policy }}
+subjects:
+  - { kind: ServiceAccount, name: {{ $name }}, namespace: {{ .Release.Namespace }} }
+roleRef: { apiGroup: rbac.authorization.k8s.io, kind: ClusterRole, name: {{ $policy }} }
+---
+{{- end }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ $name }}
+data:
+  reader.json: |
+    {{ dict "namespace" .Release.Namespace "workspaceNamespace" .Release.Namespace "workspaceClaim" $f.workspaceClaim "workspaceRoot" $f.workspaceRoot "nodeName" $r.nodeName "image" $f.runnerImage "imagePullSecret" $f.pullSecret "release" .Release.Name | toJson }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $name }}
+spec:
+  replicas: {{ ternary 1 0 $r.running }}
+  strategy: { type: Recreate }
+  selector:
+    matchLabels: { app: {{ $name }} }
+  template:
+    metadata:
+      labels: { app: {{ $name }} }
+      annotations:
+        checksum/config: {{ toJson (list $f $r) | sha256sum | quote }}
+    spec:
+      serviceAccountName: {{ $name }}
+      terminationGracePeriodSeconds: 900
+      imagePullSecrets: [{ name: {{ $f.pullSecret | quote }} }]
+      containers:
+        - name: reader-service
+          image: {{ $f.runnerImage | quote }}
+          command: [node, /opt/deephive/dist/scripts/environment/source-reader-service.js, /reader-config/reader.json, /source-reader-token/token]
+          ports: [{ name: http, containerPort: 3003 }]
+          readinessProbe: { tcpSocket: { port: http } }
+          resources:
+            requests: { cpu: 100m, memory: 128Mi }
+            limits: { cpu: "1", memory: 512Mi }
+          volumeMounts:
+            - { name: config, mountPath: /reader-config, readOnly: true }
+            - { name: token, mountPath: /source-reader-token, readOnly: true }
+      volumes:
+        - name: config
+          configMap: { name: {{ $name }} }
+        - name: token
+          secret: { secretName: {{ $r.tokenSecret | quote }} }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $name }}
+spec:
+  selector: { app: {{ $name }} }
+  ports: [{ name: http, port: 3003, targetPort: http }]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ $name }}
+spec:
+  podSelector:
+    matchLabels: { app: {{ $name }} }
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector: { matchLabels: { app: {{ .Release.Name }} } }
+        - podSelector: { matchLabels: { app: {{ .Release.Name }}-runner } }
+      ports: [{ protocol: TCP, port: 3003 }]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ $name }}-workloads
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      deephive/role: source-reader
+  policyTypes: [Ingress, Egress]
+  ingress: []
+  egress: []
+{{- end }}
