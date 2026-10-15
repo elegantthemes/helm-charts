@@ -432,3 +432,22 @@ with tempfile.TemporaryDirectory(prefix='reader-default-off-') as temp:
     path.write_text(text)
     subprocess.run(['helm', 'template', 'review', str(target), '--is-upgrade', '-n', 'dph-app', '-f', '-'], input=json.dumps(values).encode(), stdout=subprocess.DEVNULL, check=True)
 print('PASS never-enabled reader upgrade avoids cluster storage lookup')
+
+# Regression evidence: conditional activation keeps the runner Role and binding
+# as distinct YAML documents, including after the binding is retained on stop.
+for config in [phase3, stopped]:
+    docs = render(config=config, installed=True)
+    role = next(d for d in docs if d['kind'] == 'Role' and d['metadata']['name'] == 'review-runner')
+    binding = next(d for d in docs if d['kind'] == 'RoleBinding' and d['metadata']['name'] == 'review-runner')
+    assert 'rules' in role and 'rules' not in binding
+    assert binding['roleRef']['name'] == role['metadata']['name']
+print('PASS runner Role and conditional RoleBinding are separate documents')
+
+# ConfigMaps use DNS subdomain names (253 chars), unlike Service DNS labels.
+for release in ['a' * 50 + 'one', 'a' * 50 + 'two']:
+    docs = render(release=release, config=builtin)
+    capacity = next(d for d in docs if d['kind'] == 'ConfigMap' and d['metadata']['name'].endswith('-ordinary-capacity'))
+    assert len(capacity['metadata']['name']) == 71
+    consumer = next(d for d in docs if d['kind'] == 'Deployment' and d['metadata']['name'] == release)
+    assert any(v.get('configMap', {}).get('name') == capacity['metadata']['name'] for v in consumer['spec']['template']['spec']['volumes'])
+print('PASS long-release capacity ConfigMap identity and volume reference')
