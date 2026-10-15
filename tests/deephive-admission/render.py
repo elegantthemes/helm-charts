@@ -203,8 +203,10 @@ invalid['fullEnvironment']['legacyProtocol2Images'].append(invalid['fullEnvironm
 assert subprocess.run(['helm', 'template', 'review', str(root.parent.parent / 'charts/deephive'), '-f', '-'], input=json.dumps(invalid).encode(), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode != 0
 invalid = copy.deepcopy(phase3)
 invalid['fullEnvironment']['ordinaryInstallCommand'] = []
+render(config=invalid)
+invalid['fullEnvironment']['ordinaryInstallCommand'] = ['relative-installer']
 assert subprocess.run(['helm', 'template', 'review', str(root.parent.parent / 'charts/deephive'), '-f', '-'], input=json.dumps(invalid).encode(), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode != 0
-print('PASS explicit protocol 2 drain exception and mandatory isolated installer')
+print('PASS explicit protocol 2 drain exception and optional trusted installer')
 
 # Protection installation must not grant a runner admission identity prematurely.
 docs = render()

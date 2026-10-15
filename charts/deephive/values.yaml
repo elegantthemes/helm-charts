@@ -71,7 +71,7 @@ fullEnvironment:
   approvedBootstraps: {} # immutable session digest -> bootstrap/runtime identity
   sessionProtocol: 3
   ordinaryAdmissionCommand: [] # trusted command reserves existing ordinary worker capacity
-  ordinaryInstallCommand: [] # audited isolated installer; no consumer credentials or worker mounts
+  ordinaryInstallCommand: [] # optional override; empty uses the built-in trusted worker installer
   ordinaryHandoffCommand: [] # proves task source writers stopped and reservation released
   ordinaryScratchRoot: "" # outside candidate source
   ordinaryCacheProbePath: "" # actual retained CSI cache directory on each ordinary-worker node
