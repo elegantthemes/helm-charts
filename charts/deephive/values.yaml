@@ -18,6 +18,16 @@ WORKSPACE_CLAIM_NAME:
 WORKSPACE_STORAGE_CLASS_NAME: linode-block-storage
 WORKSPACE_STORAGE_SIZE: 250Gi
 
+# Optional: name of an existing Secret (created by Terraform, not by this chart) that holds the
+# Codex CLI ChatGPT login (auth.json). When set the chart adds a ServiceAccount for the consumer
+# pod and a Role allowing get/patch on only that Secret. The chart never renders the Secret, so
+# upgrades and rollbacks cannot overwrite refreshed tokens. Set the same name as
+# CODEX_AUTH_SECRET_NAME in the DeepHive env file. Empty = disabled.
+CODEX_AUTH_SECRET_NAME: ""
+# Image pull Secrets to attach to that ServiceAccount (the consumer stops using `default`,
+# so a pull secret attached only to `default` would no longer apply).
+CODEX_AUTH_IMAGE_PULL_SECRETS: []
+
 # Preserve the original workspace PVC during a cutover to a different claim.
 LEGACY_WORKSPACE_RETAIN: false
 LEGACY_WORKSPACE_STORAGE_CLASS_NAME: linode-block-storage

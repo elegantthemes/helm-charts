@@ -1,0 +1,43 @@
+{{- if .Values.CODEX_AUTH_SECRET_NAME }}
+{{- $secretName := .Values.CODEX_AUTH_SECRET_NAME | toString }}
+# The Secret itself is created by Terraform (empty, with ignore_changes on its data) and
+# DeepHive updates it as Codex refreshes tokens. It is deliberately NOT part of this chart:
+# anything rendered here is replayed by `helm rollback` and would overwrite refreshed tokens.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ .Release.Name }}-consumer-sa
+  namespace: {{ .Release.Namespace }}
+{{- with .Values.CODEX_AUTH_IMAGE_PULL_SECRETS }}
+imagePullSecrets:
+{{- range . }}
+  - name: {{ . | quote }}
+{{- end }}
+{{- end }}
+---
+# Least privilege: read and patch only this one Secret (no list/watch/create/delete).
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ .Release.Name }}-codex-auth
+  namespace: {{ .Release.Namespace }}
+rules:
+  - apiGroups: [""]
+    resources: ["secrets"]
+    resourceNames: [{{ $secretName | quote }}]
+    verbs: ["get", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ .Release.Name }}-codex-auth
+  namespace: {{ .Release.Namespace }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ .Release.Name }}-consumer-sa
+    namespace: {{ .Release.Namespace }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ .Release.Name }}-codex-auth
+{{- end }}
