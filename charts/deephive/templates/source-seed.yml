@@ -1,0 +1,46 @@
+{{- $f := .Values.fullEnvironment }}
+{{- if $f.sourceSeedExportEnabled }}
+{{- if or (not $f.enabled) $f.routingEnabled $f.taskAllowlist }}{{ fail "Export source seed with protections enabled and routing disabled" }}{{ end }}
+{{- if or (not (hasPrefix (printf "%s/" $f.workspaceRoot) $f.sourceSeedPath)) (ne (clean $f.sourceSeedPath) $f.sourceSeedPath) }}{{ fail "Source seed export requires a canonical workspace descendant" }}{{ end }}
+{{- $claim := default (printf "%s-workspace" .Release.Name) .Values.WORKSPACE_CLAIM_NAME }}
+{{- if or (ne $claim $f.workspaceClaim) (ne .Values.WORKSPACE_ROOT $f.workspaceRoot) }}{{ fail "Source seed export must share the active consumer workspace claim and root" }}{{ end }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ .Release.Name | trunc 46 | trimSuffix "-" }}-seed-{{ list .Release.Namespace .Release.Name .Chart.Version $f.sessionImage $f.sourceSeedPath $f.workspaceClaim $f.workspaceRoot $f.nodeName $f.pullSecret $f.prepullTolerations | toJson | sha256sum | trunc 10 }}
+spec:
+  backoffLimit: 0
+  activeDeadlineSeconds: 3600
+  template:
+    metadata:
+      labels:
+        app: deephive-seed-export
+        app.kubernetes.io/instance: {{ .Release.Name }}
+    spec:
+      restartPolicy: Never
+      automountServiceAccountToken: false
+      nodeSelector:
+        kubernetes.io/hostname: {{ $f.nodeName | quote }}
+      tolerations:
+        - { key: deephive-execution, operator: Equal, value: "true", effect: NoSchedule }
+{{- with $f.prepullTolerations }}
+{{ toYaml . | indent 8 }}
+{{- end }}
+      imagePullSecrets:
+        - name: {{ $f.pullSecret | quote }}
+      containers:
+        - name: export
+          image: {{ $f.sessionImage | quote }}
+          command: ["node", "/opt/deephive/dist/scripts/environment/export-source-seed.js"]
+          args: {{ list $f.workspaceRoot $f.sourceSeedPath | toJson }}
+          resources:
+            requests: {cpu: "250m", memory: "256Mi"}
+            limits: {cpu: "2", memory: "2Gi"}
+          volumeMounts:
+            - name: workspace
+              mountPath: {{ $f.workspaceRoot | quote }}
+      volumes:
+        - name: workspace
+          persistentVolumeClaim:
+            claimName: {{ $f.workspaceClaim | quote }}
+{{- end }}
