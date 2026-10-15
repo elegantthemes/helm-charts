@@ -3,13 +3,41 @@ import copy
 import json
 from pathlib import Path
 import subprocess
+import shutil
+import tempfile
 import yaml
 
 root = Path(__file__).resolve().parent
 values = json.loads((root / 'values.json').read_text())
 
+# Positive activation fixtures model already-installed admission resources. The
+# original chart remains used by the explicit protection-first regressions.
+fixture = tempfile.TemporaryDirectory(prefix='deephive-installed-admission-')
+fixture_chart = Path(fixture.name) / 'deephive'
+chart = root.parent.parent / 'charts/deephive'
+shutil.copytree(chart, fixture_chart)
+for name in ['session-lifecycle.yml', 'source-reader.yml']:
+    path = fixture_chart / 'templates' / name
+    text = path.read_text()
+    if name == 'session-lifecycle.yml':
+        old = '$policy := lookup "admissionregistration.k8s.io/v1" "ValidatingAdmissionPolicy" "" $policyName'
+        binding_name = '$policyName'
+        policy_var = '$policy'
+    else:
+        old = '$installed := lookup "admissionregistration.k8s.io/v1" "ValidatingAdmissionPolicy" "" $policy'
+        binding_name = '$policy'
+        policy_var = '$installed'
+    assert old in text
+    text = text.replace(old, policy_var + ' := dict "metadata" (dict "generation" 1) "spec" (dict "failurePolicy" "Fail") "status" (dict "observedGeneration" 1 "typeChecking" (dict "expressionWarnings" (list)))')
+    old = '$binding := lookup "admissionregistration.k8s.io/v1" "ValidatingAdmissionPolicyBinding" "" ' + binding_name
+    assert old in text
+    text = text.replace(old, '$binding := dict "spec" (dict "policyName" ' + binding_name + ' "validationActions" (list "Deny"))')
+    path.write_text(text)
+
 def render(release='review', namespace='dph-app', config=None):
-    raw = subprocess.check_output(['helm', 'template', release, str(root.parent.parent / 'charts/deephive'), '-n', namespace, '-f', '-'], input=json.dumps(config or values).encode())
+    config = config or values
+    activated = config['fullEnvironment'].get('runnerEnabled') or config.get('sourceReaderService', {}).get('running')
+    raw = subprocess.check_output(['helm', 'template', release, str(fixture_chart if activated else chart), '-n', namespace, '-f', '-'], input=json.dumps(config).encode())
     return [p for p in yaml.safe_load_all(raw) if p]
 
 def item(docs, kind, suffix):
@@ -96,7 +124,7 @@ assert all(rule['ports'][0]['port'] != 3002 for rule in item(plain, 'NetworkPoli
 phase3 = copy.deepcopy(values)
 phase3.update(WORKSPACE_CLAIM_NAME='workspace', WORKSPACE_ROOT='/workspace-root', WORKSPACE_ACCESS_MODES=['ReadWriteMany'], VIRTUAL_HOST='deephive.example')
 phase3['fullEnvironment'].update(
-    routingEnabled=True, observationEnabled=True, sourceSeedPath='/workspace-root/seed',
+    routingEnabled=True, runnerEnabled=True, observationEnabled=True, sourceSeedPath='/workspace-root/seed',
     sourceReader={'readerId': 'fresh-csi-fixture', 'command': ['/opt/bin/read-source']},
     evidenceBucket='private-fixture', evidenceRegion='us-east-1',
     evidenceReadSecret='evidence-read', evidenceReadSecretRevision='1',
@@ -115,7 +143,8 @@ assert before['metadata']['annotations'] != consumer_template(render(config=rota
 print('PASS observation-off isolation and evidence credential rotation')
 
 def rejected(config, expected):
-    result = subprocess.run(['helm', 'template', 'review', str(root.parent.parent / 'charts/deephive'), '-f', '-'], input=json.dumps(config), text=True, capture_output=True)
+    activated = config['fullEnvironment'].get('runnerEnabled') or config.get('sourceReaderService', {}).get('running')
+    result = subprocess.run(['helm', 'template', 'review', str(fixture_chart if activated else chart), '-f', '-'], input=json.dumps(config), text=True, capture_output=True)
     assert result.returncode != 0 and expected in result.stderr, result.stderr
 missing = copy.deepcopy(phase3)
 missing['fullEnvironment']['sourceReader']['readerId'] = ''
@@ -302,3 +331,28 @@ assert cluster_role['rules'] == [{'apiGroups': [''], 'resources': ['persistentvo
 assert '/persistentvolumeclaims?labelSelector=' in hook['spec']['template']['spec']['containers'][0]['args'][0]
 assert '/persistentvolumes?labelSelector=' in hook['spec']['template']['spec']['containers'][0]['args'][0]
 print('PASS probe directories, seed workspace/taint and retained reader storage drain checks')
+
+# Routing activation cannot select a stopped runner or managed reader broker.
+invalid = copy.deepcopy(phase3)
+invalid['fullEnvironment']['runnerEnabled'] = False
+rejected(invalid, 'runnerEnabled=true')
+invalid = copy.deepcopy(phase3)
+invalid['sourceReaderService'] = {'enabled': True, 'running': False, 'tokenSecret': 'reader-token', 'tokenRevision': '1', 'nodeName': 'reader-node'}
+rejected(invalid, 'managed source reader running=true')
+managed = copy.deepcopy(values)
+managed['INSTALL_PATH'] = '/custom/deephive'
+managed['sourceReaderService'] = invalid['sourceReaderService']
+docs = render(config=managed)
+command = json.loads(next(e['value'] for e in consumer_template(docs)['spec']['containers'][0]['env'] if e['name'] == 'FULL_ENVIRONMENT_READER_CONFIG'))['command']
+assert command[2] == '/custom/deephive/dist/scripts/environment/remote-source-reader.js'
+seed = copy.deepcopy(values)
+seed.update(WORKSPACE_ROOT='/workspace-root', WORKSPACE_CLAIM_NAME='workspace')
+seed['fullEnvironment'].update(sourceSeedExportEnabled=True, sourceSeedPath='/workspace-root/seeds/candidate')
+def seed_name(config):
+    return next(p['metadata']['name'] for p in render(config=config) if p['kind'] == 'Job' and '-seed-' in p['metadata']['name'])
+original = seed_name(seed)
+for key, value in [('nodeName', 'other-node'), ('pullSecret', 'new-pull'), ('prepullTolerations', [{'key': 'extra', 'operator': 'Exists'}])]:
+    changed = copy.deepcopy(seed)
+    changed['fullEnvironment'][key] = value
+    assert seed_name(changed) != original
+print('PASS routing activation, custom install root and immutable seed-job replacement')

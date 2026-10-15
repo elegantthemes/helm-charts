@@ -38,6 +38,9 @@ case('old reader node cleanup', pod, 'pods', True, lambda p: p['spec'].update(no
 cases[-1]['Activation']['request']['operation'] = 'DELETE'
 case('reader PVC', pvc, 'persistentvolumeclaims')
 case('reader PV', pv, 'persistentvolumes')
+case('reject session network labels', pod, 'pods', False, lambda p: p['metadata']['labels'].update({'app.kubernetes.io/name': 'deephive-session'}))
+case('old CSI secret cleanup', pv, 'persistentvolumes', True, lambda p: p['spec']['csi']['nodePublishSecretRef'].update(name='previous', namespace='previous'))
+cases[-1]['Activation']['request']['operation'] = 'DELETE'
 case('reject writer claim', pod, 'pods', False, lambda p: p['spec']['volumes'][0]['persistentVolumeClaim'].update(claimName='workspace'))
 case('reject reader credentials', pod, 'pods', False, lambda p: p['spec']['containers'][0].update(envFrom=[{'secretRef': {'name': 'runner'}}]))
 case('reject host access', pod, 'pods', False, lambda p: p['spec'].update(hostPID=True))

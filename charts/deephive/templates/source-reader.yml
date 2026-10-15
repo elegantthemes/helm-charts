@@ -44,6 +44,10 @@ spec:
       message: Reader workloads must stay in the configured namespace.
     - expression: >-
         request.resource.resource != 'pods' ||
+        request.operation == 'DELETE' || variables.obj.metadata.labels.all(k, k in ['app.kubernetes.io/instance', 'deephive/source-reader', 'deephive/role'])
+      message: Reader labels must not select other workload network policies.
+    - expression: >-
+        request.resource.resource != 'pods' ||
         ((request.operation == 'DELETE' || (has(variables.obj.spec.nodeName) && variables.obj.spec.nodeName == '{{ $r.nodeName }}')) &&
          variables.obj.spec.containers.size() == 1 &&
          variables.obj.spec.serviceAccountName == 'default' &&
@@ -81,8 +85,9 @@ spec:
          variables.obj.spec.claimRef.namespace == '{{ .Release.Namespace }}' &&
          variables.obj.spec.csi.driver == 'csi.juicefs.com' && variables.obj.spec.csi.readOnly &&
          variables.obj.spec.csi.volumeHandle == variables.obj.metadata.name &&
-         variables.obj.spec.csi.nodePublishSecretRef.name == '{{ $r.filesystemSecretName }}' &&
-         variables.obj.spec.csi.nodePublishSecretRef.namespace == '{{ $r.filesystemSecretNamespace }}' &&
+         (request.operation == 'DELETE' ||
+           (variables.obj.spec.csi.nodePublishSecretRef.name == '{{ $r.filesystemSecretName }}' &&
+            variables.obj.spec.csi.nodePublishSecretRef.namespace == '{{ $r.filesystemSecretNamespace }}')) &&
          variables.obj.spec.mountOptions == ['ro', 'cache-size=0', 'open-cache=0', 'attr-cache=0', 'entry-cache=0', 'buffer-size=64'])
       message: Reader volumes must retain data and use independent read-only JuiceFS handles and approved CSI credentials.
 ---

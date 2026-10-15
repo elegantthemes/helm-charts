@@ -1,5 +1,5 @@
 {{- $ordinary := include "deephive.ordinaryCommands" . | fromJson }}
-{{- $reader := include "deephive.sourceReader" (dict "context" . "codeRoot" "/srv/deephive") | fromJson }}
+{{- $reader := include "deephive.sourceReader" (dict "context" . "codeRoot" (default "/srv/deephive" .Values.INSTALL_PATH)) | fromJson }}
 {{- if and (or .Values.fullEnvironment.routingEnabled .Values.fullEnvironment.taskAllowlist .Values.fullEnvironment.observationEnabled) (not .Values.fullEnvironment.enabled) }}{{ fail "Routing or observation requires fullEnvironment.enabled" }}{{ end }}
 {{- if and (or .Values.fullEnvironment.routingEnabled .Values.fullEnvironment.taskAllowlist) (or (not .Values.fullEnvironment.sourceSeedPath) (not (hasPrefix "/" .Values.fullEnvironment.sourceSeedPath)) (not $ordinary.admit) (not $ordinary.release) (not (hasPrefix "/" .Values.fullEnvironment.ordinaryScratchRoot)) (not $reader.command) (not ($reader.readerId | trim)) (not .Values.fullEnvironment.evidenceBucket) (not .Values.fullEnvironment.publicOrigin)) }}{{ fail "Routing requires source seed, fresh reader, private evidence bucket and stable origin" }}{{ end }}
 {{- if or .Values.fullEnvironment.routingEnabled .Values.fullEnvironment.taskAllowlist }}
@@ -28,6 +28,10 @@
 {{- $workspaceClaim := default (printf "%s-workspace" .Release.Name) .Values.WORKSPACE_CLAIM_NAME -}}
 {{- if and (or .Values.fullEnvironment.routingEnabled .Values.fullEnvironment.taskAllowlist) (or (ne $workspaceClaim .Values.fullEnvironment.workspaceClaim) (ne .Values.WORKSPACE_ROOT .Values.fullEnvironment.workspaceRoot) (not (hasPrefix "/" .Values.fullEnvironment.workspaceRoot))) }}{{ fail "Routing requires consumer and runner to share the same workspace claim and absolute canonical workspace root" }}{{ end }}
 {{- if and (or .Values.fullEnvironment.routingEnabled .Values.fullEnvironment.taskAllowlist) (or (ne (clean .Values.fullEnvironment.sourceSeedPath) .Values.fullEnvironment.sourceSeedPath) (ne (clean .Values.fullEnvironment.workspaceRoot) .Values.fullEnvironment.workspaceRoot) (not (hasPrefix (printf "%s/" .Values.fullEnvironment.workspaceRoot) .Values.fullEnvironment.sourceSeedPath))) }}{{ fail "Routing source seed must be a canonical descendant of the shared workspace root" }}{{ end }}
+{{- if or .Values.fullEnvironment.routingEnabled .Values.fullEnvironment.taskAllowlist }}
+{{- if not .Values.fullEnvironment.runnerEnabled }}{{ fail "Routing requires runnerEnabled=true after protection installation" }}{{ end }}
+{{- if and .Values.sourceReaderService.enabled (not .Values.sourceReaderService.running) }}{{ fail "Routing requires the managed source reader running=true" }}{{ end }}
+{{- end }}
 {{- if and .Values.LEGACY_WORKSPACE_RETAIN (eq $workspaceClaim (printf "%s-workspace" .Release.Name)) -}}
 {{- fail "LEGACY_WORKSPACE_RETAIN requires a different WORKSPACE_CLAIM_NAME" -}}
 {{- end -}}
