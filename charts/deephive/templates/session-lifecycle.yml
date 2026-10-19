@@ -1,0 +1,195 @@
+{{- $readerName := include "deephive.readerServiceName" . }}
+{{- $drainCheck := include "deephive.drainCheckName" . }}
+{{- $readerNS := include "deephive.readerWorkloadNamespace" . }}
+{{- if and .Release.IsUpgrade (not .Values.sourceReaderService.enabled) }}
+{{- $broker := lookup "apps/v1" "Deployment" .Release.Namespace $readerName }}
+{{- $previousReader := or $broker (lookup "v1" "ConfigMap" .Release.Namespace $readerName) }}
+{{- if $previousReader }}
+{{- if and $broker (or (ne (int $broker.spec.replicas) 0) (gt (int ($broker.status.replicas | default 0)) 0)) }}{{ fail "Drain and scale the source reader to zero before removing its protection" }}{{ end }}
+{{- range $pod := (lookup "v1" "Pod" .Release.Namespace "").items }}
+{{- if or (eq (index ($pod.metadata.labels | default dict) "app") $readerName) (and (eq (index ($pod.metadata.labels | default dict) "deephive/role") "source-reader") (eq (index ($pod.metadata.labels | default dict) "app.kubernetes.io/instance") $.Release.Name)) }}{{ fail "Reader pods remain; retain reader protection until cleanup completes" }}{{ end }}
+{{- end }}
+{{- range $pod := (lookup "v1" "Pod" $readerNS "").items }}
+{{- if eq (index ($pod.metadata.labels | default dict) "app.kubernetes.io/instance") $.Release.Name }}{{ fail "Reader workload pods remain; retain reader protection until cleanup completes" }}{{ end }}
+{{- end }}
+{{- range $claim := (lookup "v1" "PersistentVolumeClaim" $readerNS "").items }}
+{{- if and (hasKey ($claim.metadata.labels | default dict) "deephive/source-reader") (eq (index ($claim.metadata.labels | default dict) "app.kubernetes.io/instance") $.Release.Name) }}{{ fail "Reader claims remain; retain reader protection until cleanup completes" }}{{ end }}
+{{- end }}
+{{- range $volume := (lookup "v1" "PersistentVolume" "" "").items }}
+{{- if and (hasKey ($volume.metadata.labels | default dict) "deephive/source-reader") (eq (index ($volume.metadata.labels | default dict) "app.kubernetes.io/instance") $.Release.Name) (eq (($volume.spec.claimRef | default dict).namespace | default "") $readerNS) }}{{ fail "Reader volumes remain; retain reader protection until cleanup completes" }}{{ end }}
+{{- end }}
+{{- end }}
+{{- end }}
+{{- $drainName := printf "dph-drain-%s" (printf "%s/%s" .Release.Namespace .Release.Name | sha256sum | trunc 24) }}
+{{- $f := .Values.fullEnvironment }}
+{{- $identity := printf "%s-%s-session-admission" .Release.Namespace .Release.Name }}
+{{- $policyName := printf "%s-%s" ($identity | trunc 50 | trimSuffix "-") ((list .Release.Namespace .Release.Name "session-admission") | toJson | sha256sum | trunc 12) }}
+{{- if and $f.enabled $f.runnerEnabled }}
+{{- $policy := lookup "admissionregistration.k8s.io/v1" "ValidatingAdmissionPolicy" "" $policyName }}
+{{- $binding := lookup "admissionregistration.k8s.io/v1" "ValidatingAdmissionPolicyBinding" "" $policyName }}
+{{- if or (not $policy) (not $binding) }}{{ fail "Install fullEnvironment with runnerEnabled=false, verify admission, then enable the runner in a second upgrade" }}{{ end }}
+{{- if ne ($policy.spec.failurePolicy | default "") "Fail" }}{{ fail "Session admission must fail closed" }}{{ end }}
+{{- if or (ne $binding.spec.policyName $policyName) (not (has "Deny" $binding.spec.validationActions)) }}{{ fail "Session admission binding must enforce Deny" }}{{ end }}
+{{- if not (hasKey $policy "status") }}{{ fail "Admission type checking has not completed" }}{{ end }}
+{{- if ne (int64 ($policy.status.observedGeneration | default 0)) (int64 $policy.metadata.generation) }}{{ fail "Wait for admission policy status to observe the installed generation" }}{{ end }}
+{{- if $policy.status.typeChecking.expressionWarnings }}{{ fail "Resolve session admission expression warnings before runner enablement" }}{{ end }}
+{{- end }}
+{{- if and .Release.IsUpgrade (not $f.enabled) }}
+{{- $runner := lookup "apps/v1" "Deployment" .Release.Namespace (printf "%s-runner" .Release.Name) }}
+{{- if and $runner (or (ne (int $runner.spec.replicas) 0) (gt (int ($runner.status.replicas | default 0)) 0)) }}{{ fail "Scale the drained runner to zero and wait for its pods to end before removing protections" }}{{ end }}
+{{- $pods := lookup "v1" "Pod" .Release.Namespace "" }}
+{{- range $pod := $pods.items }}
+{{- if eq (index ($pod.metadata.labels | default dict) "app") (printf "%s-runner" $.Release.Name) }}{{ fail "Runner pods remain; wait for their deletion before removing session protections" }}{{ end }}
+{{- if and (eq (index ($pod.metadata.labels | default dict) "app.kubernetes.io/name") "deephive-session") (eq (index ($pod.metadata.labels | default dict) "app.kubernetes.io/instance") $.Release.Name) }}{{ fail "Drain and confirm deletion of session pods before disabling fullEnvironment; keep admission, proxy and network protections installed" }}{{ end }}
+{{- end }}
+{{- end }}
+{{- if $f.enabled }}
+# Helm uninstall does not re-render templates. A retained read-only pre-delete
+# hook checks the live cluster before Helm can remove any session protections.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ $drainCheck }}
+  annotations:
+    helm.sh/hook: pre-delete
+    helm.sh/hook-weight: "-3"
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ $drainCheck }}
+  annotations:
+    helm.sh/hook: pre-delete
+    helm.sh/hook-weight: "-2"
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+rules:
+  - apiGroups: [""]
+    resources: [pods]
+    verbs: [list]
+  - apiGroups: [apps]
+    resources: [deployments]
+    resourceNames: [{{ printf "%s-runner" .Release.Name | quote }}, {{ $readerName | quote }}]
+    verbs: [get]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ $drainCheck }}
+  annotations:
+    helm.sh/hook: pre-delete
+    helm.sh/hook-weight: "-1"
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+subjects:
+  - kind: ServiceAccount
+    name: {{ $drainCheck }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ $drainCheck }}
+---
+{{- if .Values.sourceReaderService.enabled }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ $drainCheck }}-reader
+  namespace: {{ $readerNS }}
+  annotations:
+    helm.sh/hook: pre-delete
+    helm.sh/hook-weight: "-2"
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+rules:
+  - apiGroups: [""]
+    resources: [pods, persistentvolumeclaims]
+    verbs: [list]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ $drainCheck }}-reader
+  namespace: {{ $readerNS }}
+  annotations:
+    helm.sh/hook: pre-delete
+    helm.sh/hook-weight: "-1"
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+subjects:
+  - { kind: ServiceAccount, name: {{ $drainCheck }}, namespace: {{ .Release.Namespace }} }
+roleRef: { apiGroup: rbac.authorization.k8s.io, kind: Role, name: {{ $drainCheck }}-reader }
+---
+{{- end }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ $drainName }}
+  annotations:
+    helm.sh/hook: pre-delete
+    helm.sh/hook-weight: "-2"
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+rules:
+  - apiGroups: [""]
+    resources: [persistentvolumes]
+    verbs: [list]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ $drainName }}
+  annotations:
+    helm.sh/hook: pre-delete
+    helm.sh/hook-weight: "-1"
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+subjects:
+  - { kind: ServiceAccount, name: {{ $drainCheck }}, namespace: {{ .Release.Namespace }} }
+roleRef: { apiGroup: rbac.authorization.k8s.io, kind: ClusterRole, name: {{ $drainName }} }
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ $drainCheck }}
+  annotations:
+    helm.sh/hook: pre-delete
+    helm.sh/hook-weight: "0"
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+spec:
+  activeDeadlineSeconds: 120
+  backoffLimit: 0
+  template:
+    spec:
+      restartPolicy: Never
+      serviceAccountName: {{ $drainCheck }}
+      imagePullSecrets: [{ name: {{ $f.pullSecret | quote }} }]
+      containers:
+        - name: check
+          image: {{ $f.runnerImage | quote }}
+          command: [node, --input-type=module, -e]
+          args:
+            - |
+              import { KubernetesApi } from '/opt/deephive/dist/src/execution/environment/kubernetes.js';
+              const api = await KubernetesApi.inCluster();
+              const runner = await api.call('GET', '/apis/apps/v1/namespaces/' + {{ .Release.Namespace | toJson }} + '/deployments/' + {{ printf "%s-runner" .Release.Name | toJson }});
+              if (runner && (runner.spec.replicas !== 0 || (runner.status.replicas ?? 0) !== 0)) throw new Error('Scale the drained runner to zero and wait before uninstall');
+              const selector = 'app.kubernetes.io/name=deephive-session,app.kubernetes.io/instance=' + {{ .Release.Name | toJson }};
+              const pods = await api.call('GET', '/api/v1/namespaces/' + {{ .Release.Namespace | toJson }} + '/pods?labelSelector=' + encodeURIComponent(selector));
+              const runners = await api.call('GET', '/api/v1/namespaces/' + {{ .Release.Namespace | toJson }} + '/pods?labelSelector=' + encodeURIComponent('app=' + {{ printf "%s-runner" .Release.Name | toJson }}));
+              if (!runners || runners.items.length) throw new Error('Runner pods remain; admission may still create sessions');
+              if (!pods || pods.items.length) throw new Error('Session drain incomplete; retain admission, proxy and network isolation');
+              const reader = await api.call('GET', '/apis/apps/v1/namespaces/' + {{ .Release.Namespace | toJson }} + '/deployments/' + {{ $readerName | toJson }});
+              if (reader && (reader.spec.replicas !== 0 || (reader.status.replicas ?? 0) !== 0)) throw new Error('Drain and scale the source reader to zero before uninstall');
+              for (const selector of ['app=' + {{ $readerName | toJson }}, 'deephive/role=source-reader,app.kubernetes.io/instance=' + {{ .Release.Name | toJson }}]) {
+                const remaining = await api.call('GET', '/api/v1/namespaces/' + {{ .Release.Namespace | toJson }} + '/pods?labelSelector=' + encodeURIComponent(selector));
+                if (!remaining || remaining.items.length) throw new Error('Reader pods remain; retain source-reader admission');
+              }
+              const readerSelector = 'app.kubernetes.io/instance=' + {{ .Release.Name | toJson }} + ',deephive/source-reader';
+{{- if .Values.sourceReaderService.enabled }}
+              const readerNamespace = {{ $readerNS | toJson }};
+              const readerPods = await api.call('GET', '/api/v1/namespaces/' + readerNamespace + '/pods?labelSelector=' + encodeURIComponent(readerSelector));
+              const claims = await api.call('GET', '/api/v1/namespaces/' + readerNamespace + '/persistentvolumeclaims?labelSelector=' + encodeURIComponent(readerSelector));
+              if (!readerPods || readerPods.items.length) throw new Error('Reader workload pods remain; retain cleanup permissions');
+              if (!claims || claims.items.length) throw new Error('Reader claims remain; retain cleanup permissions');
+{{- end }}
+              const volumes = await api.call('GET', '/api/v1/persistentvolumes?labelSelector=' + encodeURIComponent(readerSelector));
+              if (!volumes || volumes.items.some(v => v.spec?.claimRef?.namespace === {{ $readerNS | toJson }})) throw new Error('Reader volumes remain; retain cleanup permissions');
+          resources:
+            requests: { cpu: 50m, memory: 64Mi }
+            limits: { cpu: 250m, memory: 256Mi }
+{{- end }}

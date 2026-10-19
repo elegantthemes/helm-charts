@@ -3,13 +3,56 @@ import copy
 import json
 from pathlib import Path
 import subprocess
+import shutil
+import tempfile
 import yaml
 
 root = Path(__file__).resolve().parent
 values = json.loads((root / 'values.json').read_text())
 
-def render(release='review', namespace='dph-app', config=None):
-    raw = subprocess.check_output(['helm', 'template', release, str(root.parent.parent / 'charts/deephive'), '-n', namespace, '-f', '-'], input=json.dumps(config or values).encode())
+# Positive activation fixtures model already-installed admission resources. The
+# original chart remains used by the explicit protection-first regressions.
+fixture = tempfile.TemporaryDirectory(prefix='deephive-installed-admission-')
+fixture_chart = Path(fixture.name) / 'deephive'
+chart = root.parent.parent / 'charts/deephive'
+shutil.copytree(chart, fixture_chart)
+for name in ['session-lifecycle.yml', 'source-reader.yml']:
+    path = fixture_chart / 'templates' / name
+    text = path.read_text()
+    if name == 'session-lifecycle.yml':
+        old = '$policy := lookup "admissionregistration.k8s.io/v1" "ValidatingAdmissionPolicy" "" $policyName'
+        binding_name = '$policyName'
+        policy_var = '$policy'
+    else:
+        old = '$installed := lookup "admissionregistration.k8s.io/v1" "ValidatingAdmissionPolicy" "" $policy'
+        binding_name = '$policy'
+        policy_var = '$installed'
+    assert old in text
+    text = text.replace(old, policy_var + ' := dict "metadata" (dict "generation" 1) "spec" (dict "failurePolicy" "Fail") "status" (dict "observedGeneration" 1 "typeChecking" (dict "expressionWarnings" (list)))')
+    old = '$binding := lookup "admissionregistration.k8s.io/v1" "ValidatingAdmissionPolicyBinding" "" ' + binding_name
+    assert old in text
+    text = text.replace(old, '$binding := dict "spec" (dict "policyName" ' + binding_name + ' "validationActions" (list "Deny"))')
+    path.write_text(text)
+
+# Model bindings retained from a previously running release for stop/cleanup tests.
+for filename, expressions in {
+    'full-environment.yml': ['lookup "rbac.authorization.k8s.io/v1" "RoleBinding" .Release.Namespace (printf "%s-runner" .Release.Name)'],
+    'source-reader.yml': [
+        'lookup "rbac.authorization.k8s.io/v1" "RoleBinding" $readerNS $name',
+        'lookup "rbac.authorization.k8s.io/v1" "RoleBinding" .Release.Namespace (printf "%s-workspace" $name)',
+        'lookup "rbac.authorization.k8s.io/v1" "ClusterRoleBinding" "" $policy'],
+}.items():
+    path = fixture_chart / 'templates' / filename
+    text = path.read_text()
+    for expression in expressions:
+        assert expression in text
+        text = text.replace(expression, 'dict "metadata" (dict "name" "previous-binding")')
+    path.write_text(text)
+
+def render(release='review', namespace='dph-app', config=None, installed=False):
+    config = config or values
+    activated = installed or config['fullEnvironment'].get('runnerEnabled') or config.get('sourceReaderService', {}).get('running')
+    raw = subprocess.check_output(['helm', 'template', release, str(fixture_chart if activated else chart), '-n', namespace, '-f', '-'], input=json.dumps(config).encode())
     return [p for p in yaml.safe_load_all(raw) if p]
 
 def item(docs, kind, suffix):
@@ -41,7 +84,7 @@ after_docs = render(config=changed)
 after = item(after_docs, 'Deployment', '-runner')['spec']['template']
 assert before['metadata']['annotations'] != after['metadata']['annotations']
 assert after['spec']['containers'][0]['readinessProbe']['tcpSocket']['port'] == 'control'
-assert item(after_docs, 'DaemonSet', '-session-prepull')['spec']['template']['spec']['tolerations'] == changed['fullEnvironment']['prepullTolerations']
+assert all(t in item(after_docs, 'DaemonSet', '-session-prepull')['spec']['template']['spec']['tolerations'] for t in changed['fullEnvironment']['prepullTolerations'])
 proxy = item(after_docs, 'ConfigMap', '-session-egress')['data']['squid.conf']
 assert 'acl approved dstdomain -n ' in proxy
 print('PASS secret rotation, readiness, taints and proxy lookup configuration')
@@ -85,7 +128,8 @@ mysql['MYSQL_PASSWORD'] = 'rotated-fixture-password'
 rotated = next(p for p in render(config=mysql) if p['kind'] == 'Deployment' and p['metadata']['name'] == 'review')
 assert rotated['spec']['template']['metadata']['annotations'] != consumer['spec']['template']['metadata']['annotations']
 runner_role = next(p for p in mysql_docs if p['kind'] == 'Role' and p['metadata']['name'] == 'review-runner')
-assert all('secrets' not in rule['resources'] and 'list' not in rule['verbs'] for rule in runner_role['rules'])
+assert all('secrets' not in rule['resources'] and ('list' not in rule['verbs'] or rule['resources'] == ['pods']) for rule in runner_role['rules'])
+assert any(rule['resources'] == ['pods'] and 'list' in rule['verbs'] for rule in runner_role['rules'])
 print('PASS consumer MySQL credential references, rotation and runner read permissions')
 
 # Phase 3 feature-off boundaries and fresh-reader admission.
@@ -95,7 +139,7 @@ assert all(rule['ports'][0]['port'] != 3002 for rule in item(plain, 'NetworkPoli
 phase3 = copy.deepcopy(values)
 phase3.update(WORKSPACE_CLAIM_NAME='workspace', WORKSPACE_ROOT='/workspace-root', WORKSPACE_ACCESS_MODES=['ReadWriteMany'], VIRTUAL_HOST='deephive.example')
 phase3['fullEnvironment'].update(
-    routingEnabled=True, observationEnabled=True, sourceSeedPath='/workspace-root/seed',
+    routingEnabled=True, runnerEnabled=True, observationEnabled=True, sourceSeedPath='/workspace-root/seed',
     sourceReader={'readerId': 'fresh-csi-fixture', 'command': ['/opt/bin/read-source']},
     evidenceBucket='private-fixture', evidenceRegion='us-east-1',
     evidenceReadSecret='evidence-read', evidenceReadSecretRevision='1',
@@ -114,7 +158,8 @@ assert before['metadata']['annotations'] != consumer_template(render(config=rota
 print('PASS observation-off isolation and evidence credential rotation')
 
 def rejected(config, expected):
-    result = subprocess.run(['helm', 'template', 'review', str(root.parent.parent / 'charts/deephive'), '-f', '-'], input=json.dumps(config), text=True, capture_output=True)
+    activated = config['fullEnvironment'].get('runnerEnabled') or config.get('sourceReaderService', {}).get('running')
+    result = subprocess.run(['helm', 'template', 'review', str(fixture_chart if activated else chart), '-f', '-'], input=json.dumps(config), text=True, capture_output=True)
     assert result.returncode != 0 and expected in result.stderr, result.stderr
 missing = copy.deepcopy(phase3)
 missing['fullEnvironment']['sourceReader']['readerId'] = ''
@@ -203,5 +248,206 @@ invalid['fullEnvironment']['legacyProtocol2Images'].append(invalid['fullEnvironm
 assert subprocess.run(['helm', 'template', 'review', str(root.parent.parent / 'charts/deephive'), '-f', '-'], input=json.dumps(invalid).encode(), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode != 0
 invalid = copy.deepcopy(phase3)
 invalid['fullEnvironment']['ordinaryInstallCommand'] = []
+render(config=invalid)
+invalid['fullEnvironment']['ordinaryInstallCommand'] = ['relative-installer']
 assert subprocess.run(['helm', 'template', 'review', str(root.parent.parent / 'charts/deephive'), '-f', '-'], input=json.dumps(invalid).encode(), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode != 0
-print('PASS explicit protocol 2 drain exception and mandatory isolated installer')
+print('PASS explicit protocol 2 drain exception and optional trusted installer')
+
+# Protection installation must not grant a runner admission identity prematurely.
+docs = render()
+assert item(docs, 'Deployment', '-runner')['spec']['replicas'] == 0
+assert not any(p['kind'] == 'RoleBinding' and p['metadata']['name'].endswith('-runner') for p in docs)
+hook = item(docs, 'Job', '-session-drain-check')
+assert hook['metadata']['annotations']['helm.sh/hook'] == 'pre-delete'
+assert hook['spec']['activeDeadlineSeconds'] == 120
+assert 'Runner pods remain' in hook['spec']['template']['spec']['containers'][0]['args'][0]
+changed = copy.deepcopy(values)
+changed['fullEnvironment']['runnerEnabled'] = True
+attempt = subprocess.run(['helm', 'template', 'review', str(root.parent.parent / 'charts/deephive'), '-n', 'dph-app', '-f', '-'], input=json.dumps(changed).encode(), capture_output=True)
+assert attempt.returncode != 0 and b'runnerEnabled=false' in attempt.stderr
+print('PASS protection-first install and drain-before-uninstall gate')
+
+# Local task cancellation does not require a privileged node-wide fence command.
+changed = copy.deepcopy(values)
+changed['fullEnvironment']['pressureCommand'] = []
+docs = render(config=changed)
+consumer = next(p for p in docs if p['kind'] == 'Deployment' and p['metadata']['name'] == 'review')['spec']['template']['spec']
+probe = next(v for v in consumer['volumes'] if v['name'] == 'ordinary-cache-probe')
+assert probe['hostPath'] == {'path': '/var/lib/deephive/cache', 'type': 'Directory'}
+mount = next(v for v in consumer['containers'][0]['volumeMounts'] if v['name'] == 'ordinary-cache-probe')
+assert mount['readOnly'] is True
+assert next(e for e in consumer['containers'][0]['env'] if e['name'] == 'FULL_ENVIRONMENT_ORDINARY_CACHE_ROOT')['value'] == '/ordinary-cache-probe'
+print('PASS local pressure probe and optional infrastructure hook')
+
+# Built-in hooks receive the exact config consumed by the compiled CLI.
+builtin = copy.deepcopy(phase3)
+builtin['fullEnvironment'].update(ordinaryAdmissionCommand=[], ordinaryHandoffCommand=[], ordinaryCapacity={'enabled': True, 'pool': 'stage-ordinary', 'slots': 1, 'memoryMiB': 4096, 'taskMiB': 4096})
+docs = render(config=builtin)
+capacity = json.loads(item(docs, 'ConfigMap', '-ordinary-capacity')['data']['capacity.json'])
+assert capacity == {'pool': 'stage-ordinary', 'workspaceRoot': phase3['WORKSPACE_ROOT'], 'slots': 1, 'memoryMiB': 4096, 'taskMiB': 4096}
+consumer = consumer_template(docs)['spec']
+env = {e['name']: e.get('value') for e in consumer['containers'][0]['env']}
+for name, action in [('FULL_ENVIRONMENT_ORDINARY_ADMISSION_COMMAND', 'admit'), ('FULL_ENVIRONMENT_ORDINARY_HANDOFF_COMMAND', 'release')]:
+    command = json.loads(env[name])
+    assert command[-2:] == ['/ordinary-config/capacity.json', action]
+    assert command[2].endswith('/dist/scripts/environment/ordinary-capacity.js')
+assert any(v.get('configMap', {}).get('name') == 'review-ordinary-capacity' for v in consumer['volumes'])
+assert any('emptyDir' in v for v in consumer['volumes'])
+invalid = copy.deepcopy(builtin)
+invalid['fullEnvironment']['ordinaryCapacity']['taskMiB'] = 8192
+rejected(invalid, 'positive slot and memory budgets')
+invalid = copy.deepcopy(builtin)
+invalid['fullEnvironment']['ordinaryHandoffCommand'] = ['/bin/true']
+rejected(invalid, 'not both')
+print('PASS built-in capacity config, commands, scratch and budget validation')
+seed = copy.deepcopy(values)
+seed['WORKSPACE_ROOT'] = seed['fullEnvironment'].get('workspaceRoot', '/workspace-root')
+seed['WORKSPACE_CLAIM_NAME'] = seed['fullEnvironment']['workspaceClaim']
+seed['fullEnvironment'].update(sourceSeedExportEnabled=True, sourceSeedPath='/workspace-root/seeds/candidate')
+docs = render(config=seed)
+job = next(p for p in docs if p['kind'] == 'Job' and '-seed-' in p['metadata']['name'])
+assert job['spec']['backoffLimit'] == 0
+pod = job['spec']['template']['spec']
+assert pod['automountServiceAccountToken'] is False
+assert pod['containers'][0]['command'][-1].endswith('/export-source-seed.js')
+assert 'envFrom' not in pod['containers'][0]
+seed['fullEnvironment']['sourceSeedPath'] = '/outside'
+rejected(seed, 'canonical workspace descendant')
+print('PASS credential-free, explicit source seed export')
+
+# The uninstall hook reads both Deployments even when the reader was disabled.
+for release in ['review', 'other']:
+    docs = render(release=release)
+    role = item(docs, 'Role', '-session-drain-check')
+    deployment_rule = next(r for r in role['rules'] if r['resources'] == ['deployments'])
+    assert deployment_rule['verbs'] == ['get']
+    assert set(deployment_rule['resourceNames']) == {release + '-runner', release + '-source-reader'}
+print('PASS uninstall hook can read both drained deployment identities')
+
+# Source export is prepared against the same claim and root even with routing off.
+seed = copy.deepcopy(values)
+seed['WORKSPACE_ROOT'] = seed['fullEnvironment'].get('workspaceRoot', '/workspace-root')
+seed['WORKSPACE_CLAIM_NAME'] = seed['fullEnvironment']['workspaceClaim']
+seed['fullEnvironment'].update(sourceSeedExportEnabled=True, sourceSeedPath='/workspace-root/seeds/candidate')
+docs = render(config=seed)
+job = next(p for p in docs if p['kind'] == 'Job' and '-seed-' in p['metadata']['name'])
+assert {'key': 'deephive-execution', 'operator': 'Equal', 'value': 'true', 'effect': 'NoSchedule'} in job['spec']['template']['spec']['tolerations']
+for key in ['WORKSPACE_CLAIM_NAME', 'WORKSPACE_ROOT']:
+    invalid = copy.deepcopy(seed)
+    invalid[key] = 'other' if key == 'WORKSPACE_CLAIM_NAME' else '/other'
+    rejected(invalid, 'active consumer workspace')
+runner = item(docs, 'Deployment', '-runner')['spec']['template']['spec']
+assert all(v['hostPath']['type'] == 'Directory' for v in runner['volumes'] if 'hostPath' in v)
+hook = item(docs, 'Job', '-session-drain-check')
+role = item(docs, 'Role', '-session-drain-check')
+assert not any('pods/log' in r['resources'] for r in role['rules'])
+cluster_role = next(p for p in docs if p['kind'] == 'ClusterRole' and p['metadata']['name'].startswith('dph-drain-'))
+assert cluster_role['rules'] == [{'apiGroups': [''], 'resources': ['persistentvolumes'], 'verbs': ['list']}]
+assert 'const readerNamespace' not in hook['spec']['template']['spec']['containers'][0]['args'][0]
+assert '/persistentvolumes?labelSelector=' in hook['spec']['template']['spec']['containers'][0]['args'][0]
+print('PASS probe directories, seed workspace/taint and retained reader storage drain checks')
+
+# Routing activation cannot select a stopped runner or managed reader broker.
+invalid = copy.deepcopy(phase3)
+invalid['fullEnvironment']['runnerEnabled'] = False
+rejected(invalid, 'runnerEnabled=true')
+invalid = copy.deepcopy(phase3)
+invalid['sourceReaderService'] = {'enabled': True, 'running': False, 'tokenSecret': 'reader-token', 'tokenRevision': '1', 'nodeName': 'reader-node'}
+rejected(invalid, 'managed source reader running=true')
+managed = copy.deepcopy(values)
+managed['INSTALL_PATH'] = '/custom/deephive'
+managed['sourceReaderService'] = invalid['sourceReaderService']
+docs = render(config=managed)
+command = json.loads(next(e['value'] for e in consumer_template(docs)['spec']['containers'][0]['env'] if e['name'] == 'FULL_ENVIRONMENT_READER_CONFIG'))['command']
+assert command[2] == '/custom/deephive/dist/scripts/environment/remote-source-reader.js'
+seed = copy.deepcopy(values)
+seed.update(WORKSPACE_ROOT='/workspace-root', WORKSPACE_CLAIM_NAME='workspace')
+seed['fullEnvironment'].update(sourceSeedExportEnabled=True, sourceSeedPath='/workspace-root/seeds/candidate')
+def seed_name(config):
+    return next(p['metadata']['name'] for p in render(config=config) if p['kind'] == 'Job' and '-seed-' in p['metadata']['name'])
+original = seed_name(seed)
+for key, value in [('nodeName', 'other-node'), ('pullSecret', 'new-pull'), ('prepullTolerations', [{'key': 'extra', 'operator': 'Exists'}])]:
+    changed = copy.deepcopy(seed)
+    changed['fullEnvironment'][key] = value
+    assert seed_name(changed) != original
+print('PASS routing activation, custom install root and immutable seed-job replacement')
+
+managed = copy.deepcopy(values)
+managed['sourceReaderService'] = {'enabled': True, 'running': True, 'tokenSecret': 'reader-token', 'tokenRevision': '1', 'nodeName': 'reader-node'}
+docs = render(config=managed)
+reader_namespace = json.loads(item(docs, 'ConfigMap', '-source-reader')['data']['reader.json'])['namespace']
+assert reader_namespace != 'dph-app' and len(reader_namespace) <= 63
+bindings = [d for d in docs if d['kind'] == 'RoleBinding' and d['metadata']['name'] == 'review-source-reader']
+assert len(bindings) == 1 and bindings[0]['metadata']['namespace'] == reader_namespace
+assert bindings[0]['subjects'][0]['namespace'] == 'dph-app'
+roles = [d for d in docs if d['kind'] == 'Role' and any('pods/log' in r['resources'] for r in d['rules'])]
+assert roles and all(d['metadata']['namespace'] == reader_namespace for d in roles)
+workspace = item(docs, 'Role', '-source-reader-workspace')
+assert workspace['rules'] == [{'apiGroups': [''], 'resources': ['persistentvolumeclaims'], 'resourceNames': ['workspace'], 'verbs': ['get']}]
+network = item(docs, 'NetworkPolicy', '-source-reader-workloads')
+assert network['metadata']['namespace'] == reader_namespace and network['spec']['egress'] == []
+for name, volume in [('review', 'source-reader-token'), ('review-runner', 'source-reader-token'), ('review-source-reader', 'token')]:
+    pod = next(p for p in docs if p['kind'] == 'Deployment' and p['metadata']['name'] == name)['spec']['template']['spec']
+    secret = next(v['secret'] for v in pod['volumes'] if v['name'] == volume)
+    assert secret['items'] == [{'key': 'token', 'path': 'token'}]
+reader_drain = item(docs, 'Role', '-session-drain-check-reader')
+assert reader_drain['metadata']['namespace'] == reader_namespace
+assert reader_drain['rules'][0]['resources'] == ['pods', 'persistentvolumeclaims']
+script = item(docs, 'Job', '-session-drain-check')['spec']['template']['spec']['containers'][0]['args'][0]
+assert reader_namespace in script and '/persistentvolumeclaims?labelSelector=' in script
+invalid = copy.deepcopy(managed)
+invalid['sourceReaderService']['tokenSecret'] = 'runner'
+rejected(invalid, 'dedicated Secret')
+print('PASS dedicated reader namespace, scoped logs, kubelet-only credentials and token projections')
+
+stopped = copy.deepcopy(managed)
+stopped['sourceReaderService']['running'] = False
+stopped['fullEnvironment']['runnerEnabled'] = False
+docs = render(config=stopped, installed=True)
+for name in ['review-runner', 'review-source-reader', 'review-source-reader-workspace']:
+    assert any(d['kind'] == 'RoleBinding' and d['metadata']['name'] == name for d in docs)
+assert any(d['kind'] == 'ClusterRoleBinding' and d['roleRef']['name'].startswith('dph-reader-') for d in docs)
+print('PASS stopped workloads retain previously granted cleanup permissions')
+
+long_names = set()
+for release in ['a' * 50 + 'one', 'a' * 50 + 'two']:
+    docs = render(release=release, config=managed)
+    broker = next(d for d in docs if d['kind'] == 'Deployment' and d['metadata']['name'].startswith('a') and any(v.get('name') == 'token' for v in d['spec']['template']['spec'].get('volumes', [])))
+    name = broker['metadata']['name']
+    assert len(name) <= 53 and name not in long_names
+    long_names.add(name)
+    assert any(d['kind'] == 'Service' and d['metadata']['name'] == name for d in docs)
+    assert len(broker['spec']['template']['metadata']['labels']['app']) <= 63
+    consumer = next(d for d in docs if d['kind'] == 'Deployment' and d['metadata']['name'] == release)
+    config = json.loads(next(e['value'] for e in consumer['spec']['template']['spec']['containers'][0]['env'] if e['name'] == 'FULL_ENVIRONMENT_READER_CONFIG'))
+    assert 'http://' + name + ':3003' in config['command']
+    assert all(len(d['metadata']['name']) <= 63 for d in docs if d['kind'] == 'Job')
+print('PASS bounded, collision-resistant reader and drain identities')
+
+with tempfile.TemporaryDirectory(prefix='reader-default-off-') as temp:
+    target = Path(temp) / 'chart'
+    shutil.copytree(chart, target)
+    path = target / 'templates/session-lifecycle.yml'
+    text = path.read_text().replace('lookup "v1" "PersistentVolume" "" ""', 'fail "unexpected cluster PV lookup"')
+    path.write_text(text)
+    subprocess.run(['helm', 'template', 'review', str(target), '--is-upgrade', '-n', 'dph-app', '-f', '-'], input=json.dumps(values).encode(), stdout=subprocess.DEVNULL, check=True)
+print('PASS never-enabled reader upgrade avoids cluster storage lookup')
+
+# Regression evidence: conditional activation keeps the runner Role and binding
+# as distinct YAML documents, including after the binding is retained on stop.
+for config in [phase3, stopped]:
+    docs = render(config=config, installed=True)
+    role = next(d for d in docs if d['kind'] == 'Role' and d['metadata']['name'] == 'review-runner')
+    binding = next(d for d in docs if d['kind'] == 'RoleBinding' and d['metadata']['name'] == 'review-runner')
+    assert 'rules' in role and 'rules' not in binding
+    assert binding['roleRef']['name'] == role['metadata']['name']
+print('PASS runner Role and conditional RoleBinding are separate documents')
+
+# ConfigMaps use DNS subdomain names (253 chars), unlike Service DNS labels.
+for release in ['a' * 50 + 'one', 'a' * 50 + 'two']:
+    docs = render(release=release, config=builtin)
+    capacity = next(d for d in docs if d['kind'] == 'ConfigMap' and d['metadata']['name'].endswith('-ordinary-capacity'))
+    assert len(capacity['metadata']['name']) == 71
+    consumer = next(d for d in docs if d['kind'] == 'Deployment' and d['metadata']['name'] == release)
+    assert any(v.get('configMap', {}).get('name') == capacity['metadata']['name'] for v in consumer['spec']['template']['spec']['volumes'])
+print('PASS long-release capacity ConfigMap identity and volume reference')

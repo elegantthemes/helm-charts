@@ -29,6 +29,7 @@
     },
     "ordinaryInstallCommand": [
       "/infra/ordinary-install"
-    ]
+    ],
+    "ordinaryCacheProbePath": "/var/lib/deephive/cache"
   }
 }

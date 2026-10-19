@@ -1,8 +1,10 @@
+{{- $ordinary := include "deephive.ordinaryCommands" . | fromJson }}
+{{- $reader := include "deephive.sourceReader" (dict "context" . "codeRoot" (default "/srv/deephive" .Values.INSTALL_PATH)) | fromJson }}
 {{- if and (or .Values.fullEnvironment.routingEnabled .Values.fullEnvironment.taskAllowlist .Values.fullEnvironment.observationEnabled) (not .Values.fullEnvironment.enabled) }}{{ fail "Routing or observation requires fullEnvironment.enabled" }}{{ end }}
-{{- if and (or .Values.fullEnvironment.routingEnabled .Values.fullEnvironment.taskAllowlist) (or (not .Values.fullEnvironment.sourceSeedPath) (not (hasPrefix "/" .Values.fullEnvironment.sourceSeedPath)) (not .Values.fullEnvironment.ordinaryAdmissionCommand) (not .Values.fullEnvironment.ordinaryHandoffCommand) (not .Values.fullEnvironment.ordinaryInstallCommand) (not (hasPrefix "/" .Values.fullEnvironment.ordinaryScratchRoot)) (not .Values.fullEnvironment.sourceReader.command) (not (.Values.fullEnvironment.sourceReader.readerId | trim)) (not .Values.fullEnvironment.evidenceBucket) (not .Values.fullEnvironment.publicOrigin)) }}{{ fail "Routing requires source seed, fresh reader, private evidence bucket and stable origin" }}{{ end }}
+{{- if and (or .Values.fullEnvironment.routingEnabled .Values.fullEnvironment.taskAllowlist) (or (not .Values.fullEnvironment.sourceSeedPath) (not (hasPrefix "/" .Values.fullEnvironment.sourceSeedPath)) (not $ordinary.admit) (not $ordinary.release) (not (hasPrefix "/" .Values.fullEnvironment.ordinaryScratchRoot)) (not $reader.command) (not ($reader.readerId | trim)) (not .Values.fullEnvironment.evidenceBucket) (not .Values.fullEnvironment.publicOrigin)) }}{{ fail "Routing requires source seed, fresh reader, private evidence bucket and stable origin" }}{{ end }}
 {{- if or .Values.fullEnvironment.routingEnabled .Values.fullEnvironment.taskAllowlist }}
-{{- range $command := list .Values.fullEnvironment.sourceReader.command .Values.fullEnvironment.ordinaryAdmissionCommand .Values.fullEnvironment.ordinaryHandoffCommand .Values.fullEnvironment.ordinaryInstallCommand }}
-{{- if not (hasPrefix "/" (index $command 0)) }}{{ fail "Source reader and ordinary-worker fencing commands must use absolute executable paths" }}{{ end }}
+{{- range $command := list $reader.command $ordinary.admit $ordinary.release .Values.fullEnvironment.ordinaryInstallCommand }}
+{{- if and $command (not (hasPrefix "/" (index $command 0))) }}{{ fail "Source reader and ordinary-worker fencing commands must use absolute executable paths" }}{{ end }}
 {{- end }}
 {{- end }}
 {{- if and .Values.fullEnvironment.evidenceBucket (not .Values.fullEnvironment.evidenceRegion) }}{{ fail "Private evidence bucket requires its region" }}{{ end }}
@@ -18,6 +20,7 @@
 {{- if and .Values.fullEnvironment.evidenceBucket (has .Values.fullEnvironment.evidenceReadSecret (list "secrets" .Values.fullEnvironment.runnerSecret .Values.fullEnvironment.agentSecret (.Values.fullEnvironment.integrationSecret | default ""))) }}{{ fail "Evidence requires a dedicated read-only Secret separate from runner, agent and consumer credentials" }}{{ end }}
 {{- if or .Values.fullEnvironment.routingEnabled .Values.fullEnvironment.taskAllowlist }}
 {{- if not (has "ReadWriteMany" .Values.WORKSPACE_ACCESS_MODES) }}{{ fail "Routing requires a ReadWriteMany shared workspace claim" }}{{ end }}
+{{- if or (not (hasPrefix "/" .Values.fullEnvironment.ordinaryCacheProbePath)) (eq .Values.fullEnvironment.ordinaryCacheProbePath "/") }}{{ fail "Routing requires an actual ordinary-worker retained-cache probe directory" }}{{ end }}
 {{- $scratch := .Values.fullEnvironment.ordinaryScratchRoot }}
 {{- $source := .Values.fullEnvironment.workspaceRoot }}
 {{- if or (eq $scratch "/") (ne (clean $scratch) $scratch) (eq $scratch $source) (hasPrefix (printf "%s/" $source) $scratch) (hasPrefix (printf "%s/" $scratch) $source) }}{{ fail "Ordinary scratch must be canonical and disjoint from the shared candidate source workspace" }}{{ end }}
@@ -25,6 +28,10 @@
 {{- $workspaceClaim := default (printf "%s-workspace" .Release.Name) .Values.WORKSPACE_CLAIM_NAME -}}
 {{- if and (or .Values.fullEnvironment.routingEnabled .Values.fullEnvironment.taskAllowlist) (or (ne $workspaceClaim .Values.fullEnvironment.workspaceClaim) (ne .Values.WORKSPACE_ROOT .Values.fullEnvironment.workspaceRoot) (not (hasPrefix "/" .Values.fullEnvironment.workspaceRoot))) }}{{ fail "Routing requires consumer and runner to share the same workspace claim and absolute canonical workspace root" }}{{ end }}
 {{- if and (or .Values.fullEnvironment.routingEnabled .Values.fullEnvironment.taskAllowlist) (or (ne (clean .Values.fullEnvironment.sourceSeedPath) .Values.fullEnvironment.sourceSeedPath) (ne (clean .Values.fullEnvironment.workspaceRoot) .Values.fullEnvironment.workspaceRoot) (not (hasPrefix (printf "%s/" .Values.fullEnvironment.workspaceRoot) .Values.fullEnvironment.sourceSeedPath))) }}{{ fail "Routing source seed must be a canonical descendant of the shared workspace root" }}{{ end }}
+{{- if or .Values.fullEnvironment.routingEnabled .Values.fullEnvironment.taskAllowlist }}
+{{- if not .Values.fullEnvironment.runnerEnabled }}{{ fail "Routing requires runnerEnabled=true after protection installation" }}{{ end }}
+{{- if and .Values.sourceReaderService.enabled (not .Values.sourceReaderService.running) }}{{ fail "Routing requires the managed source reader running=true" }}{{ end }}
+{{- end }}
 {{- if and .Values.LEGACY_WORKSPACE_RETAIN (eq $workspaceClaim (printf "%s-workspace" .Release.Name)) -}}
 {{- fail "LEGACY_WORKSPACE_RETAIN requires a different WORKSPACE_CLAIM_NAME" -}}
 {{- end -}}
@@ -62,6 +69,10 @@ kind: PersistentVolumeClaim
 metadata:
   name: {{ $workspaceClaim }}
   namespace: {{ .Release.Namespace }}
+{{- if .Values.fullEnvironment.writebackEnabled }}
+  labels:
+    deephive.elegantthemes.com/writeback: enabled
+{{- end }}
 spec:
   accessModes:
 {{ toYaml .Values.WORKSPACE_ACCESS_MODES | indent 4 }}
@@ -107,6 +118,10 @@ spec:
   template:
     metadata:
       annotations:
+        checksum/ordinary-capacity: {{ toJson .Values.fullEnvironment.ordinaryCapacity | sha256sum | quote }}
+{{- if .Values.sourceReaderService.enabled }}
+        source-reader-token-revision: {{ .Values.sourceReaderService.tokenRevision | quote }}
+{{- end }}
 {{- if .Values.fullEnvironment.observationEnabled }}
         observation-secret-revision: {{ required "Runner Secret revision required with observation; increment it after token rotation" .Values.fullEnvironment.runnerSecretRevision | quote }}
 {{- end }}
@@ -166,15 +181,19 @@ spec:
             - name: FULL_ENVIRONMENT_SOURCE_SEED
               value: {{ .Values.fullEnvironment.sourceSeedPath | quote }}
             - name: FULL_ENVIRONMENT_ORDINARY_ADMISSION_COMMAND
-              value: {{ toJson .Values.fullEnvironment.ordinaryAdmissionCommand | quote }}
+              value: {{ toJson $ordinary.admit | quote }}
             - name: FULL_ENVIRONMENT_ORDINARY_INSTALL_COMMAND
               value: {{ toJson .Values.fullEnvironment.ordinaryInstallCommand | quote }}
+            - name: FULL_ENVIRONMENT_LEGACY_RECOVERY_COMMAND
+              value: {{ toJson .Values.fullEnvironment.legacyRecoveryCommand | quote }}
             - name: FULL_ENVIRONMENT_ORDINARY_HANDOFF_COMMAND
-              value: {{ toJson .Values.fullEnvironment.ordinaryHandoffCommand | quote }}
+              value: {{ toJson $ordinary.release | quote }}
             - name: FULL_ENVIRONMENT_ORDINARY_SCRATCH_ROOT
               value: {{ .Values.fullEnvironment.ordinaryScratchRoot | quote }}
+            - name: FULL_ENVIRONMENT_ORDINARY_CACHE_ROOT
+              value: {{ ternary "/ordinary-cache-probe" "" (not (empty .Values.fullEnvironment.ordinaryCacheProbePath)) | quote }}
             - name: FULL_ENVIRONMENT_READER_CONFIG
-              value: {{ toJson .Values.fullEnvironment.sourceReader | quote }}
+              value: {{ toJson $reader | quote }}
 {{- if or .Values.fullEnvironment.observationEnabled .Values.fullEnvironment.evidenceBucket }}
             - name: BROWSER_PUBLIC_ORIGIN
               value: {{ required "Stable HTTPS origin required" .Values.fullEnvironment.publicOrigin | quote }}
@@ -256,9 +275,25 @@ spec:
             periodSeconds: 5
             timeoutSeconds: 3
           volumeMounts:
+{{- if .Values.fullEnvironment.ordinaryCapacity.enabled }}
+            - name: ordinary-config
+              mountPath: /ordinary-config
+              readOnly: true
+            - name: ordinary-scratch
+              mountPath: {{ .Values.fullEnvironment.ordinaryScratchRoot | quote }}
+{{- end }}
+{{- if .Values.sourceReaderService.enabled }}
+            - { name: source-reader-token, mountPath: /source-reader-token, readOnly: true }
+{{- end }}
+{{- if .Values.fullEnvironment.ordinaryCacheProbePath }}
+            - name: ordinary-cache-probe
+              mountPath: /ordinary-cache-probe
+              readOnly: true
+{{- end }}
             - name: wordpress
               mountPath: /srv
             - name: workspace
+              mountPropagation: HostToContainer
               mountPath: {{ .Values.WORKSPACE_ROOT | squote }}
             - name: config
               mountPath: /config
@@ -305,6 +340,20 @@ spec:
           operator: Exists
           effect: NoSchedule
       volumes:
+{{- if .Values.fullEnvironment.ordinaryCapacity.enabled }}
+        - name: ordinary-config
+          configMap: { name: {{ .Release.Name }}-ordinary-capacity }
+        - name: ordinary-scratch
+          emptyDir: { sizeLimit: {{ .Values.fullEnvironment.ordinaryCapacity.scratchSize | quote }} }
+{{- end }}
+{{- if .Values.sourceReaderService.enabled }}
+        - name: source-reader-token
+          secret: { secretName: {{ .Values.sourceReaderService.tokenSecret | quote }}, items: [{ key: token, path: token }] }
+{{- end }}
+{{- if .Values.fullEnvironment.ordinaryCacheProbePath }}
+        - name: ordinary-cache-probe
+          hostPath: { path: {{ .Values.fullEnvironment.ordinaryCacheProbePath | quote }}, type: Directory }
+{{- end }}
         - name: wordpress
           emptyDir: {}
         - name: workspace
