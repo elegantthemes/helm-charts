@@ -170,6 +170,8 @@ spec:
       containers:
         - name: {{ .Release.Name }}
           env:
+            - name: WORKSPACE_COPY_METHOD
+              value: {{ .Values.WORKSPACE_COPY_METHOD | default "fs.cp" | quote }}
 {{- if or .Values.fullEnvironment.routingEnabled .Values.fullEnvironment.taskAllowlist }}
             - name: WORKSPACE_ROOT
               value: {{ .Values.WORKSPACE_ROOT | quote }}
