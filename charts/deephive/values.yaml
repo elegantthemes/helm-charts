@@ -12,6 +12,8 @@ PORT: 3000
 REPLICAS:
 VIRTUAL_HOST:
 WORKSPACE_ROOT:
+# Native cloning requires the JuiceFS CLI and a JuiceFS-backed workspace.
+WORKSPACE_COPY_METHOD: fs.cp
 WORKSPACE_ACCESS_MODES:
   - ReadWriteOnce
 WORKSPACE_CLAIM_NAME:
