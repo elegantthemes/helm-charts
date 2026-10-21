@@ -12,11 +12,23 @@ PORT: 3000
 REPLICAS:
 VIRTUAL_HOST:
 WORKSPACE_ROOT:
+# Native cloning requires the JuiceFS CLI and a JuiceFS-backed workspace.
+WORKSPACE_COPY_METHOD: fs.cp
 WORKSPACE_ACCESS_MODES:
   - ReadWriteOnce
 WORKSPACE_CLAIM_NAME:
 WORKSPACE_STORAGE_CLASS_NAME: linode-block-storage
 WORKSPACE_STORAGE_SIZE: 250Gi
+
+# Optional: name of an existing Secret (created by Terraform, not by this chart) that holds the
+# Codex CLI ChatGPT login (auth.json). When set the chart adds a ServiceAccount for the consumer
+# pod and a Role allowing get/patch on only that Secret. The chart never renders the Secret, so
+# upgrades and rollbacks cannot overwrite refreshed tokens. Set the same name as
+# CODEX_AUTH_SECRET_NAME in the DeepHive env file. Empty = disabled.
+CODEX_AUTH_SECRET_NAME: ""
+# Image pull Secrets to attach to that ServiceAccount (the consumer stops using `default`,
+# so a pull secret attached only to `default` would no longer apply).
+CODEX_AUTH_IMAGE_PULL_SECRETS: []
 
 # Preserve the original workspace PVC during a cutover to a different claim.
 LEGACY_WORKSPACE_RETAIN: false
@@ -49,6 +61,40 @@ DB_PASSWORD:
 # Phase 2 preparation only. Routing and workload creation remain disabled.
 fullEnvironment:
   enabled: false
+  runnerEnabled: false # install and verify protections first
+  draining: false # stop admission while existing sessions finish
+  validationTimeoutMs: 3600000 # capped by each session original deadline
+  writebackEnabled: false # label only this PVC for scoped CSI configuration
+  observationEnabled: false
+  routingEnabled: false
+  taskAllowlist: "" # comma-separated explicit staging issue numbers
+  sourceSeedExportEnabled: false # one-time immutable seed export; enable before routing
+  sourceSeedPath: "" # trusted credential-free /opt/divi-seed export on the shared PVC
+  legacyProtocol2Images: [] # explicit drain-only exceptions; never permits protocol 3 validation
+  approvedBootstraps: {} # immutable session digest -> bootstrap/runtime identity
+  sessionProtocol: 3
+  ordinaryCapacity:
+    enabled: false # generate built-in admission/release commands and mount config
+    pool: "" # stable shared budget identity, e.g. staging-ordinary; survives rollout
+    slots: 1
+    memoryMiB: 4096
+    taskMiB: 4096
+    scratchSize: 45Gi
+  ordinaryAdmissionCommand: [] # trusted command reserves existing ordinary worker capacity
+  ordinaryInstallCommand: [] # optional override; empty uses the built-in trusted worker installer
+  legacyRecoveryCommand: [] # operator-confirmed interrupted legacy writer recovery; not a capacity hook
+  ordinaryHandoffCommand: [] # override capacity release/recovery hook
+  ordinaryScratchRoot: /ordinary-scratch # mounted emptyDir when ordinaryCapacity.enabled
+  ordinaryCacheProbePath: "" # actual retained CSI cache directory on each ordinary-worker node
+  sourceReader:
+    readerId: "" # fresh CSI mount/cache identity, never the writer's staging cache
+    command: [] # trusted executable returns a complete SourceManifest as JSON
+  publicOrigin: "" # https://<DeepHive host>, exact browser Origin
+  evidenceBucket: "" # dedicated private bucket provisioned in Phase 4
+  evidenceRegion: ""
+  evidenceEndpoint: "" # optional S3-compatible service endpoint
+  evidenceReadSecret: "" # read-only AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY
+  evidenceReadSecretRevision: "" # required with evidence; increment and upgrade on credential rotation
   nodeName: ""
   runnerImage: "" # immutable ghcr.io/...@sha256:...
   sessionImage: ""
@@ -68,5 +114,16 @@ fullEnvironment:
   scratchProbePath: "" # dedicated DeepHive scratch directory on the kubelet filesystem
   cacheProbePath: "" # retained JuiceFS staging/cache filesystem; must be real node path
   approvedEgressDomains: []
-  # Infrastructure-supplied trusted command fences ordinary AND full writers.
+  # Optional infrastructure pressure notification/cancellation hook; not termination proof.
   pressureCommand: []
+
+# Install reader admission protection before granting the broker identity.
+sourceReaderService:
+  workloadNamespace: "" # Terraform provisions the derived dph-reader-<release hash> namespace
+  enabled: false
+  running: false
+  tokenSecret: "" # existing Secret with token key; platform processes only
+  tokenRevision: "" # increment on Secret rotation
+  nodeName: "" # independent reader node
+  filesystemSecretName: juicefs-deephive-workspace
+  filesystemSecretNamespace: kube-system

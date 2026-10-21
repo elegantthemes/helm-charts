@@ -22,3 +22,9 @@ Defaults preserve the existing `<release>-workspace` Linode `ReadWriteOnce` clai
 With `LEGACY_WORKSPACE_RETAIN: true`, the chart continues rendering the original 250Gi Linode RWO claim with `helm.sh/resource-policy: keep`. The active claim must have a different name. Keep the legacy settings aligned with the existing PVC; do not change its immutable storage class or access modes.
 
 Before applying, verify that the JuiceFS CSI driver and `juicefs-rwx` StorageClass are available. After applying, verify that the new claim is Bound, the consumer mounts it, and the original claim remains. Staging keeps one consumer replica and removes the worker-node hostname pin; RWX storage does not make concurrent consumers safe. Intake remains PVC-free.
+
+## Workspace copy method
+
+`WORKSPACE_COPY_METHOD` controls consumer workspace provisioning. The default `fs.cp` uses portable copying. Set it to `juicefs` to opt into native cloning on a JuiceFS-backed workspace with toolbox image `elegantthemes/deephive:26.10.20` or another image containing the CLI. The application falls back to portable copying if the clone command fails or its source lock times out; Git validation still runs.
+
+Terraform staging exposes this chart value through the `workspace_copy_method` Terraform variable. Set that variable in the Terraform Cloud workspace UI, then plan/apply and verify the consumer rollout and copy-method logs. Set it back to `fs.cp` and apply to disable native cloning. Changing the setting affects future provisioning copies.

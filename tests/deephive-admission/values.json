@@ -22,6 +22,14 @@
     ],
     "compatibleSessionImages": [
       "ghcr.io/elegantthemes/session@sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
-    ]
+    ],
+    "approvedBootstraps": {
+      "ghcr.io/elegantthemes/session@sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "ghcr.io/elegantthemes/session@sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+    },
+    "ordinaryInstallCommand": [
+      "/infra/ordinary-install"
+    ],
+    "ordinaryCacheProbePath": "/var/lib/deephive/cache"
   }
 }

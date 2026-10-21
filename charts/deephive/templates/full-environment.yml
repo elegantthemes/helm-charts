@@ -1,3 +1,4 @@
+{{- $reader := include "deephive.sourceReader" (dict "context" . "codeRoot" "/opt/deephive") | fromJson }}
 {{- if .Values.fullEnvironment.enabled }}
 {{- $f := .Values.fullEnvironment }}
 {{- $nodeRole := printf "%s-%s" (printf "%s-%s-execution-node" .Release.Namespace .Release.Name | trunc 50 | trimSuffix "-") ((list .Release.Namespace .Release.Name "execution-node") | toJson | sha256sum | trunc 12) }}
@@ -7,8 +8,17 @@
 {{- if not (regexMatch "@sha256:[a-f0-9]{64}$" $f.sessionImage) }}{{ fail "fullEnvironment.sessionImage must pin a digest" }}{{ end }}
 {{- if not (regexMatch "@sha256:[a-f0-9]{64}$" $f.databaseImage) }}{{ fail "fullEnvironment.databaseImage must pin a digest" }}{{ end }}
 {{- if or (eq $f.agentSecret "secrets") (eq ($f.integrationSecret | default "") "secrets") (eq $f.agentSecret $f.runnerSecret) (and $f.integrationSecret (eq $f.integrationSecret $f.runnerSecret)) }}{{ fail "Session credentials must not reference consumer or runner Secrets" }}{{ end }}
-{{- if not $f.pressureCommand }}{{ fail "Node-wide active-writer pressure fencing must be configured" }}{{ end }}
 {{- if not $f.approvedEgressDomains }}{{ fail "Explicit approved package/model/test domains required" }}{{ end }}
+{{- if and $f.observationEnabled (not $f.publicOrigin) }}{{ fail "Exact public observation origin required" }}{{ end }}
+{{- if not (has (toJson $f.sessionProtocol) (list "2" "3")) }}{{ fail "Session protocol must be 2 or 3" }}{{ end }}
+{{- if and (or $f.routingEnabled $f.taskAllowlist) (ne (int $f.sessionProtocol) 3) }}{{ fail "Phase 3 routing requires session protocol 3" }}{{ end }}
+{{- range $image := $f.legacyProtocol2Images }}
+{{- if not (has $image (append $f.compatibleSessionImages $f.sessionImage)) }}{{ fail "Legacy protocol 2 images must be retained compatible images" }}{{ end }}
+{{- if and (eq $image $f.sessionImage) (ne (int $f.sessionProtocol) 2) }}{{ fail "Current protocol 3 image cannot be a legacy bootstrap exception" }}{{ end }}
+{{- end }}
+{{- range $image := append $f.compatibleSessionImages $f.sessionImage }}
+{{- if and (not (has $image $f.legacyProtocol2Images)) (not (regexMatch "^[a-f0-9]{64}$" (index $f.approvedBootstraps $image | default ""))) }}{{ fail "Every pinned and compatible session image requires its approved bootstrap/runtime identity" }}{{ end }}
+{{- end }}
 apiVersion: v1
 kind: ServiceAccount
 metadata:
@@ -21,8 +31,9 @@ metadata:
 rules:
   - apiGroups: [""]
     resources: [pods]
-    verbs: [get, create, patch, delete]
+    verbs: [get, list, create, patch, delete]
 ---
+{{- if or $f.runnerEnabled (lookup "rbac.authorization.k8s.io/v1" "RoleBinding" .Release.Namespace (printf "%s-runner" .Release.Name)) }}
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
@@ -34,6 +45,7 @@ roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
   name: {{ .Release.Name }}-runner
+{{- end }}
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
@@ -64,7 +76,7 @@ metadata:
   name: {{ .Release.Name }}-runner
 data:
   runner.json: |
-    {{ dict "namespace" .Release.Namespace "release" .Release.Name "nodeName" $f.nodeName "image" $f.sessionImage "databaseImage" $f.databaseImage "imagePullSecret" $f.pullSecret "agentSecret" (required "Session agent Secret required" $f.agentSecret) "integrationSecret" ($f.integrationSecret | default "") "workspaceClaim" $f.workspaceClaim "workspaceRoot" $f.workspaceRoot "scratchRoot" "/node-scratch" "cacheRoot" "/node-cache" "runnerUrl" (printf "http://%s-runner:3001" .Release.Name) "proxyUrl" (printf "http://%s:3128" $egress) "pressureCommand" $f.pressureCommand "signingKeyFile" "/runner-secret/signing-key" "controlPort" 3001 | toJson }}
+    {{ dict "namespace" .Release.Namespace "release" .Release.Name "nodeName" $f.nodeName "image" $f.sessionImage "databaseImage" $f.databaseImage "imagePullSecret" $f.pullSecret "agentSecret" (required "Session agent Secret required" $f.agentSecret) "integrationSecret" ($f.integrationSecret | default "") "workspaceClaim" $f.workspaceClaim "workspaceRoot" $f.workspaceRoot "scratchRoot" "/node-scratch" "cacheRoot" "/node-cache" "runnerUrl" (printf "http://%s-runner:3001" .Release.Name) "proxyUrl" (printf "http://%s:3128" $egress) "pressureCommand" $f.pressureCommand "signingKeyFile" "/runner-secret/signing-key" "controlPort" 3001 "observationPort" (ternary 3002 0 $f.observationEnabled) "observationTokenFile" "/runner-secret/observation-token" "approvedBootstraps" $f.approvedBootstraps "sourceReader" $reader "sessionProtocol" $f.sessionProtocol "draining" $f.draining "validationTimeoutMs" $f.validationTimeoutMs | toJson }}
 {{/* The config contains no credentials; signing key is read from runner-only Secret. */}}
 ---
 apiVersion: apps/v1
@@ -72,16 +84,21 @@ kind: Deployment
 metadata:
   name: {{ .Release.Name }}-runner
 spec:
-  replicas: 1
+  replicas: {{ ternary 1 0 $f.runnerEnabled }}
   selector:
     matchLabels: { app: {{ .Release.Name }}-runner }
   template:
     metadata:
       annotations:
+{{- if .Values.sourceReaderService.enabled }}
+        source-reader-token-revision: {{ .Values.sourceReaderService.tokenRevision | quote }}
+{{- end }}
         checksum/runner-config: {{ toJson $f | sha256sum | quote }}
       labels: { app: {{ .Release.Name }}-runner, redis-client: "true" }
     spec:
       nodeName: {{ $f.nodeName | quote }}
+      tolerations:
+        - { key: deephive-execution, operator: Equal, value: "true", effect: NoSchedule }
       serviceAccountName: {{ .Release.Name }}-runner
       imagePullSecrets:
         - name: {{ required "Private pull secret required" $f.pullSecret | quote }}
@@ -92,12 +109,22 @@ spec:
           env:
             - name: FULL_ENVIRONMENT_CONFIG
               value: /runner-config/runner.json
+            - name: FULL_ENVIRONMENT_ROUTING
+              value: {{ ternary "1" "0" $f.routingEnabled | quote }}
+            - name: FULL_ENVIRONMENT_TASK_ALLOWLIST
+              value: {{ $f.taskAllowlist | quote }}
+            - name: BROWSER_EVIDENCE_BUCKET
+              value: {{ $f.evidenceBucket | quote }}
+            - name: BROWSER_EVIDENCE_REGION
+              value: {{ $f.evidenceRegion | quote }}
+            - name: BROWSER_EVIDENCE_ENDPOINT
+              value: {{ $f.evidenceEndpoint | quote }}
           envFrom:
             - secretRef: { name: {{ required "Runner-only secret required" $f.runnerSecret | quote }} }
           resources:
             requests: { memory: 512Mi, cpu: 250m }
             limits: { memory: 1Gi, cpu: "2" }
-          ports: [{ name: control, containerPort: 3001 }]
+          ports: [{ name: control, containerPort: 3001 }, { name: observation, containerPort: 3002 }]
           # The listener starts only after configuration, Kubernetes and ledger initialization.
           readinessProbe:
             tcpSocket: { port: control }
@@ -105,12 +132,19 @@ spec:
             timeoutSeconds: 2
             failureThreshold: 2
           volumeMounts:
+{{- if .Values.sourceReaderService.enabled }}
+            - { name: source-reader-token, mountPath: /source-reader-token, readOnly: true }
+{{- end }}
             - { name: config, mountPath: /runner-config, readOnly: true }
             - { name: secret, mountPath: /runner-secret, readOnly: true }
-            - { name: workspace, mountPath: {{ $f.workspaceRoot | quote }} }
+            - { name: workspace, mountPath: {{ $f.workspaceRoot | quote }}, mountPropagation: HostToContainer }
             - { name: cache-probe, mountPath: /node-cache, readOnly: true }
             - { name: scratch-probe, mountPath: /node-scratch, readOnly: true }
       volumes:
+{{- if .Values.sourceReaderService.enabled }}
+        - name: source-reader-token
+          secret: { secretName: {{ .Values.sourceReaderService.tokenSecret | quote }}, items: [{ key: token, path: token }] }
+{{- end }}
         - name: config
           configMap: { name: {{ .Release.Name }}-runner }
         - name: secret
@@ -128,7 +162,7 @@ metadata:
   name: {{ .Release.Name }}-runner
 spec:
   selector: { app: {{ .Release.Name }}-runner }
-  ports: [{ port: 3001, targetPort: control }]
+  ports: [{ name: control, port: 3001, targetPort: control }, { name: observation, port: 3002, targetPort: observation }]
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
@@ -138,7 +172,15 @@ spec:
   podSelector:
     matchLabels: { app.kubernetes.io/name: deephive-session, app.kubernetes.io/instance: {{ .Release.Name | quote }} }
   policyTypes: [Ingress, Egress]
+{{- if $f.observationEnabled }}
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels: { app: {{ .Release.Name }}-runner }
+      ports: [{ protocol: TCP, port: 5901 }]
+{{- else }}
   ingress: []
+{{- end }}
   egress:
     - to:
         - namespaceSelector:
@@ -164,6 +206,12 @@ spec:
     matchLabels: { app: {{ .Release.Name }}-runner }
   policyTypes: [Ingress]
   ingress:
+{{- if $f.observationEnabled }}
+    - from:
+        - podSelector:
+            matchLabels: { app: {{ .Release.Name }} }
+      ports: [{ protocol: TCP, port: 3002 }]
+{{- end }}
     - from:
         - podSelector:
             matchLabels: { app.kubernetes.io/name: deephive-session, app.kubernetes.io/instance: {{ .Release.Name | quote }} }
@@ -180,8 +228,9 @@ spec:
     metadata:
       labels: { app: {{ $prepull }} }
     spec:
-      {{- with $f.prepullTolerations }}
       tolerations:
+        - { key: deephive-execution, operator: Equal, value: "true", effect: NoSchedule }
+      {{- with $f.prepullTolerations }}
         {{- toYaml . | nindent 8 }}
       {{- end }}
       affinity:
