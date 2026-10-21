@@ -451,3 +451,23 @@ for release in ['a' * 50 + 'one', 'a' * 50 + 'two']:
     consumer = next(d for d in docs if d['kind'] == 'Deployment' and d['metadata']['name'] == release)
     assert any(v.get('configMap', {}).get('name') == capacity['metadata']['name'] for v in consumer['spec']['template']['spec']['volumes'])
 print('PASS long-release capacity ConfigMap identity and volume reference')
+
+# Cache metadata startup recovery requires a stopped predecessor. Intake keeps
+# its existing independent rolling update and never receives worker boot identity.
+cache_docs = render()
+consumer = next(p for p in cache_docs if p['kind'] == 'Deployment' and p['metadata']['name'] == 'review')
+assert consumer['spec']['strategy'] == {'type': 'Recreate'}
+env = consumer['spec']['template']['spec']['containers'][0]['env']
+assert next(e for e in env if e['name'] == 'POD_UID') == {'name': 'POD_UID', 'valueFrom': {'fieldRef': {'fieldPath': 'metadata.uid'}}}
+intake = next(p for p in cache_docs if p['kind'] == 'Deployment' and p['metadata']['name'] == 'review-intake')
+assert intake['spec']['strategy'].get('type', 'RollingUpdate') != 'Recreate'
+assert not any(e['name'] == 'POD_UID' for e in intake['spec']['template']['spec']['containers'][0]['env'])
+for replicas in [0, 1]:
+    config = copy.deepcopy(values)
+    config['REPLICAS'] = replicas
+    assert next(p for p in render(config=config) if p['kind'] == 'Deployment' and p['metadata']['name'] == 'review')['spec']['replicas'] == replicas
+config = copy.deepcopy(values)
+config['REPLICAS'] = 2
+invalid = subprocess.run(['helm', 'template', 'review', str(chart), '-n', 'dph-app', '-f', '-'], input=json.dumps(config), text=True, capture_output=True)
+assert invalid.returncode and 'at most one consumer replica' in invalid.stderr
+print('PASS single-consumer Recreate, Downward API identity and unchanged intake rollout')
