@@ -104,13 +104,11 @@ spec:
               command:
                 - 'bash'
                 - '-c'
-                - 'SCRIPT_NAME=/healthz'
-                - 'SCRIPT_FILENAME={{ .Values.INSTALL_PATH }}/web/healthz.php'
-                - 'REQUEST_METHOD=GET'
-                - 'cgi-fcgi'
-                - '-bind'
-                - '-connect'
-                - '127.0.0.1:9000'
+                - >-
+                  SCRIPT_NAME=/healthz
+                  SCRIPT_FILENAME={{ .Values.INSTALL_PATH }}/web/healthz.php
+                  REQUEST_METHOD=GET
+                  cgi-fcgi -bind -connect 127.0.0.1:9000 | grep -q 'ready!'
             periodSeconds: 30
           ports:
             - name: fastcgi
@@ -120,13 +118,11 @@ spec:
               command:
                 - 'bash'
                 - '-c'
-                - 'SCRIPT_NAME=/healthz'
-                - 'SCRIPT_FILENAME={{ .Values.INSTALL_PATH }}/web/healthz.php'
-                - 'REQUEST_METHOD=GET'
-                - 'cgi-fcgi'
-                - '-bind'
-                - '-connect'
-                - '127.0.0.1:9000'
+                - >-
+                  SCRIPT_NAME=/healthz
+                  SCRIPT_FILENAME={{ .Values.INSTALL_PATH }}/web/healthz.php
+                  REQUEST_METHOD=GET
+                  cgi-fcgi -bind -connect 127.0.0.1:9000 | grep -q 'ready!'
             periodSeconds: 10
           resources:
             requests:
