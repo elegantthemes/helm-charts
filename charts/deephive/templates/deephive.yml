@@ -1,3 +1,4 @@
+{{- if gt (int .Values.REPLICAS) 1 }}{{ fail "Cache startup recovery requires at most one consumer replica" }}{{ end }}
 {{- $ordinary := include "deephive.ordinaryCommands" . | fromJson }}
 {{- $reader := include "deephive.sourceReader" (dict "context" . "codeRoot" (default "/srv/deephive" .Values.INSTALL_PATH)) | fromJson }}
 {{- if and (or .Values.fullEnvironment.routingEnabled .Values.fullEnvironment.taskAllowlist .Values.fullEnvironment.observationEnabled) (not .Values.fullEnvironment.enabled) }}{{ fail "Routing or observation requires fullEnvironment.enabled" }}{{ end }}
@@ -108,10 +109,9 @@ metadata:
     app: {{ .Release.Name }}
 spec:
   replicas: {{ .Values.REPLICAS }}
+  # Startup cache cleanup runs before workers; the predecessor must stop first.
   strategy:
-    rollingUpdate:
-      maxSurge: 0
-      maxUnavailable: 1
+    type: Recreate
   selector:
     matchLabels:
       app: {{ .Release.Name }}
@@ -221,6 +221,11 @@ spec:
               valueFrom:
                 secretKeyRef: { name: {{ .Values.fullEnvironment.evidenceReadSecret | quote }}, key: AWS_SECRET_ACCESS_KEY }
 {{- end }}
+            # Instance identity comes directly from Kubernetes, not ENV_FILE.
+            - name: POD_UID
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.uid
             - name: NODE_NAME
               valueFrom:
                 fieldRef:
