@@ -17,17 +17,17 @@ Run `python3 tests/deephive-admission/render.py` for release-name collisions,
 quoted identifiers, Secret-revision rollouts, readiness, pre-pull taints and proxy
 lookup configuration. This is rendering validation, not deployed acceptance.
 
-Increment `fullEnvironment.runnerSecretRevision` and upgrade Helm after rotating
-an existing runner Secret in place, or explicitly restart `<release>-runner`.
+Increment `fullWorker.runnerSecretRevision` and upgrade Helm after rotating
+an existing runner Secret in place, or explicitly restart `<release>-full-worker`.
 The chart does not watch external Secret changes automatically. Configure
-`fullEnvironment.prepullTolerations` for the dedicated node's scheduling taints.
+`fullWorker.prepullTolerations` for the dedicated node's scheduling taints.
 
 Session pods must carry the chart's `app.kubernetes.io/instance` release label.
 Before upgrading an older runner/chart that created unlabeled pods, drain those
 sessions while the old policy still permits cleanup; do not strand them behind
 the new release-scoped admission policy. This is a Phase 4 rollout gate.
 
-Phase 3 runner upgrades require `fullEnvironment.approvedBootstraps` entries for
+Phase 3 runner upgrades require `fullWorker.approvedBootstraps` entries for
 the pinned session image and every retained active/compatible image. Use each
 reviewed image manifest's actual bootstrap/runtime identity; fixture hashes in
 `values.json` are synthetic. Drain sessions whose approved identity cannot be
@@ -46,7 +46,7 @@ include this revision, so both processes reload the token.
 
 Routing requires the consumer and runner to mount the same workspace PVC at the
 same absolute canonical root (`WORKSPACE_CLAIM_NAME`/`WORKSPACE_ROOT` and
-`fullEnvironment.workspaceClaim`/`workspaceRoot`). Public origins use lowercase
+`fullWorker.workspaceClaim`/`workspaceRoot`). Public origins use lowercase
 DNS hosts, matching the chart ingress deployment. IP-literal origins are not
 supported by this chart. Optional nondefault ports must be 1–65535; omit port
 443 and leading zeroes so the configured string matches the browser Origin.
@@ -57,8 +57,8 @@ outside paths and lexical traversal/aliases. Phase 4 still verifies the actual
 seed contents and fresh CSI mount; Helm cannot establish filesystem freshness.
 
 Routing participants share a ReadWriteMany claim because consumers and the
-pinned runner can occupy different nodes. Ordinary scratch must be canonical
+pinned runner can occupy different nodes. Lite scratch must be canonical
 and outside the entire shared candidate workspace. The public-origin hostname
 must match `VIRTUAL_HOST`. Evidence reader credentials use a dedicated Secret,
-separate from runner, agent/integration and ordinary consumer Secrets; Phase 4
+separate from runner, agent/integration and lite consumer Secrets; Phase 4
 verifies actual read-only IAM permissions and RWX CSI behavior.

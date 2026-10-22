@@ -21,13 +21,13 @@
 {{- end }}
 {{- end }}
 {{- $drainName := printf "dph-drain-%s" (printf "%s/%s" .Release.Namespace .Release.Name | sha256sum | trunc 24) }}
-{{- $f := .Values.fullEnvironment }}
+{{- $f := .Values.fullWorker }}
 {{- $identity := printf "%s-%s-session-admission" .Release.Namespace .Release.Name }}
 {{- $policyName := printf "%s-%s" ($identity | trunc 50 | trimSuffix "-") ((list .Release.Namespace .Release.Name "session-admission") | toJson | sha256sum | trunc 12) }}
 {{- if and $f.enabled $f.runnerEnabled }}
 {{- $policy := lookup "admissionregistration.k8s.io/v1" "ValidatingAdmissionPolicy" "" $policyName }}
 {{- $binding := lookup "admissionregistration.k8s.io/v1" "ValidatingAdmissionPolicyBinding" "" $policyName }}
-{{- if or (not $policy) (not $binding) }}{{ fail "Install fullEnvironment with runnerEnabled=false, verify admission, then enable the runner in a second upgrade" }}{{ end }}
+{{- if or (not $policy) (not $binding) }}{{ fail "Install fullWorker with runnerEnabled=false, verify admission, then enable the runner in a second upgrade" }}{{ end }}
 {{- if ne ($policy.spec.failurePolicy | default "") "Fail" }}{{ fail "Session admission must fail closed" }}{{ end }}
 {{- if or (ne $binding.spec.policyName $policyName) (not (has "Deny" $binding.spec.validationActions)) }}{{ fail "Session admission binding must enforce Deny" }}{{ end }}
 {{- if not (hasKey $policy "status") }}{{ fail "Admission type checking has not completed" }}{{ end }}
@@ -35,12 +35,12 @@
 {{- if $policy.status.typeChecking.expressionWarnings }}{{ fail "Resolve session admission expression warnings before runner enablement" }}{{ end }}
 {{- end }}
 {{- if and .Release.IsUpgrade (not $f.enabled) }}
-{{- $runner := lookup "apps/v1" "Deployment" .Release.Namespace (printf "%s-runner" .Release.Name) }}
+{{- $runner := lookup "apps/v1" "Deployment" .Release.Namespace (include "deephive.fullWorkerName" .) }}
 {{- if and $runner (or (ne (int $runner.spec.replicas) 0) (gt (int ($runner.status.replicas | default 0)) 0)) }}{{ fail "Scale the drained runner to zero and wait for its pods to end before removing protections" }}{{ end }}
 {{- $pods := lookup "v1" "Pod" .Release.Namespace "" }}
 {{- range $pod := $pods.items }}
-{{- if eq (index ($pod.metadata.labels | default dict) "app") (printf "%s-runner" $.Release.Name) }}{{ fail "Runner pods remain; wait for their deletion before removing session protections" }}{{ end }}
-{{- if and (eq (index ($pod.metadata.labels | default dict) "app.kubernetes.io/name") "deephive-session") (eq (index ($pod.metadata.labels | default dict) "app.kubernetes.io/instance") $.Release.Name) }}{{ fail "Drain and confirm deletion of session pods before disabling fullEnvironment; keep admission, proxy and network protections installed" }}{{ end }}
+{{- if eq (index ($pod.metadata.labels | default dict) "app") (include "deephive.fullWorkerName" $) }}{{ fail "Runner pods remain; wait for their deletion before removing session protections" }}{{ end }}
+{{- if and (eq (index ($pod.metadata.labels | default dict) "app.kubernetes.io/name") "deephive-session") (eq (index ($pod.metadata.labels | default dict) "app.kubernetes.io/instance") $.Release.Name) }}{{ fail "Drain and confirm deletion of session pods before disabling fullWorker; keep admission, proxy and network protections installed" }}{{ end }}
 {{- end }}
 {{- end }}
 {{- if $f.enabled }}
@@ -69,7 +69,7 @@ rules:
     verbs: [list]
   - apiGroups: [apps]
     resources: [deployments]
-    resourceNames: [{{ printf "%s-runner" .Release.Name | quote }}, {{ $readerName | quote }}]
+    resourceNames: [{{ include "deephive.fullWorkerName" . | quote }}, {{ $readerName | quote }}]
     verbs: [get]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
@@ -164,13 +164,13 @@ spec:
           command: [node, --input-type=module, -e]
           args:
             - |
-              import { KubernetesApi } from '/opt/deephive/dist/src/execution/environment/kubernetes.js';
+              import { KubernetesApi } from '/opt/deephive/dist/src/taskEnvironments/environment/kubernetes.js';
               const api = await KubernetesApi.inCluster();
-              const runner = await api.call('GET', '/apis/apps/v1/namespaces/' + {{ .Release.Namespace | toJson }} + '/deployments/' + {{ printf "%s-runner" .Release.Name | toJson }});
+              const runner = await api.call('GET', '/apis/apps/v1/namespaces/' + {{ .Release.Namespace | toJson }} + '/deployments/' + {{ include "deephive.fullWorkerName" . | toJson }});
               if (runner && (runner.spec.replicas !== 0 || (runner.status.replicas ?? 0) !== 0)) throw new Error('Scale the drained runner to zero and wait before uninstall');
               const selector = 'app.kubernetes.io/name=deephive-session,app.kubernetes.io/instance=' + {{ .Release.Name | toJson }};
               const pods = await api.call('GET', '/api/v1/namespaces/' + {{ .Release.Namespace | toJson }} + '/pods?labelSelector=' + encodeURIComponent(selector));
-              const runners = await api.call('GET', '/api/v1/namespaces/' + {{ .Release.Namespace | toJson }} + '/pods?labelSelector=' + encodeURIComponent('app=' + {{ printf "%s-runner" .Release.Name | toJson }}));
+              const runners = await api.call('GET', '/api/v1/namespaces/' + {{ .Release.Namespace | toJson }} + '/pods?labelSelector=' + encodeURIComponent('app=' + {{ include "deephive.fullWorkerName" . | toJson }}));
               if (!runners || runners.items.length) throw new Error('Runner pods remain; admission may still create sessions');
               if (!pods || pods.items.length) throw new Error('Session drain incomplete; retain admission, proxy and network isolation');
               const reader = await api.call('GET', '/apis/apps/v1/namespaces/' + {{ .Release.Namespace | toJson }} + '/deployments/' + {{ $readerName | toJson }});

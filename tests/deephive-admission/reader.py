@@ -14,13 +14,13 @@ policy = next(d for d in docs if d['kind'] == 'ValidatingAdmissionPolicy' and d[
 broker = next(d for d in docs if d['kind'] == 'Deployment' and d['metadata']['name'] == 'review-source-reader')
 assert broker['spec']['replicas'] == 0
 assert not any(d['kind'] in ['RoleBinding', 'ClusterRoleBinding'] and d.get('roleRef', {}).get('name') in ['review-source-reader', policy['metadata']['name']] for d in docs)
-for name in ['review', 'review-runner']:
+for name in ['review', 'review-full-worker']:
  pod = next(d for d in docs if d['kind'] == 'Deployment' and d['metadata']['name'] == name)['spec']['template']['spec']
  if name == 'review':
-  command = json.loads(next(e for e in pod['containers'][0]['env'] if e['name'] == 'FULL_ENVIRONMENT_READER_CONFIG')['value'])['command']
+  command = json.loads(next(e for e in pod['containers'][0]['env'] if e['name'] == 'FULL_WORKER_READER_CONFIG')['value'])['command']
   assert command[2] == '/srv/deephive/dist/scripts/environment/remote-source-reader.js'
  assert next(v for v in pod['volumes'] if v['name'] == 'source-reader-token')['secret']['secretName'] == 'reader-token'
-config = json.loads(next(d for d in docs if d['kind'] == 'ConfigMap' and d['metadata']['name'] == 'review-runner')['data']['runner.json'])
+config = json.loads(next(d for d in docs if d['kind'] == 'ConfigMap' and d['metadata']['name'] == 'review-full-worker')['data']['runner.json'])
 assert config['sourceReader']['command'][-2:] == ['http://review-source-reader:3003', '/source-reader-token/token']
 reader_namespace = json.loads(next(d for d in docs if d['kind'] == 'ConfigMap' and d['metadata']['name'] == 'review-source-reader')['data']['reader.json'])['namespace']
 assert reader_namespace != 'dph-app'
@@ -28,7 +28,7 @@ reader_role = next(d for d in docs if d['kind'] == 'Role' and d['metadata']['nam
 assert reader_role['metadata']['namespace'] == reader_namespace
 assert all(d['metadata'].get('namespace') == reader_namespace for d in docs if d['kind'] == 'Role' and any('pods/log' in r['resources'] for r in d['rules']))
 meta = {'name': 'dh-source-test', 'labels': {'app.kubernetes.io/instance': 'review', 'deephive/source-reader': 'test', 'deephive/role': 'source-reader'}}
-pod = {'metadata': meta, 'spec': {'nodeName': 'reader-node', 'serviceAccountName': 'default', 'automountServiceAccountToken': False, 'containers': [{'name': 'reader', 'image': values['fullEnvironment']['runnerImage'], 'securityContext': {'allowPrivilegeEscalation': False, 'readOnlyRootFilesystem': True, 'capabilities': {'drop': ['ALL']}}, 'volumeMounts': [{'name': 'source', 'mountPath': '/workspace-root/task', 'readOnly': True}]}], 'volumes': [{'name': 'source', 'persistentVolumeClaim': {'claimName': 'dh-source-test', 'readOnly': True}}]}}
+pod = {'metadata': meta, 'spec': {'nodeName': 'reader-node', 'serviceAccountName': 'default', 'automountServiceAccountToken': False, 'containers': [{'name': 'reader', 'image': values['fullWorker']['runnerImage'], 'securityContext': {'allowPrivilegeEscalation': False, 'readOnlyRootFilesystem': True, 'capabilities': {'drop': ['ALL']}}, 'volumeMounts': [{'name': 'source', 'mountPath': '/workspace-root/task', 'readOnly': True}]}], 'volumes': [{'name': 'source', 'persistentVolumeClaim': {'claimName': 'dh-source-test', 'readOnly': True}}]}}
 pvc = {'metadata': meta, 'spec': {'volumeName': 'dh-source-test', 'storageClassName': '', 'accessModes': ['ReadOnlyMany']}}
 pv = {'metadata': meta, 'spec': {'persistentVolumeReclaimPolicy': 'Retain', 'storageClassName': '', 'accessModes': ['ReadOnlyMany'], 'claimRef': {'name': 'dh-source-test', 'namespace': reader_namespace}, 'csi': {'driver': 'csi.juicefs.com', 'readOnly': True, 'volumeHandle': 'dh-source-test', 'nodePublishSecretRef': {'name': 'juicefs-deephive-workspace', 'namespace': 'kube-system'}}, 'mountOptions': ['ro', 'cache-size=0', 'open-cache=0', 'attr-cache=0', 'entry-cache=0', 'buffer-size=64']}}
 pod['spec']['containers'][0]['resources'] = {'requests': {'cpu': '100m', 'memory': '128Mi', 'ephemeral-storage': '16Mi'}, 'limits': {'cpu': '1', 'memory': '512Mi', 'ephemeral-storage': '256Mi'}}

@@ -1,7 +1,7 @@
-{{- if .Values.fullEnvironment.enabled }}
-{{- $f := .Values.fullEnvironment }}
+{{- if .Values.fullWorker.enabled }}
+{{- $f := .Values.fullWorker }}
 {{- $egress := printf "%s-session-egress" .Release.Name | trunc 63 | trimSuffix "-" }}
-{{- if not (regexMatch "@sha256:[a-f0-9]{64}$" $f.proxyImage) }}{{ fail "fullEnvironment.proxyImage must pin a digest" }}{{ end }}
+{{- if not (regexMatch "@sha256:[a-f0-9]{64}$" $f.proxyImage) }}{{ fail "fullWorker.proxyImage must pin a digest" }}{{ end }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
