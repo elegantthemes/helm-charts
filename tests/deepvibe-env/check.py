@@ -37,7 +37,7 @@ def render(env_file):
     return checksums
 
 base = "ADMIN_API_KEY='fixture-only'"
-media = base + "\nDEEPVIBE_MEDIA_BUCKET='fixture-media'\nAWS_REGION='us-east-1'\nAWS_ACCESS_KEY_ID='FIXTUREKEY'\nAWS_SECRET_ACCESS_KEY='fixture-secret'\nDEEPVIBE_WP_SITE_URL='https://wp.example.test/'\nDEEPVIBE_WP_USERNAME='fixture-reader'\nDEEPVIBE_WP_APPLICATION_PASSWORD='fixture password'"
+media = base + "\nDEEPVIBE_MEDIA_BUCKET='fixture-media'\nDEEPVIBE_MEDIA_ENDPOINT='https://us-ord-1.linodeobjects.com'\nAWS_REGION='us-ord'\nAWS_ACCESS_KEY_ID='FIXTUREKEY'\nAWS_SECRET_ACCESS_KEY='fixture-secret'\nDEEPVIBE_WP_SITE_URL='https://wp.example.test/'\nDEEPVIBE_WP_USERNAME='fixture-reader'\nDEEPVIBE_WP_APPLICATION_PASSWORD='fixture password'"
 first, configured, rotated = render(base), render(media), render(media.replace('fixture-secret', 'rotated-fixture-secret'))
 for name in first:
     assert first[name] != configured[name] != rotated[name]

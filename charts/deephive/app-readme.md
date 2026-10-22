@@ -36,7 +36,7 @@ without either connection. Planning, source editing and reviews use the existing
 Redis configuration; media uploads remain unavailable until configured.
 
 Use the canonical Terraform app workspace (`apps/deephive/stage`, workspace
-`elegantthemes/deephive-stage-v2`) to supply the optional DeepVibe variables. The
+`elegantthemes/deephive-stage-v2`) to provision media and supply optional WordPress variables. The
 shared module generates `ENV_FILE`; this chart already stores it in Secret
 `secrets`, key `.env`, and mounts `/config` read-only into intake and consumer.
 Both deployment checksums roll on changes. Do not add separate Helm values or
@@ -45,50 +45,39 @@ version bump is needed for these existing capabilities.
 
 Runtime names carried in that file:
 
-- `DEEPVIBE_MEDIA_BUCKET` and `AWS_REGION`: an existing private AWS S3 bucket and
-  its region. This adapter uses AWS S3, not the separate Linode execution-evidence
-  bucket or credentials.
-- Optional `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_SESSION_TOKEN`: a
-  dedicated, scoped S3 identity supplied as sensitive Terraform inputs. Leave
-  them absent when an already-configured SDK workload identity is available.
+- `DEEPVIBE_MEDIA_BUCKET`: dedicated private bucket created by
+  [Terraform #39](https://github.com/elegantthemes/terraform/pull/39).
+- `DEEPVIBE_MEDIA_ENDPOINT`: generated HTTPS Linode service origin, without a
+  bucket path. Required for Linode; omitting it selects Amazon S3 SDK defaults.
+- `AWS_REGION`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`: Linode region and
+  generated bucket-limited key. These names are S3 SDK conventions, not evidence
+  of an Amazon AWS deployment. Terraform does not need manual media credentials.
 - `DEEPVIBE_WP_SITE_URL`, `DEEPVIBE_WP_USERNAME`,
-  `DEEPVIBE_WP_APPLICATION_PASSWORD`: a dedicated WordPress account/application
-  password for read imports. Use staging for the pilot. Application passwords
-  inherit the account's capabilities; choose the account role accordingly.
+  `DEEPVIBE_WP_APPLICATION_PASSWORD`: optional dedicated WordPress read-import
+  account; supply the complete group or omit it. The password inherits the user's
+  capabilities.
 
-Provision the bucket and identity through the owning AWS infrastructure process.
-This chart does not create AWS resources. Keep Block Public Access enabled and
-limit the identity to `s3:PutObject` and `s3:GetObject` on
-`arn:aws:s3:::<bucket>/deepvibe/*`. HeadObject verification uses GetObject
-permission. If using SSE-KMS, grant the required key permissions for checksum
-verification. No bucket listing or deletion permission is required by the app.
+Terraform provisions the bucket explicitly as E1 and private, with a dedicated
+Linode `read_write` bucket-scoped identity. That permission is broader than a
+prefix-scoped AWS IAM policy; do not describe it as PutObject/GetObject-only or
+reuse execution-evidence credentials. Terraform manages exact admin-origin POST
+CORS through the Linode S3 endpoint, because the Linode provider's simple CORS
+switch allows all origins. The chart transports configuration only. No new values,
+provider logic, or chart version bump is needed here.
 
-Set bucket CORS to allow browser POST uploads from each exact admin origin,
-including scheme and port where applicable. For staging this is
-`https://deephive.staging.etdevs.com`. Example (replace the origin for other
-installations):
+Deploy the endpoint-capable app from #339 before applying Terraform #39; older
+app code ignores the custom endpoint. Then verify both deployments roll and test
+browser POST, SHA256 HEAD verification, private preview/download and anonymous
+access denial against the real E1 bucket. SDK signing tests and configuration
+presence do not prove live E1 checksum compatibility. Keep verification fail-closed
+and resolve incompatibilities before enabling editorial uploads. WordPress import
+requires its separate optional credentials. Never print `.env` or generated keys.
 
-```json
-{
-  "CORSRules": [{
-    "AllowedOrigins": ["https://deephive.staging.etdevs.com"],
-    "AllowedMethods": ["POST"],
-    "AllowedHeaders": ["*"]
-  }]
-}
-```
-
-CORS does not grant bucket access. The signed policy restricts the object key,
-size, content type and SHA256 checksum. Never use a public-read bucket or reuse
-execution-runner credentials. Media remains private and uses short-lived read
-URLs. No automatic media cleanup is enabled.
-
-After a reviewed Terraform apply, confirm both deployments roll, then use the
-DeepVibe Connections screen and a staging upload to verify browser POST, checksum
-verification, preview/download and source import. Never print runtime `.env` or
-credential values to verify their presence. A bucket/region check alone does not
-prove credentials, CORS or KMS access work. No infrastructure apply or credential
-population is part of this companion PR.
+CORS does not grant access. Policies constrain key, size, content type and checksum;
+read URLs are short-lived. Do not grant public ACLs or blanket lifecycle expiry:
+this storage holds durable source files alongside draft media. No automatic media
+cleanup, cloud plan, infrastructure apply or live acceptance is performed by this
+chart companion.
 
 Offline contract check (requires Helm and PyYAML):
 `python3 tests/deepvibe-env/check.py`.
