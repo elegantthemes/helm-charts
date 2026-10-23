@@ -38,6 +38,8 @@ def case(name, obj, resource, expected=True, mutate=None):
  if mutate: mutate(obj)
  cases.append({'Name': name, 'Expect': expected, 'Activation': {'variables': {'obj': obj}, 'object': obj, 'oldObject': obj, 'request': {'namespace': reader_namespace if resource != 'persistentvolumes' else '', 'resource': {'resource': resource}, 'operation': 'CREATE'}}})
 case('reader Pod', pod, 'pods')
+case('reader Pod cluster region label', pod, 'pods', True, lambda p: p['metadata']['labels'].update({'topology.kubernetes.io/region': 'us-ord'}))
+case('reject unknown reader label', pod, 'pods', False, lambda p: p['metadata']['labels'].update({'unexpected-label': 'unexpected'}))
 case('reject writer node', pod, 'pods', False, lambda p: p['spec'].update(nodeName='writer-node'))
 case('reject unspecified node', pod, 'pods', False, lambda p: p['spec'].pop('nodeName'))
 case('old reader node cleanup', pod, 'pods', True, lambda p: p['spec'].update(nodeName='old-reader'))

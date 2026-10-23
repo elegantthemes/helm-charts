@@ -48,7 +48,7 @@ spec:
       message: Reader workloads must stay in the configured namespace.
     - expression: >-
         request.resource.resource != 'pods' ||
-        request.operation == 'DELETE' || variables.obj.metadata.labels.all(k, k in ['app.kubernetes.io/instance', 'deephive/source-reader', 'deephive/role'])
+        request.operation == 'DELETE' || variables.obj.metadata.labels.all(k, k in ['app.kubernetes.io/instance', 'deephive/source-reader', 'deephive/role', 'topology.kubernetes.io/region'])
       message: Reader labels must not select other workload network policies.
     - expression: >-
         request.resource.resource != 'pods' ||
