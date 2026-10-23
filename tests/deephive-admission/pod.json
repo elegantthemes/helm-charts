@@ -168,7 +168,7 @@
           },
           {
             "name": "SESSION_RUNNER_URL",
-            "value": "http://review-runner:3001"
+            "value": "http://review-full-worker:3001"
           },
           {
             "name": "SESSION_TOKEN",
@@ -184,7 +184,7 @@
           },
           {
             "name": "NO_PROXY",
-            "value": "127.0.0.1,localhost,review-runner"
+            "value": "127.0.0.1,localhost,review-full-worker"
           },
           {
             "name": "OPENAI_API_KEY",

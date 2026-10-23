@@ -1,11 +1,12 @@
+{{- include "deephive.normalizeWorkerValues" . -}}
 {{- if .Values.sourceReaderService.enabled }}
 {{- $r := .Values.sourceReaderService }}
-{{- $f := .Values.fullEnvironment }}
+{{- $f := .Values.fullWorker }}
 {{- $readerNS := include "deephive.readerWorkloadNamespace" . }}
 {{- if and $r.workloadNamespace (ne $r.workloadNamespace $readerNS) }}{{ fail "Reader workload namespace must match the dedicated release identity" }}{{ end }}
 {{- $name := include "deephive.readerServiceName" . }}
 {{- $policy := printf "dph-reader-%s" (printf "%s/%s" .Release.Namespace .Release.Name | sha256sum | trunc 24) }}
-{{- if not $f.enabled }}{{ fail "Source reader requires fullEnvironment.enabled" }}{{ end }}
+{{- if not $f.enabled }}{{ fail "Source reader requires fullWorker.enabled" }}{{ end }}
 {{- if or (not $r.tokenSecret) (not $r.tokenRevision) (not $r.nodeName) }}{{ fail "Source reader requires token Secret/revision and reader node" }}{{ end }}
 {{- if has $r.tokenSecret (list "secrets" $f.runnerSecret $f.agentSecret ($f.integrationSecret | default "") ($f.evidenceReadSecret | default "")) }}{{ fail "Reader token must use a dedicated Secret" }}{{ end }}
 {{- if $r.running }}
@@ -237,7 +238,7 @@ spec:
   ingress:
     - from:
         - podSelector: { matchLabels: { app: {{ .Release.Name }} } }
-        - podSelector: { matchLabels: { app: {{ .Release.Name }}-runner } }
+        - podSelector: { matchExpressions: [{ key: app, operator: In, values: [{{ include "deephive.fullWorkerName" . | quote }}, {{ printf "%s-runner" .Release.Name | quote }}] }] }
       ports: [{ protocol: TCP, port: 3003 }]
 ---
 apiVersion: networking.k8s.io/v1

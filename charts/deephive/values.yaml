@@ -58,8 +58,8 @@ DB_DATABASE: deephive
 DB_USERNAME: deephive
 DB_PASSWORD:
 
-# Phase 2 preparation only. Routing and workload creation remain disabled.
-fullEnvironment:
+# Full worker configuration. Install protections before starting workers.
+fullWorker:
   enabled: false
   runnerEnabled: false # install and verify protections first
   draining: false # stop admission while existing sessions finish
@@ -73,19 +73,19 @@ fullEnvironment:
   legacyProtocol2Images: [] # explicit drain-only exceptions; never permits protocol 3 validation
   approvedBootstraps: {} # immutable session digest -> bootstrap/runtime identity
   sessionProtocol: 3
-  ordinaryCapacity:
+  liteCapacity:
     enabled: false # generate built-in admission/release commands and mount config
-    pool: "" # stable shared budget identity, e.g. staging-ordinary; survives rollout
+    pool: "" # stable shared budget identity, e.g. staging-lite; survives rollout
     slots: 1
     memoryMiB: 4096
     taskMiB: 4096
     scratchSize: 45Gi
-  ordinaryAdmissionCommand: [] # trusted command reserves existing ordinary worker capacity
-  ordinaryInstallCommand: [] # optional override; empty uses the built-in trusted worker installer
+  liteAdmissionCommand: [] # trusted command reserves existing lite worker capacity
+  liteInstallCommand: [] # optional override; empty uses the built-in trusted worker installer
   legacyRecoveryCommand: [] # operator-confirmed interrupted legacy writer recovery; not a capacity hook
-  ordinaryHandoffCommand: [] # override capacity release/recovery hook
-  ordinaryScratchRoot: /ordinary-scratch # mounted emptyDir when ordinaryCapacity.enabled
-  ordinaryCacheProbePath: "" # actual retained CSI cache directory on each ordinary-worker node
+  liteHandoffCommand: [] # override capacity release/recovery hook
+  liteScratchRoot: /lite-scratch # mounted emptyDir when liteCapacity.enabled
+  liteCacheProbePath: "" # actual retained CSI cache directory on each lite-worker node
   sourceReader:
     readerId: "" # fresh CSI mount/cache identity, never the writer's staging cache
     command: [] # trusted executable returns a complete SourceManifest as JSON
@@ -106,9 +106,9 @@ fullEnvironment:
   integrationSecret: "" # optional ET_USERNAME, ET_API_KEY, ET_PASSWORD, GITHUB_TOKEN
   runnerSecret: "" # Redis, signing key, scoped source-publication credentials
   # Increment on in-place Secret rotation and upgrade Helm to roll envFrom credentials.
-  # Alternatively: kubectl rollout restart deployment/<release>-runner
+  # Alternatively: kubectl rollout restart deployment/<release>-full-worker
   runnerSecretRevision: ""
-  prepullTolerations: [] # match the dedicated execution node's NoSchedule taints
+  prepullTolerations: [] # match the Full worker node's NoSchedule taints
   workspaceClaim: ""
   workspaceRoot: /workspace-root # must match enrolled canonical paths
   scratchProbePath: "" # dedicated DeepHive scratch directory on the kubelet filesystem

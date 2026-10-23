@@ -1,12 +1,13 @@
+{{- include "deephive.normalizeWorkerValues" . -}}
 {{- $reader := include "deephive.sourceReader" (dict "context" . "codeRoot" "/opt/deephive") | fromJson }}
-{{- if .Values.fullEnvironment.enabled }}
-{{- $f := .Values.fullEnvironment }}
-{{- $nodeRole := printf "%s-%s" (printf "%s-%s-execution-node" .Release.Namespace .Release.Name | trunc 50 | trimSuffix "-") ((list .Release.Namespace .Release.Name "execution-node") | toJson | sha256sum | trunc 12) }}
-{{- $prepull := printf "%s-session-prepull" .Release.Name | trunc 63 | trimSuffix "-" }}
+{{- if .Values.fullWorker.enabled }}
+{{- $f := .Values.fullWorker }}
+{{- $nodeRole := printf "%s-%s" (printf "%s-%s-full-worker-node" .Release.Namespace .Release.Name | trunc 50 | trimSuffix "-") ((list .Release.Namespace .Release.Name "full-worker-node") | toJson | sha256sum | trunc 12) }}
+{{- $prepull := printf "%s-full-session-prepull" .Release.Name | trunc 63 | trimSuffix "-" }}
 {{- $egress := printf "%s-session-egress" .Release.Name | trunc 63 | trimSuffix "-" }}
-{{- if not (regexMatch "@sha256:[a-f0-9]{64}$" $f.runnerImage) }}{{ fail "fullEnvironment.runnerImage must pin a digest" }}{{ end }}
-{{- if not (regexMatch "@sha256:[a-f0-9]{64}$" $f.sessionImage) }}{{ fail "fullEnvironment.sessionImage must pin a digest" }}{{ end }}
-{{- if not (regexMatch "@sha256:[a-f0-9]{64}$" $f.databaseImage) }}{{ fail "fullEnvironment.databaseImage must pin a digest" }}{{ end }}
+{{- if not (regexMatch "@sha256:[a-f0-9]{64}$" $f.runnerImage) }}{{ fail "fullWorker.runnerImage must pin a digest" }}{{ end }}
+{{- if not (regexMatch "@sha256:[a-f0-9]{64}$" $f.sessionImage) }}{{ fail "fullWorker.sessionImage must pin a digest" }}{{ end }}
+{{- if not (regexMatch "@sha256:[a-f0-9]{64}$" $f.databaseImage) }}{{ fail "fullWorker.databaseImage must pin a digest" }}{{ end }}
 {{- if or (eq $f.agentSecret "secrets") (eq ($f.integrationSecret | default "") "secrets") (eq $f.agentSecret $f.runnerSecret) (and $f.integrationSecret (eq $f.integrationSecret $f.runnerSecret)) }}{{ fail "Session credentials must not reference consumer or runner Secrets" }}{{ end }}
 {{- if not $f.approvedEgressDomains }}{{ fail "Explicit approved package/model/test domains required" }}{{ end }}
 {{- if and $f.observationEnabled (not $f.publicOrigin) }}{{ fail "Exact public observation origin required" }}{{ end }}
@@ -22,29 +23,29 @@
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: {{ .Release.Name }}-runner
+  name: {{ (include "deephive.fullWorkerName" .) }}
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
-  name: {{ .Release.Name }}-runner
+  name: {{ (include "deephive.fullWorkerName" .) }}
 rules:
   - apiGroups: [""]
     resources: [pods]
     verbs: [get, list, create, patch, delete]
 ---
-{{- if or $f.runnerEnabled (lookup "rbac.authorization.k8s.io/v1" "RoleBinding" .Release.Namespace (printf "%s-runner" .Release.Name)) }}
+{{- if or $f.runnerEnabled (lookup "rbac.authorization.k8s.io/v1" "RoleBinding" .Release.Namespace (include "deephive.fullWorkerName" .)) }}
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
-  name: {{ .Release.Name }}-runner
+  name: {{ (include "deephive.fullWorkerName" .) }}
 subjects:
   - kind: ServiceAccount
-    name: {{ .Release.Name }}-runner
+    name: {{ (include "deephive.fullWorkerName" .) }}
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
-  name: {{ .Release.Name }}-runner
+  name: {{ (include "deephive.fullWorkerName" .) }}
 {{- end }}
 ---
 apiVersion: rbac.authorization.k8s.io/v1
@@ -54,7 +55,7 @@ metadata:
 rules:
   - apiGroups: [""]
     resources: [nodes]
-    resourceNames: [{{ required "Execution node required" $f.nodeName | quote }}]
+    resourceNames: [{{ required "Full worker node required" $f.nodeName | quote }}]
     verbs: [get]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
@@ -63,7 +64,7 @@ metadata:
   name: {{ $nodeRole }}
 subjects:
   - kind: ServiceAccount
-    name: {{ .Release.Name }}-runner
+    name: {{ (include "deephive.fullWorkerName" .) }}
     namespace: {{ .Release.Namespace }}
 roleRef:
   apiGroup: rbac.authorization.k8s.io
@@ -73,20 +74,20 @@ roleRef:
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: {{ .Release.Name }}-runner
+  name: {{ (include "deephive.fullWorkerName" .) }}
 data:
   runner.json: |
-    {{ dict "namespace" .Release.Namespace "release" .Release.Name "nodeName" $f.nodeName "image" $f.sessionImage "databaseImage" $f.databaseImage "imagePullSecret" $f.pullSecret "agentSecret" (required "Session agent Secret required" $f.agentSecret) "integrationSecret" ($f.integrationSecret | default "") "workspaceClaim" $f.workspaceClaim "workspaceRoot" $f.workspaceRoot "scratchRoot" "/node-scratch" "cacheRoot" "/node-cache" "runnerUrl" (printf "http://%s-runner:3001" .Release.Name) "proxyUrl" (printf "http://%s:3128" $egress) "pressureCommand" $f.pressureCommand "signingKeyFile" "/runner-secret/signing-key" "controlPort" 3001 "observationPort" (ternary 3002 0 $f.observationEnabled) "observationTokenFile" "/runner-secret/observation-token" "approvedBootstraps" $f.approvedBootstraps "sourceReader" $reader "sessionProtocol" $f.sessionProtocol "draining" $f.draining "validationTimeoutMs" $f.validationTimeoutMs | toJson }}
+    {{ dict "namespace" .Release.Namespace "release" .Release.Name "nodeName" $f.nodeName "image" $f.sessionImage "databaseImage" $f.databaseImage "imagePullSecret" $f.pullSecret "agentSecret" (required "Session agent Secret required" $f.agentSecret) "integrationSecret" ($f.integrationSecret | default "") "workspaceClaim" $f.workspaceClaim "workspaceRoot" $f.workspaceRoot "scratchRoot" "/node-scratch" "cacheRoot" "/node-cache" "runnerUrl" (printf "http://%s:3001" (include "deephive.fullWorkerName" .)) "proxyUrl" (printf "http://%s:3128" $egress) "pressureCommand" $f.pressureCommand "signingKeyFile" "/runner-secret/signing-key" "controlPort" 3001 "observationPort" (ternary 3002 0 $f.observationEnabled) "observationTokenFile" "/runner-secret/observation-token" "approvedBootstraps" $f.approvedBootstraps "sourceReader" $reader "sessionProtocol" $f.sessionProtocol "draining" $f.draining "validationTimeoutMs" $f.validationTimeoutMs | toJson }}
 {{/* The config contains no credentials; signing key is read from runner-only Secret. */}}
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ .Release.Name }}-runner
+  name: {{ (include "deephive.fullWorkerName" .) }}
 spec:
   replicas: {{ ternary 1 0 $f.runnerEnabled }}
   selector:
-    matchLabels: { app: {{ .Release.Name }}-runner }
+    matchLabels: { app: {{ (include "deephive.fullWorkerName" .) }} }
   template:
     metadata:
       annotations:
@@ -94,24 +95,24 @@ spec:
         source-reader-token-revision: {{ .Values.sourceReaderService.tokenRevision | quote }}
 {{- end }}
         checksum/runner-config: {{ toJson $f | sha256sum | quote }}
-      labels: { app: {{ .Release.Name }}-runner, redis-client: "true" }
+      labels: { app: {{ (include "deephive.fullWorkerName" .) }}, deephive/worker-mode: full, redis-client: "true" }
     spec:
       nodeName: {{ $f.nodeName | quote }}
       tolerations:
-        - { key: deephive-execution, operator: Equal, value: "true", effect: NoSchedule }
-      serviceAccountName: {{ .Release.Name }}-runner
+        - { key: deephive-full, operator: Equal, value: "true", effect: NoSchedule }
+      serviceAccountName: {{ (include "deephive.fullWorkerName" .) }}
       imagePullSecrets:
         - name: {{ required "Private pull secret required" $f.pullSecret | quote }}
       containers:
         - name: runner
           image: {{ $f.runnerImage | quote }}
-          command: [node, /opt/deephive/dist/src/runner.js]
+          command: [node, /opt/deephive/dist/src/fullWorker.js]
           env:
-            - name: FULL_ENVIRONMENT_CONFIG
+            - name: FULL_WORKER_CONFIG
               value: /runner-config/runner.json
-            - name: FULL_ENVIRONMENT_ROUTING
+            - name: FULL_WORKER_ROUTING
               value: {{ ternary "1" "0" $f.routingEnabled | quote }}
-            - name: FULL_ENVIRONMENT_TASK_ALLOWLIST
+            - name: FULL_WORKER_TASK_ALLOWLIST
               value: {{ $f.taskAllowlist | quote }}
             - name: BROWSER_EVIDENCE_BUCKET
               value: {{ $f.evidenceBucket | quote }}
@@ -146,7 +147,7 @@ spec:
           secret: { secretName: {{ .Values.sourceReaderService.tokenSecret | quote }}, items: [{ key: token, path: token }] }
 {{- end }}
         - name: config
-          configMap: { name: {{ .Release.Name }}-runner }
+          configMap: { name: {{ (include "deephive.fullWorkerName" .) }} }
         - name: secret
           secret: { secretName: {{ $f.runnerSecret | quote }} }
         - name: workspace
@@ -159,9 +160,19 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
+  name: {{ (include "deephive.fullWorkerName" .) }}
+spec:
+  selector: { app: {{ (include "deephive.fullWorkerName" .) }} }
+  ports: [{ name: control, port: 3001, targetPort: control }, { name: observation, port: 3002, targetPort: observation }]
+---
+# Existing session pods retain their original SESSION_RUNNER_URL. Keep that
+# private Service name pointing at the current controller across the rename.
+apiVersion: v1
+kind: Service
+metadata:
   name: {{ .Release.Name }}-runner
 spec:
-  selector: { app: {{ .Release.Name }}-runner }
+  selector: { app: {{ include "deephive.fullWorkerName" . }} }
   ports: [{ name: control, port: 3001, targetPort: control }, { name: observation, port: 3002, targetPort: observation }]
 ---
 apiVersion: networking.k8s.io/v1
@@ -176,7 +187,7 @@ spec:
   ingress:
     - from:
         - podSelector:
-            matchLabels: { app: {{ .Release.Name }}-runner }
+            matchExpressions: [{ key: app, operator: In, values: [{{ include "deephive.fullWorkerName" . | quote }}, {{ printf "%s-runner" .Release.Name | quote }}] }]
       ports: [{ protocol: TCP, port: 5901 }]
 {{- else }}
   ingress: []
@@ -190,7 +201,7 @@ spec:
       ports: [{ protocol: UDP, port: 53 }, { protocol: TCP, port: 53 }]
     - to:
         - podSelector:
-            matchLabels: { app: {{ .Release.Name }}-runner }
+            matchExpressions: [{ key: app, operator: In, values: [{{ include "deephive.fullWorkerName" . | quote }}, {{ printf "%s-runner" .Release.Name | quote }}] }]
       ports: [{ protocol: TCP, port: 3001 }]
     - to:
         - podSelector:
@@ -200,10 +211,10 @@ spec:
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: {{ .Release.Name }}-runner-control
+  name: {{ (include "deephive.fullWorkerName" .) }}-control
 spec:
   podSelector:
-    matchLabels: { app: {{ .Release.Name }}-runner }
+    matchLabels: { app: {{ (include "deephive.fullWorkerName" .) }} }
   policyTypes: [Ingress]
   ingress:
 {{- if $f.observationEnabled }}
@@ -229,7 +240,7 @@ spec:
       labels: { app: {{ $prepull }} }
     spec:
       tolerations:
-        - { key: deephive-execution, operator: Equal, value: "true", effect: NoSchedule }
+        - { key: deephive-full, operator: Equal, value: "true", effect: NoSchedule }
       {{- with $f.prepullTolerations }}
         {{- toYaml . | nindent 8 }}
       {{- end }}

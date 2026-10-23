@@ -1,5 +1,6 @@
-{{- if .Values.fullEnvironment.enabled }}
-{{- $f := .Values.fullEnvironment }}
+{{- include "deephive.normalizeWorkerValues" . -}}
+{{- if .Values.fullWorker.enabled }}
+{{- $f := .Values.fullWorker }}
 {{- $identity := printf "%s-%s-session-admission" .Release.Namespace .Release.Name }}
 {{- $name := printf "%s-%s" ($identity | trunc 50 | trimSuffix "-") ((list .Release.Namespace .Release.Name "session-admission") | toJson | sha256sum | trunc 12) }}
 {{- $images := concat (list $f.sessionImage) ($f.compatibleSessionImages | default list) }}
@@ -24,7 +25,7 @@ spec:
         resources: [pods]
   matchConditions:
     - name: runner-identity
-      expression: {{ printf "request.userInfo.username == 'system:serviceaccount:%s:%s-runner'" .Release.Namespace .Release.Name | quote }}
+      expression: {{ printf "request.userInfo.username in ['system:serviceaccount:%s:%s', 'system:serviceaccount:%s:%s-runner']" .Release.Namespace (include "deephive.fullWorkerName" .) .Release.Namespace .Release.Name | quote }}
   variables:
     - name: pod
       expression: "request.operation == 'DELETE' ? oldObject : object"
@@ -57,7 +58,7 @@ spec:
           (!has(variables.pod.spec.hostIPC) || !variables.pod.spec.hostIPC) &&
           variables.pod.spec.restartPolicy == 'Never'
         )
-      message: Sessions must use the execution node and have no host namespaces or API token.
+      message: Sessions must use the Full worker node and have no host namespaces or API token.
     - expression: >-
         request.operation != 'CREATE' || (
           variables.pod.spec.volumes.all(v,
