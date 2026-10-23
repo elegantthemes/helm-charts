@@ -51,6 +51,10 @@ case('old resource-shape cleanup', pod, 'pods', True, lambda p: p['spec']['conta
 cases[-1]['Activation']['request']['operation'] = 'DELETE'
 case('reader PVC', pvc, 'persistentvolumeclaims')
 case('reader PV', pv, 'persistentvolumes')
+case('reader PV omitted class', pv, 'persistentvolumes', True, lambda p: p['spec'].pop('storageClassName'))
+case('reader PV omitted class cleanup', pv, 'persistentvolumes', True, lambda p: p['spec'].pop('storageClassName'))
+cases[-1]['Activation']['request']['operation'] = 'DELETE'
+case('reject nonempty PV class', pv, 'persistentvolumes', False, lambda p: p['spec'].update(storageClassName='unexpected-class'))
 case('reject session network labels', pod, 'pods', False, lambda p: p['metadata']['labels'].update({'app.kubernetes.io/name': 'deephive-session'}))
 case('old CSI secret cleanup', pv, 'persistentvolumes', True, lambda p: p['spec']['csi']['nodePublishSecretRef'].update(name='previous', namespace='previous'))
 cases[-1]['Activation']['request']['operation'] = 'DELETE'
