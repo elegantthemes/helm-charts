@@ -93,7 +93,7 @@ spec:
     - expression: >-
         request.resource.resource != 'persistentvolumes' ||
         (variables.obj.spec.persistentVolumeReclaimPolicy == 'Retain' &&
-         variables.obj.spec.storageClassName == '' && variables.obj.spec.accessModes == ['ReadOnlyMany'] &&
+         (!has(variables.obj.spec.storageClassName) || variables.obj.spec.storageClassName == '') && variables.obj.spec.accessModes == ['ReadOnlyMany'] &&
          variables.obj.spec.claimRef.name == variables.obj.metadata.name &&
          variables.obj.spec.claimRef.namespace == '{{ $readerNS }}' &&
          variables.obj.spec.csi.driver == 'csi.juicefs.com' && variables.obj.spec.csi.readOnly &&
