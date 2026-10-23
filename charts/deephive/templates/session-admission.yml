@@ -24,7 +24,7 @@ spec:
         resources: [pods]
   matchConditions:
     - name: runner-identity
-      expression: {{ printf "request.userInfo.username == 'system:serviceaccount:%s:%s'" .Release.Namespace (include "deephive.fullWorkerName" .) | quote }}
+      expression: {{ printf "request.userInfo.username in ['system:serviceaccount:%s:%s', 'system:serviceaccount:%s:%s-runner']" .Release.Namespace (include "deephive.fullWorkerName" .) .Release.Namespace .Release.Name | quote }}
   variables:
     - name: pod
       expression: "request.operation == 'DELETE' ? oldObject : object"

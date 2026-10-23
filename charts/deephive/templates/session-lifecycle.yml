@@ -35,11 +35,13 @@
 {{- if $policy.status.typeChecking.expressionWarnings }}{{ fail "Resolve session admission expression warnings before runner enablement" }}{{ end }}
 {{- end }}
 {{- if and .Release.IsUpgrade (not $f.enabled) }}
-{{- $runner := lookup "apps/v1" "Deployment" .Release.Namespace (include "deephive.fullWorkerName" .) }}
+{{- range $runnerName := list (include "deephive.fullWorkerName" .) (printf "%s-runner" .Release.Name) }}
+{{- $runner := lookup "apps/v1" "Deployment" $.Release.Namespace $runnerName }}
 {{- if and $runner (or (ne (int $runner.spec.replicas) 0) (gt (int ($runner.status.replicas | default 0)) 0)) }}{{ fail "Scale the drained runner to zero and wait for its pods to end before removing protections" }}{{ end }}
+{{- end }}
 {{- $pods := lookup "v1" "Pod" .Release.Namespace "" }}
 {{- range $pod := $pods.items }}
-{{- if eq (index ($pod.metadata.labels | default dict) "app") (include "deephive.fullWorkerName" $) }}{{ fail "Runner pods remain; wait for their deletion before removing session protections" }}{{ end }}
+{{- if has (index ($pod.metadata.labels | default dict) "app") (list (include "deephive.fullWorkerName" $) (printf "%s-runner" $.Release.Name)) }}{{ fail "Runner pods remain; wait for their deletion before removing session protections" }}{{ end }}
 {{- if and (eq (index ($pod.metadata.labels | default dict) "app.kubernetes.io/name") "deephive-session") (eq (index ($pod.metadata.labels | default dict) "app.kubernetes.io/instance") $.Release.Name) }}{{ fail "Drain and confirm deletion of session pods before disabling fullWorker; keep admission, proxy and network protections installed" }}{{ end }}
 {{- end }}
 {{- end }}
@@ -69,7 +71,7 @@ rules:
     verbs: [list]
   - apiGroups: [apps]
     resources: [deployments]
-    resourceNames: [{{ include "deephive.fullWorkerName" . | quote }}, {{ $readerName | quote }}]
+    resourceNames: [{{ include "deephive.fullWorkerName" . | quote }}, {{ printf "%s-runner" .Release.Name | quote }}, {{ $readerName | quote }}]
     verbs: [get]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
@@ -166,12 +168,14 @@ spec:
             - |
               import { KubernetesApi } from '/opt/deephive/dist/src/taskEnvironments/environment/kubernetes.js';
               const api = await KubernetesApi.inCluster();
-              const runner = await api.call('GET', '/apis/apps/v1/namespaces/' + {{ .Release.Namespace | toJson }} + '/deployments/' + {{ include "deephive.fullWorkerName" . | toJson }});
-              if (runner && (runner.spec.replicas !== 0 || (runner.status.replicas ?? 0) !== 0)) throw new Error('Scale the drained runner to zero and wait before uninstall');
+              for (const name of [{{ include "deephive.fullWorkerName" . | toJson }}, {{ printf "%s-runner" .Release.Name | toJson }}]) {
+                const runner = await api.call('GET', '/apis/apps/v1/namespaces/' + {{ .Release.Namespace | toJson }} + '/deployments/' + name);
+                if (runner && (runner.spec.replicas !== 0 || (runner.status.replicas ?? 0) !== 0)) throw new Error('Scale the drained runner to zero and wait before uninstall');
+                const runners = await api.call('GET', '/api/v1/namespaces/' + {{ .Release.Namespace | toJson }} + '/pods?labelSelector=' + encodeURIComponent('app=' + name));
+                if (!runners || runners.items.length) throw new Error('Runner pods remain; admission may still create sessions');
+              }
               const selector = 'app.kubernetes.io/name=deephive-session,app.kubernetes.io/instance=' + {{ .Release.Name | toJson }};
               const pods = await api.call('GET', '/api/v1/namespaces/' + {{ .Release.Namespace | toJson }} + '/pods?labelSelector=' + encodeURIComponent(selector));
-              const runners = await api.call('GET', '/api/v1/namespaces/' + {{ .Release.Namespace | toJson }} + '/pods?labelSelector=' + encodeURIComponent('app=' + {{ include "deephive.fullWorkerName" . | toJson }}));
-              if (!runners || runners.items.length) throw new Error('Runner pods remain; admission may still create sessions');
               if (!pods || pods.items.length) throw new Error('Session drain incomplete; retain admission, proxy and network isolation');
               const reader = await api.call('GET', '/apis/apps/v1/namespaces/' + {{ .Release.Namespace | toJson }} + '/deployments/' + {{ $readerName | toJson }});
               if (reader && (reader.spec.replicas !== 0 || (reader.status.replicas ?? 0) !== 0)) throw new Error('Drain and scale the source reader to zero before uninstall');

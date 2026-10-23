@@ -321,7 +321,7 @@ for release in ['review', 'other']:
     role = item(docs, 'Role', '-session-drain-check')
     deployment_rule = next(r for r in role['rules'] if r['resources'] == ['deployments'])
     assert deployment_rule['verbs'] == ['get']
-    assert set(deployment_rule['resourceNames']) == {release + '-full-worker', release + '-source-reader'}
+    assert set(deployment_rule['resourceNames']) == {release + '-full-worker', release + '-runner', release + '-source-reader'}
 print('PASS uninstall hook can read both drained deployment identities')
 
 # Source export is prepared against the same claim and root even with routing off.
@@ -473,3 +473,65 @@ config['REPLICAS'] = 2
 invalid = subprocess.run(['helm', 'template', 'review', str(chart), '-n', 'dph-app', '-f', '-'], input=json.dumps(config), text=True, capture_output=True)
 assert invalid.returncode and 'at most one consumer replica' in invalid.stderr
 print('PASS single-consumer Recreate, Downward API identity and unchanged intake rollout')
+
+# Both names must remain subject to admission while Helm replaces the worker.
+policy = next(p for p in render() if p['kind'] == 'ValidatingAdmissionPolicy')
+identity = next(c['expression'] for c in policy['spec']['matchConditions'] if c['name'] == 'runner-identity')
+with tempfile.TemporaryDirectory(prefix='deephive-worker-identities-') as tmp:
+    data = Path(tmp) / 'identities.json'
+    data.write_text(json.dumps({'Expressions': [identity], 'Cases': [
+        {'Name': username, 'Expect': expected, 'Activation': {'request': {'userInfo': {'username': username}}}}
+        for username, expected in [
+            ('system:serviceaccount:dph-app:review-full-worker', True),
+            ('system:serviceaccount:dph-app:review-runner', True),
+            ('system:serviceaccount:other:review-runner', False),
+            ('system:serviceaccount:dph-app:other-runner', False),
+        ]
+    ]}))
+    subprocess.run(['go', '-C', str(root), 'run', '.', str(data)], check=True)
+
+# Offline lookups model an old deployment and orphan pods during disable.
+# No policy is installed and no cluster is contacted.
+for name in ['review-runner', 'review-full-worker']:
+    for live in ['deployment', 'pod', 'drained']:
+        with tempfile.TemporaryDirectory(prefix='deephive-worker-drain-') as tmp:
+            fixture_chart = Path(tmp) / 'deephive'
+            shutil.copytree(chart, fixture_chart)
+            lifecycle = fixture_chart / 'templates/session-lifecycle.yml'
+            text = lifecycle.read_text()
+            lookup = 'lookup "apps/v1" "Deployment" $.Release.Namespace $runnerName'
+            assert lookup in text
+            replicas = 1 if live == 'deployment' else 0
+            text = text.replace(lookup, f'dict "spec" (dict "replicas" (ternary {replicas} 0 (eq $runnerName "{name}"))) "status" (dict "replicas" 0)')
+            lookup = 'lookup "v1" "Pod" .Release.Namespace ""'
+            assert lookup in text
+            pod = f'(dict "metadata" (dict "labels" (dict "app" "{name}")))' if live == 'pod' else ''
+            text = text.replace(lookup, 'dict "items" (list ' + pod + ')')
+            lifecycle.write_text(text)
+            config = copy.deepcopy(values)
+            config['fullWorker']['enabled'] = False
+            result = subprocess.run(['helm', 'template', 'review', str(fixture_chart), '--is-upgrade', '-n', 'dph-app', '-f', '-'], input=json.dumps(config), text=True, capture_output=True)
+            if live == 'drained':
+                assert result.returncode == 0, result.stderr
+            else:
+                assert result.returncode != 0 and ('runner to zero' in result.stderr or 'Runner pods remain' in result.stderr), result.stderr
+print('PASS legacy/current worker identity and disable-drain regression cases')
+
+# Execute the rendered uninstall check against an in-memory API adapter. A live
+# legacy deployment or orphan pod must fail just as a current worker does.
+hook = item(render(), 'Job', '-session-drain-check')['spec']['template']['spec']['containers'][0]['args'][0]
+body = hook[hook.index('const api ='):].replace('const api = await KubernetesApi.inCluster();', '')
+for name in ['review-runner', 'review-full-worker']:
+    for live in ['deployment', 'pod', 'drained']:
+        stub = '''const api = { call: async (method, path) => {
+          if (path.endsWith('/deployments/' + NAME)) return {spec:{replicas: LIVE === 'deployment' ? 1 : 0},status:{replicas:0}};
+          if (path.includes('/deployments/')) return undefined;
+          if (path.includes('/pods?') && decodeURIComponent(path).endsWith('app=' + NAME) && LIVE === 'pod') return {items:[{}]};
+          return {items:[]};
+        }};'''.replace('NAME', json.dumps(name)).replace('LIVE', json.dumps(live))
+        result = subprocess.run(['node', '--input-type=module', '-e', stub + body], text=True, capture_output=True)
+        if live == 'drained':
+            assert result.returncode == 0, result.stderr
+        else:
+            assert result.returncode != 0 and ('runner to zero' in result.stderr or 'Runner pods remain' in result.stderr), result.stderr
+print('PASS rendered uninstall check blocks legacy/current deployments and orphan pods')
