@@ -164,6 +164,16 @@ spec:
   selector: { app: {{ (include "deephive.fullWorkerName" .) }} }
   ports: [{ name: control, port: 3001, targetPort: control }, { name: observation, port: 3002, targetPort: observation }]
 ---
+# Existing session pods retain their original SESSION_RUNNER_URL. Keep that
+# private Service name pointing at the current controller across the rename.
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-runner
+spec:
+  selector: { app: {{ include "deephive.fullWorkerName" . }} }
+  ports: [{ name: control, port: 3001, targetPort: control }, { name: observation, port: 3002, targetPort: observation }]
+---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:

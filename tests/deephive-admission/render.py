@@ -535,3 +535,15 @@ for name in ['review-runner', 'review-full-worker']:
         else:
             assert result.returncode != 0 and ('runner to zero' in result.stderr or 'Runner pods remain' in result.stderr), result.stderr
 print('PASS rendered uninstall check blocks legacy/current deployments and orphan pods')
+
+# Immutable active sessions still call the pre-rename DNS name. Both Services
+# must resolve to the current controller, including long release names.
+for release in ['review', 'other', 'r' * 53]:
+    docs = render(release=release)
+    worker = next(p for p in docs if p['kind'] == 'Deployment' and p['metadata']['name'].endswith(('-full-worker', '-full-work')))
+    current = next(p for p in docs if p['kind'] == 'Service' and p['metadata']['name'] == worker['metadata']['name'])
+    legacy = next(p for p in docs if p['kind'] == 'Service' and p['metadata']['name'] == release + '-runner')
+    assert legacy['spec']['selector'] == current['spec']['selector'] == worker['spec']['selector']['matchLabels']
+    assert legacy['spec']['ports'] == current['spec']['ports']
+    assert {p['port']: p['targetPort'] for p in legacy['spec']['ports']} == {3001: 'control', 3002: 'observation'}
+print('PASS legacy session callback Service resolves to the renamed controller')
