@@ -166,7 +166,7 @@ spec:
           command: [node, --input-type=module, -e]
           args:
             - |
-              import { KubernetesApi } from '/opt/deephive/dist/src/taskEnvironments/environment/kubernetes.js';
+              import { KubernetesApi } from '/opt/deephive/dist/src/task-environments/environment/kubernetes.js';
               const api = await KubernetesApi.inCluster();
               for (const name of [{{ include "deephive.fullWorkerName" . | toJson }}, {{ printf "%s-runner" .Release.Name | toJson }}]) {
                 const runner = await api.call('GET', '/apis/apps/v1/namespaces/' + {{ .Release.Namespace | toJson }} + '/deployments/' + name);
