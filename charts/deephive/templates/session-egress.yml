@@ -1,3 +1,4 @@
+{{- include "deephive.normalizeWorkerValues" . -}}
 {{- if .Values.fullWorker.enabled }}
 {{- $f := .Values.fullWorker }}
 {{- $egress := printf "%s-session-egress" .Release.Name | trunc 63 | trimSuffix "-" }}

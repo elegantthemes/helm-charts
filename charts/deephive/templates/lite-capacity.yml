@@ -1,3 +1,4 @@
+{{- include "deephive.normalizeWorkerValues" . -}}
 {{- $f := .Values.fullWorker }}
 {{- $c := $f.liteCapacity }}
 {{- if $c.enabled }}

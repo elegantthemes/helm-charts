@@ -1,3 +1,4 @@
+{{- include "deephive.normalizeWorkerValues" . -}}
 {{- $readerName := include "deephive.readerServiceName" . }}
 {{- $drainCheck := include "deephive.drainCheckName" . }}
 {{- $readerNS := include "deephive.readerWorkloadNamespace" . }}
@@ -28,6 +29,12 @@
 {{- $policy := lookup "admissionregistration.k8s.io/v1" "ValidatingAdmissionPolicy" "" $policyName }}
 {{- $binding := lookup "admissionregistration.k8s.io/v1" "ValidatingAdmissionPolicyBinding" "" $policyName }}
 {{- if or (not $policy) (not $binding) }}{{ fail "Install fullWorker with runnerEnabled=false, verify admission, then enable the runner in a second upgrade" }}{{ end }}
+{{- $expectedIdentity := printf "request.userInfo.username in ['system:serviceaccount:%s:%s', 'system:serviceaccount:%s:%s-runner']" .Release.Namespace (include "deephive.fullWorkerName" .) .Release.Namespace .Release.Name }}
+{{- $identityInstalled := false }}
+{{- range $condition := $policy.spec.matchConditions | default list }}
+{{- if and (eq $condition.name "runner-identity") (eq $condition.expression $expectedIdentity) }}{{- $identityInstalled = true }}{{- end }}
+{{- end }}
+{{- if not $identityInstalled }}{{ fail "Install admission for the renamed worker with runnerEnabled=false before starting it" }}{{ end }}
 {{- if ne ($policy.spec.failurePolicy | default "") "Fail" }}{{ fail "Session admission must fail closed" }}{{ end }}
 {{- if or (ne $binding.spec.policyName $policyName) (not (has "Deny" $binding.spec.validationActions)) }}{{ fail "Session admission binding must enforce Deny" }}{{ end }}
 {{- if not (hasKey $policy "status") }}{{ fail "Admission type checking has not completed" }}{{ end }}

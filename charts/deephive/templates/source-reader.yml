@@ -1,3 +1,4 @@
+{{- include "deephive.normalizeWorkerValues" . -}}
 {{- if .Values.sourceReaderService.enabled }}
 {{- $r := .Values.sourceReaderService }}
 {{- $f := .Values.fullWorker }}
@@ -237,7 +238,7 @@ spec:
   ingress:
     - from:
         - podSelector: { matchLabels: { app: {{ .Release.Name }} } }
-        - podSelector: { matchLabels: { app: {{ (include "deephive.fullWorkerName" .) }} } }
+        - podSelector: { matchExpressions: [{ key: app, operator: In, values: [{{ include "deephive.fullWorkerName" . | quote }}, {{ printf "%s-runner" .Release.Name | quote }}] }] }
       ports: [{ protocol: TCP, port: 3003 }]
 ---
 apiVersion: networking.k8s.io/v1

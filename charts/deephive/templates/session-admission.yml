@@ -1,3 +1,4 @@
+{{- include "deephive.normalizeWorkerValues" . -}}
 {{- if .Values.fullWorker.enabled }}
 {{- $f := .Values.fullWorker }}
 {{- $identity := printf "%s-%s-session-admission" .Release.Namespace .Release.Name }}

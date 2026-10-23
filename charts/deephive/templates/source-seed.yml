@@ -1,3 +1,4 @@
+{{- include "deephive.normalizeWorkerValues" . -}}
 {{- $f := .Values.fullWorker }}
 {{- if $f.sourceSeedExportEnabled }}
 {{- if or (not $f.enabled) $f.routingEnabled $f.taskAllowlist }}{{ fail "Export source seed with protections enabled and routing disabled" }}{{ end }}

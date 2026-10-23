@@ -29,6 +29,9 @@ for name in ['session-lifecycle.yml', 'source-reader.yml']:
         policy_var = '$installed'
     assert old in text
     text = text.replace(old, policy_var + ' := dict "metadata" (dict "generation" 1) "spec" (dict "failurePolicy" "Fail") "status" (dict "observedGeneration" 1 "typeChecking" (dict "expressionWarnings" (list)))')
+    if name == 'session-lifecycle.yml':
+        identity = '(printf "request.userInfo.username in [\'system:serviceaccount:%s:%s\', \'system:serviceaccount:%s:%s-runner\']" .Release.Namespace (include "deephive.fullWorkerName" .) .Release.Namespace .Release.Name)'
+        text = text.replace('"spec" (dict "failurePolicy" "Fail")', '"spec" (dict "failurePolicy" "Fail" "matchConditions" (list (dict "name" "runner-identity" "expression" ' + identity + ')))')
     old = '$binding := lookup "admissionregistration.k8s.io/v1" "ValidatingAdmissionPolicyBinding" "" ' + binding_name
     assert old in text
     text = text.replace(old, '$binding := dict "spec" (dict "policyName" ' + binding_name + ' "validationActions" (list "Deny"))')
@@ -57,6 +60,55 @@ def render(release='review', namespace='dph-app', config=None, installed=False):
 
 def item(docs, kind, suffix):
     return next(p for p in docs if p['kind'] == kind and p['metadata']['name'].endswith(suffix))
+
+# A pre-rename live policy cannot authorize startup under the new account.
+with tempfile.TemporaryDirectory(prefix='deephive-old-policy-') as tmp:
+    old_policy_chart = Path(tmp) / 'deephive'
+    shutil.copytree(fixture_chart, old_policy_chart)
+    lifecycle = old_policy_chart / 'templates/session-lifecycle.yml'
+    text = lifecycle.read_text().replace('"matchConditions" (list (dict "name" "runner-identity"', '"matchConditions" (list (dict "name" "old-identity"')
+    lifecycle.write_text(text)
+    config = copy.deepcopy(values)
+    config['fullWorker']['runnerEnabled'] = True
+    result = subprocess.run(['helm', 'template', 'review', str(old_policy_chart), '-n', 'dph-app', '-f', '-'], input=json.dumps(config), text=True, capture_output=True)
+    assert result.returncode and 'Install admission for the renamed worker' in result.stderr, result.stderr
+print('PASS old live admission identity cannot start renamed worker')
+
+# Model the old stored value table used by Helm --reuse-values: no fullWorker
+# defaults exist in that rendering context. Preserve legacy hooks and budget.
+with tempfile.TemporaryDirectory(prefix='deephive-legacy-values-') as tmp:
+    legacy_chart = Path(tmp) / 'deephive'
+    shutil.copytree(chart, legacy_chart)
+    defaults = yaml.safe_load((chart / 'values.yaml').read_text())
+    legacy = defaults.pop('fullWorker')
+    for suffix in ['Capacity', 'AdmissionCommand', 'InstallCommand', 'HandoffCommand', 'ScratchRoot', 'CacheProbePath']:
+        legacy['ordinary' + suffix] = legacy.pop('lite' + suffix)
+    defaults['fullEnvironment'] = legacy
+    (legacy_chart / 'values.yaml').write_text(yaml.safe_dump(defaults))
+    config = copy.deepcopy(values)
+    configured = config.pop('fullWorker')
+    for suffix in ['Capacity', 'AdmissionCommand', 'InstallCommand', 'HandoffCommand', 'ScratchRoot', 'CacheProbePath']:
+        if 'lite' + suffix in configured:
+            configured['ordinary' + suffix] = configured.pop('lite' + suffix)
+    config['fullEnvironment'] = configured
+    raw = subprocess.check_output(['helm', 'template', 'review', str(legacy_chart), '-n', 'dph-app', '-f', '-'], input=json.dumps(config), text=True)
+    assert any(p and p['kind'] == 'Service' and p['metadata']['name'] == 'review-full-worker' for p in yaml.safe_load_all(raw))
+    config['fullWorker'] = {'enabled': False}
+    raw = subprocess.check_output(['helm', 'template', 'review', str(legacy_chart), '-n', 'dph-app', '-f', '-'], input=json.dumps(config), text=True)
+    assert not any(p and p['kind'] == 'Service' and p['metadata']['name'] == 'review-full-worker' for p in yaml.safe_load_all(raw))
+print('PASS reused legacy value table and explicit new disable override')
+
+# Both old and new worker pods remain reachable through policy cutover.
+network_config = copy.deepcopy(values)
+network_config['VIRTUAL_HOST'] = 'deephive.example'
+network_config['fullWorker']['observationEnabled'] = True
+network_config['fullWorker']['publicOrigin'] = 'https://deephive.example'
+network_config['fullWorker']['runnerSecretRevision'] = '1'
+network_docs = render(config=network_config)
+sessions = next(p for p in network_docs if p['kind'] == 'NetworkPolicy' and p['metadata']['name'] == 'review-sessions')
+for selector in [sessions['spec']['ingress'][0]['from'][0]['podSelector'], sessions['spec']['egress'][1]['to'][0]['podSelector']]:
+    assert selector['matchExpressions'] == [{'key': 'app', 'operator': 'In', 'values': ['review-full-worker', 'review-runner']}]
+print('PASS legacy/current worker selectors retain callback and observation access')
 
 names = set()
 roles = set()

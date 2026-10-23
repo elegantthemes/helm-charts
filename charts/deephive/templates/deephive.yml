@@ -1,3 +1,4 @@
+{{- include "deephive.normalizeWorkerValues" . -}}
 {{- if gt (int .Values.REPLICAS) 1 }}{{ fail "Cache startup recovery requires at most one consumer replica" }}{{ end }}
 {{- $lite := include "deephive.liteCommands" . | fromJson }}
 {{- $reader := include "deephive.sourceReader" (dict "context" . "codeRoot" (default "/srv/deephive" .Values.INSTALL_PATH)) | fromJson }}
