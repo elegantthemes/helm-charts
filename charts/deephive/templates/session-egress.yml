@@ -43,6 +43,13 @@ spec:
         - name: proxy
           image: {{ $f.proxyImage | quote }}
           command: [squid, -N, -f, /etc/squid/squid.conf]
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 13
+            runAsGroup: 13
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
           resources:
             requests: { memory: 128Mi, cpu: 100m }
             limits: { memory: 512Mi, cpu: "1" }
