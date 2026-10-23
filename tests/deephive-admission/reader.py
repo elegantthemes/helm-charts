@@ -13,6 +13,10 @@ docs = [d for d in yaml.safe_load_all(raw) if d]
 policy = next(d for d in docs if d['kind'] == 'ValidatingAdmissionPolicy' and d['metadata']['name'].startswith('dph-reader-'))
 broker = next(d for d in docs if d['kind'] == 'Deployment' and d['metadata']['name'] == 'review-source-reader')
 assert broker['spec']['replicas'] == 0
+startup = broker['spec']['template']['spec']['containers'][0]['command']
+assert startup[:3] == ['node', '--input-type=module', '--eval']
+assert startup[-3:] == ['source-reader-service', '/reader-config/reader.json', '/source-reader-token/token']
+assert "!body.spec.mountOptions.includes('hide-internal')" in startup[3]
 assert not any(d['kind'] in ['RoleBinding', 'ClusterRoleBinding'] and d.get('roleRef', {}).get('name') in ['review-source-reader', policy['metadata']['name']] for d in docs)
 for name in ['review', 'review-full-worker']:
  pod = next(d for d in docs if d['kind'] == 'Deployment' and d['metadata']['name'] == name)['spec']['template']['spec']
@@ -68,6 +72,8 @@ case('reject workload token', pod, 'pods', False, lambda p: p['spec'].update(aut
 case('reject foreign role', pod, 'pods', False, lambda p: p['metadata']['labels'].update({'deephive/role': 'consumer'}))
 case('old reader image cleanup', pod, 'pods', True, lambda p: p['spec']['containers'][0].update(image='previous-approved-image'))
 cases[-1]['Activation']['request']['operation'] = 'DELETE'
+case('hide JuiceFS internal files', pv, 'persistentvolumes', True, lambda p: p['spec']['mountOptions'].append('hide-internal'))
+case('reject writeback reader mount', pv, 'persistentvolumes', False, lambda p: p['spec']['mountOptions'].append('writeback'))
 case('reject destructive reclaim', pv, 'persistentvolumes', False, lambda p: p['spec'].update(persistentVolumeReclaimPolicy='Delete'))
 case('reject writable volume', pv, 'persistentvolumes', False, lambda p: p['spec']['csi'].update(readOnly=False))
 case('reject foreign secret', pv, 'persistentvolumes', False, lambda p: p['spec']['csi']['nodePublishSecretRef'].update(name='other'))
