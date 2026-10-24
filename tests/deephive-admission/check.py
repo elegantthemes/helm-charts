@@ -31,6 +31,11 @@ def case(name, expected, change=None, operation='CREATE', old=None):
 
 
 case('real session manifest', True)
+case('harmless extra metadata', True, lambda p: p['metadata']['labels'].update({'example.internal/notes': 'demo', 'app.kubernetes.io/version': '1.4.80'}))
+case('legacy session without mode metadata', True, lambda p: p['metadata']['labels'].pop('deephive/worker-mode'))
+case('spoofed Lite mode', False, lambda p: p['metadata']['labels'].update({'deephive/worker-mode': 'lite'}))
+for key in ['app', 'release', 'redis-client', 'k8s-app', 'deephive/role', 'deephive/source-reader']:
+    case('forbidden isolation label ' + key, False, lambda p, key=key: p['metadata']['labels'].update({key: 'true'}))
 case('foreign release', False, lambda p: p['metadata']['labels'].update({'app.kubernetes.io/instance': 'other'}))
 case('missing release', False, lambda p: p['metadata']['labels'].pop('app.kubernetes.io/instance'))
 foreign = copy.deepcopy(original)

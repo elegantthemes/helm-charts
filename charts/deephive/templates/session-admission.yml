@@ -32,6 +32,8 @@ spec:
     - name: containers
       expression: "variables.pod.spec.containers + (has(variables.pod.spec.initContainers) ? variables.pod.spec.initContainers : [])"
   validations:
+    # Require session identity; extra metadata (including API-added topology)
+    # must not impersonate the chart's worker, reader, Redis or DNS selectors.
     - expression: >-
         variables.pod.metadata.namespace == {{ .Release.Namespace | quote }} &&
         variables.pod.metadata.name.matches('^dh-[a-f0-9]{40}$') &&
@@ -39,7 +41,8 @@ spec:
         variables.pod.metadata.labels['app.kubernetes.io/name'] == 'deephive-session' &&
         variables.pod.metadata.labels['app.kubernetes.io/instance'] == {{ .Release.Name | quote }} &&
         variables.pod.metadata.labels['deephive/session'] == variables.pod.metadata.name &&
-        variables.pod.metadata.labels.all(k, k in ['app.kubernetes.io/name', 'app.kubernetes.io/instance', 'deephive/session'])
+        (!('deephive/worker-mode' in variables.pod.metadata.labels) || variables.pod.metadata.labels['deephive/worker-mode'] == 'full') &&
+        variables.pod.metadata.labels.all(k, !(k in ['app', 'release', 'redis-client', 'k8s-app', 'deephive/role', 'deephive/source-reader']))
       message: Runner access is limited to task session pods, without privileged workload labels.
     - expression: >-
         request.operation != 'UPDATE' || (

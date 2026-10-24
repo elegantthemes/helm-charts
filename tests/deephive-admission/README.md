@@ -13,6 +13,10 @@ credentials, identities, host access, labels and image replacements, plus cleanu
 of an older approved image and metadata-only updates. Kubernetes API schema and
 live admission enforcement remain separate cluster acceptance checks.
 
+Extra session metadata is allowed, including Full-mode and API-added topology
+labels. Required release/session identity remains exact; worker/reader/Redis/DNS
+selector labels are forbidden, and an optional worker-mode label must be `full`.
+
 Run `python3 tests/deephive-admission/render.py` for release-name collisions,
 quoted identifiers, Secret-revision rollouts, readiness, pre-pull taints and proxy
 lookup configuration. This is rendering validation, not deployed acceptance.
