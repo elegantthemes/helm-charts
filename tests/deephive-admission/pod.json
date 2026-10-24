@@ -7,7 +7,9 @@
     "labels": {
       "app.kubernetes.io/name": "deephive-session",
       "app.kubernetes.io/instance": "review",
-      "deephive/session": "dh-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      "deephive/session": "dh-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "deephive/worker-mode": "full",
+      "topology.kubernetes.io/region": "us-ord"
     },
     "annotations": {
       "deephive/protocol": "2",
