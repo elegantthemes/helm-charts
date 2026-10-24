@@ -101,7 +101,7 @@ spec:
          (request.operation == 'DELETE' ||
            (variables.obj.spec.csi.nodePublishSecretRef.name == '{{ $r.filesystemSecretName }}' &&
             variables.obj.spec.csi.nodePublishSecretRef.namespace == '{{ $r.filesystemSecretNamespace }}')) &&
-         variables.obj.spec.mountOptions == ['ro', 'cache-size=0', 'open-cache=0', 'attr-cache=0', 'entry-cache=0', 'buffer-size=64'])
+         (variables.obj.spec.mountOptions == ['ro', 'cache-size=0', 'open-cache=0', 'attr-cache=0', 'entry-cache=0', 'buffer-size=64'] || variables.obj.spec.mountOptions == ['ro', 'cache-size=0', 'open-cache=0', 'attr-cache=0', 'entry-cache=0', 'buffer-size=64', 'hide-internal']))
       message: Reader volumes must retain data and use independent read-only JuiceFS handles and approved CSI credentials.
 ---
 apiVersion: admissionregistration.k8s.io/v1
@@ -204,7 +204,27 @@ spec:
       containers:
         - name: reader-service
           image: {{ $f.runnerImage | quote }}
-          command: [node, /opt/deephive/dist/scripts/environment/source-reader-service.js, /reader-config/reader.json, /source-reader-token/token]
+          # Older prepared images enumerate JuiceFS's synthetic files as source.
+          # Keep this compatibility shim until the image's reader requests the option.
+          command:
+            - node
+            - --input-type=module
+            - --eval
+            - |
+              import { KubernetesApi } from '/opt/deephive/dist/src/task-environments/environment/kubernetes.js';
+              const call = KubernetesApi.prototype.call;
+              KubernetesApi.prototype.call = function(method, path, body) {
+                if (method === 'POST' && path === '/api/v1/persistentvolumes' &&
+                    body?.kind === 'PersistentVolume' && body.metadata?.labels?.['deephive/source-reader'] &&
+                    !body.spec.mountOptions.includes('hide-internal')) {
+                  body.spec.mountOptions = [...body.spec.mountOptions, 'hide-internal'];
+                }
+                return call.call(this, method, path, body);
+              };
+              await import('/opt/deephive/dist/scripts/environment/source-reader-service.js');
+            - source-reader-service
+            - /reader-config/reader.json
+            - /source-reader-token/token
           ports: [{ name: http, containerPort: 3003 }]
           readinessProbe: { tcpSocket: { port: http } }
           resources:
