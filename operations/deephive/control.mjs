@@ -65,7 +65,11 @@ async function main() {
 		await redis.quit().catch(() => redis.disconnect());
 	}
 }
-main().catch((error) => {
-	console.error(JSON.stringify({ event: 'failed', name: error.name, code: error.code }));
-	process.exitCode = 1;
-});
+main()
+	.catch((error) => {
+		console.error(JSON.stringify({ event: 'failed', name: error.name, code: error.code }));
+		process.exitCode = 1;
+	})
+	.finally(() => {
+		process.stdout.write('', () => process.exit(process.exitCode ?? 0));
+	});
