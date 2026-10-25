@@ -1,5 +1,10 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { mkdtempSync, symlinkSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { spawnSync } from 'node:child_process';
 import { advance, initialRecord, AUTO_MS, HARD_MS, LITE_QUEUES } from './queue-window.mjs';
 
 function fixture(scope = 'canary') {
@@ -137,4 +142,21 @@ test('operation identifiers must be Kubernetes compatible at both ends', () => {
 		assert.throws(() => initialRecord(id, 'canary', 0, 'hash'));
 	for (const id of ['abc', '52548-test', 'a'.repeat(32)])
 		assert.equal(initialRecord(id, 'canary', 0, 'hash').id, id);
+});
+
+test('the watchdog starts when Node resolves a ConfigMap-style symlink', () => {
+	const dir = mkdtempSync(join(tmpdir(), 'deephive-watchdog-'));
+	try {
+		const link = join(dir, 'queue-window.mjs');
+		symlinkSync(fileURLToPath(new URL('./queue-window.mjs', import.meta.url)), link);
+		const result = spawnSync(process.execPath, [link, 'invalid'], {
+			encoding: 'utf8',
+			timeout: 3000,
+		});
+		assert.equal(result.error, undefined);
+		assert.equal(result.status, 1);
+		assert.match(result.stderr, /"event":"failed"/);
+	} finally {
+		rmSync(dir, { recursive: true, force: true });
+	}
 });

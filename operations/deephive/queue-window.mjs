@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from 'node:crypto';
-import { readFileSync } from 'node:fs';
+import { readFileSync, realpathSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -277,9 +277,16 @@ async function main() {
 	}
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
-	main().catch((error) => {
-		console.error(JSON.stringify({ event: 'failed', name: error.name, code: error.code }));
-		process.exitCode = 1;
-	});
+if (
+	process.argv[1] &&
+	import.meta.url === pathToFileURL(realpathSync(resolve(process.argv[1]))).href
+) {
+	main()
+		.catch((error) => {
+			console.error(JSON.stringify({ event: 'failed', name: error.name, code: error.code }));
+			process.exitCode = 1;
+		})
+		.finally(() => {
+			process.stdout.write('', () => process.exit(process.exitCode ?? 0));
+		});
 }
