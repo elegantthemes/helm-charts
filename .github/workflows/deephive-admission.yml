@@ -5,6 +5,7 @@ on:
     paths:
       - 'charts/deephive/**'
       - 'tests/deephive-admission/**'
+      - 'operations/deephive/**'
       - '.github/workflows/deephive-admission.yml'
 
 permissions:
@@ -15,6 +16,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node --test operations/deephive/queue-window.test.mjs
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
