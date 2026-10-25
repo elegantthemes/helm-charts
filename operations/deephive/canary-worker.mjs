@@ -2,7 +2,7 @@
 import { createRequire } from 'node:module';
 async function main() {
 	const [id] = process.argv.slice(2);
-	if (!/^[a-z0-9][a-z0-9-]{2,31}$/.test(id)) throw new Error('Invalid canary identity');
+	if (!/^[a-z0-9][a-z0-9-]{1,30}[a-z0-9]$/.test(id)) throw new Error('Invalid canary identity');
 	const name = `deephive-rollout-canary-${id}`;
 	const require = createRequire(process.cwd() + '/package.json');
 	require('dotenv').config();

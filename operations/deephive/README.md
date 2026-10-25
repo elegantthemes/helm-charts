@@ -8,8 +8,11 @@ The Job uses the existing `deephive-full-worker` identity without an API token,
 the existing pull Secret, and only the three Redis keys from
 `deephive-full-runner`. Its unique label does not match app Service selectors.
 The mounted code is immutable and checked against its SHA-256. The ConfigMap is
-owned by the Job, whose controller/TTL reclaim it after completion. The Redis
-journal expires after 24 hours if operator cleanup is interrupted.
+owned by the Job, whose controller/TTL reclaim it after completion. An unarmed Redis
+journal expires after 24 hours. Arming removes that expiry; recovery and its
+journal remain available until the recorded pauses are restored. Completed
+journals regain the 24-hour fallback expiry. The Job has no
+active deadline and retries container failures; TTL cleanup follows completion.
 
 ## Contract
 
@@ -20,7 +23,8 @@ so a crash cannot hide an uncertain successful pause. A restarted Job keeps the
 original absolute deadlines and resumes recorded intents, not arbitrary queues.
 The six-hour maximum is conservative from the start of the batch. Automatic
 resume starts after **5 hours 30 minutes**, leaving 30 minutes for replacement
-and Redis recovery. A per-operation 60-second mutex prevents overlapping Job
+and Redis recovery. No controller or journal expiry stops recovery during an extended
+Redis outage; the six-hour deadline is never reset or extended. A per-operation 60-second mutex prevents overlapping Job
 Pods from rewriting the journal. Redis commands have bounded timeouts and do not
 replay offline pause requests. Do not run concurrent manual pause/resume
 operations on these queues during this operator window.

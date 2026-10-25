@@ -4,7 +4,7 @@ async function main() {
 	const [mode, id, hash] = process.argv.slice(2);
 	if (
 		!['status', 'arm', 'resume', 'cleanup'].includes(mode) ||
-		!/^[a-z0-9][a-z0-9-]{2,31}$/.test(id) ||
+		!/^[a-z0-9][a-z0-9-]{1,30}[a-z0-9]$/.test(id) ||
 		!/^[a-f0-9]{64}$/.test(hash)
 	)
 		throw new Error('Invalid operation command');

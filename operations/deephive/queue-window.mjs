@@ -27,7 +27,7 @@ export const HARD_MS = 360 * 60_000;
 export const canaryQueue = (id) => `deephive-rollout-canary-${id}`;
 
 export function initialRecord(id, scope, now, scriptHash) {
-	if (!/^[a-z0-9][a-z0-9-]{2,31}$/.test(id) || !['lite', 'canary'].includes(scope)) {
+	if (!/^[a-z0-9][a-z0-9-]{1,30}[a-z0-9]$/.test(id) || !['lite', 'canary'].includes(scope)) {
 		throw new Error('Invalid operation identity');
 	}
 	return {
@@ -193,7 +193,16 @@ async function main() {
 		};
 		const io = {
 			now: serverNow,
-			save: (state) => redis.hset(key, 'record', JSON.stringify(state)),
+			save: async (state) => {
+				const transaction = redis.multi().hset(key, 'record', JSON.stringify(state));
+				// Once armed, recovery metadata must outlive an extended Redis outage.
+				if (state.startedAt !== undefined && state.phase !== 'complete')
+					transaction.persist(key);
+				else transaction.expire(key, 86400);
+				const results = await transaction.exec();
+				if (!results || results.some(([error]) => error))
+					throw new Error('Journal save failed');
+			},
 			isPaused: (name) => queues.get(name).isPaused(),
 			pause: (name) => queues.get(name).pause(),
 			resume: (name) => queues.get(name).resume(),

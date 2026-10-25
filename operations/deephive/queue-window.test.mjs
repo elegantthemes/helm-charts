@@ -131,3 +131,10 @@ test('a failed resume is retried without extending deadlines', async () => {
 	assert.equal(f.load().phase, 'complete');
 	assert.equal(f.load().autoResumeAt, deadline);
 });
+
+test('operation identifiers must be Kubernetes compatible at both ends', () => {
+	for (const id of ['abc-', '-abc', 'ab', 'a'.repeat(33)])
+		assert.throws(() => initialRecord(id, 'canary', 0, 'hash'));
+	for (const id of ['abc', '52548-test', 'a'.repeat(32)])
+		assert.equal(initialRecord(id, 'canary', 0, 'hash').id, id);
+});

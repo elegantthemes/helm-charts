@@ -23,6 +23,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      - run: python3 operations/deephive/render.test.py
       - uses: actions/setup-go@v5
         with:
           go-version-file: tests/deephive-admission/go.mod

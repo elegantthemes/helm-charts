@@ -11,7 +11,7 @@ p.add_argument('operation')
 p.add_argument('scope', choices=['lite', 'canary'])
 p.add_argument('--job-uid')
 a = p.parse_args()
-assert re.fullmatch(r'[a-z0-9][a-z0-9-]{2,31}', a.operation)
+assert re.fullmatch(r'[a-z0-9][a-z0-9-]{1,30}[a-z0-9]', a.operation)
 name = 'deephive-queue-window-' + a.operation
 source = pathlib.Path(__file__).with_name('queue-window.mjs').read_text()
 digest = hashlib.sha256(source.encode()).hexdigest()
@@ -50,7 +50,7 @@ else:
         'volumes': [{'name': 'code', 'configMap': {'name': name + '-code', 'defaultMode': 292}}],
     }
     out = {'apiVersion': 'batch/v1', 'kind': 'Job', 'metadata': meta,
-           'spec': {'parallelism': 1, 'completions': 1, 'backoffLimit': 100,
-                    'activeDeadlineSeconds': 28800, 'ttlSecondsAfterFinished': 600,
+           'spec': {'parallelism': 1, 'completions': 1, 'backoffLimit': 2147483647,
+                    'ttlSecondsAfterFinished': 600,
                     'template': {'metadata': {'labels': labels}, 'spec': pod}}}
 print(json.dumps(out, indent=2))
