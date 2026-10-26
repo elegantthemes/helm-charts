@@ -94,7 +94,7 @@ spec:
 {{- if .Values.sourceReaderService.enabled }}
         source-reader-token-revision: {{ .Values.sourceReaderService.tokenRevision | quote }}
 {{- end }}
-        checksum/runner-config: {{ toJson $f | sha256sum | quote }}
+        checksum/runner-config: {{ toJson (list $f .Values.DEEPHIVE_VERSION) | sha256sum | quote }}
       labels: { app: {{ (include "deephive.fullWorkerName" .) }}, deephive/worker-mode: full, redis-client: "true" }
     spec:
       nodeName: {{ $f.nodeName | quote }}
@@ -106,8 +106,17 @@ spec:
       containers:
         - name: runner
           image: {{ $f.runnerImage | quote }}
-          command: [node, /opt/deephive/dist/src/fullWorker.js]
+          command:
+            - /bin/bash
+            - -ec
+            - |
+              if [ -x /usr/local/bin/deephive-app-start ]; then
+                exec /usr/local/bin/deephive-app-start node /opt/deephive/dist/src/fullWorker.js
+              fi
+              exec node /opt/deephive/dist/src/fullWorker.js
           env:
+            - name: DEEPHIVE_VERSION
+              value: {{ .Values.DEEPHIVE_VERSION | quote }}
             - name: FULL_WORKER_CONFIG
               value: /runner-config/runner.json
             - name: FULL_WORKER_ROUTING
