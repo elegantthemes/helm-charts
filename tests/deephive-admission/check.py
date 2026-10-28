@@ -81,16 +81,15 @@ with tempfile.TemporaryDirectory(prefix='deephive-admission-') as temp:
 shared_render = subprocess.check_output([
     'helm', 'template', 'review', str(root.parent.parent / 'charts/deephive'),
     '-n', 'dph-app', '-f', str(root / 'values.json'),
-    '--set', 'fullWorker.integrationSecret=secrets',
+    '--set', 'fullWorker.githubSecretRef.name=review-full-runner',
+    '--set', 'fullWorker.githubSecretRef.key=GH_TOKEN',
 ], text=True)
 shared_policy = next(p for p in yaml.safe_load_all(shared_render)
                      if p and p['kind'] == 'ValidatingAdmissionPolicy')
-original['spec']['containers'][0]['env'] = [e for e in original['spec']['containers'][0]['env']
-    if e.get('valueFrom', {}).get('secretKeyRef', {}).get('name') != 'integration']
 cases = []
-case('exact Lite GitHub key', True, lambda p: p['spec']['containers'][0]['env'].append({'name': 'GITHUB_TOKEN', 'valueFrom': {'secretKeyRef': {'name': 'secrets', 'key': 'GITHUB_TOKEN'}}}))
-case('unrelated consumer database key', False, lambda p: p['spec']['containers'][0]['env'].append({'name': 'BAD', 'valueFrom': {'secretKeyRef': {'name': 'secrets', 'key': 'MYSQL_ROOT_PASSWORD'}}}))
-case('unrelated consumer model key', False, lambda p: p['spec']['containers'][0]['env'].append({'name': 'BAD', 'valueFrom': {'secretKeyRef': {'name': 'secrets', 'key': 'OPENAI_API_KEY'}}}))
+case('exact Lite GitHub key', True, lambda p: p['spec']['containers'][0]['env'].append({'name': 'GITHUB_TOKEN', 'valueFrom': {'secretKeyRef': {'name': 'review-full-runner', 'key': 'GH_TOKEN'}}}))
+case('unrelated runner database key', False, lambda p: p['spec']['containers'][0]['env'].append({'name': 'BAD', 'valueFrom': {'secretKeyRef': {'name': 'review-full-runner', 'key': 'REDIS_URL'}}}))
+case('unrelated runner model key', False, lambda p: p['spec']['containers'][0]['env'].append({'name': 'BAD', 'valueFrom': {'secretKeyRef': {'name': 'review-full-runner', 'key': 'OPENAI_API_KEY'}}}))
 case('whole consumer Secret still forbidden', False, lambda p: p['spec']['containers'][0].update(envFrom=[{'secretRef': {'name': 'secrets'}}]))
 with tempfile.TemporaryDirectory(prefix='deephive-shared-github-') as temp:
     fixture = Path(temp) / 'fixtures.json'

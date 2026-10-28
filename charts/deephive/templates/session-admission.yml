@@ -1,6 +1,7 @@
 {{- include "deephive.normalizeWorkerValues" . -}}
 {{- if .Values.fullWorker.enabled }}
 {{- $f := .Values.fullWorker }}
+{{- $github := $f.githubSecretRef | default dict }}
 {{- $identity := printf "%s-%s-session-admission" .Release.Namespace .Release.Name }}
 {{- $name := printf "%s-%s" ($identity | trunc 50 | trimSuffix "-") ((list .Release.Namespace .Release.Name "session-admission") | toJson | sha256sum | trunc 12) }}
 {{- $images := concat (list $f.sessionImage) ($f.compatibleSessionImages | default list) }}
@@ -95,9 +96,11 @@ spec:
         request.operation != 'CREATE' || variables.containers.all(c,
           (!has(c.envFrom) || size(c.envFrom) == 0) &&
           (!has(c.env) || c.env.all(e, !has(e.valueFrom) || !has(e.valueFrom.secretKeyRef) ||
-            (e.valueFrom.secretKeyRef.name in {{ toJson $secrets }} &&
-             e.valueFrom.secretKeyRef.key in ['OPENAI_API_KEY', 'ET_USERNAME', 'ET_API_KEY', 'ET_PASSWORD', 'GITHUB_TOKEN'] &&
-             (e.valueFrom.secretKeyRef.name != 'secrets' || e.valueFrom.secretKeyRef.key == 'GITHUB_TOKEN')))) &&
+            ((e.valueFrom.secretKeyRef.name in {{ toJson $secrets }} &&
+              e.valueFrom.secretKeyRef.key in ['OPENAI_API_KEY', 'ET_USERNAME', 'ET_API_KEY', 'ET_PASSWORD', 'GITHUB_TOKEN']) ||
+             (c.name == 'session' && e.name == 'GITHUB_TOKEN' &&
+              e.valueFrom.secretKeyRef.name == {{ ($github.name | default "") | quote }} &&
+              e.valueFrom.secretKeyRef.key == {{ ($github.key | default "") | quote }})))) &&
           has(c.securityContext) &&
           has(c.securityContext.allowPrivilegeEscalation) && !c.securityContext.allowPrivilegeEscalation &&
           (!has(c.securityContext.privileged) || !c.securityContext.privileged) &&

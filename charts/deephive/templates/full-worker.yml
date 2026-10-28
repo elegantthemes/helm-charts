@@ -2,13 +2,17 @@
 {{- $reader := include "deephive.sourceReader" (dict "context" . "codeRoot" "/opt/deephive") | fromJson }}
 {{- if .Values.fullWorker.enabled }}
 {{- $f := .Values.fullWorker }}
+{{- $github := $f.githubSecretRef | default dict }}
+{{- if $github }}
+{{- if or (not ($github.name | default "")) (not (has ($github.key | default "") (list "GH_TOKEN" "GITHUB_TOKEN"))) }}{{ fail "GitHub credential reference requires an existing Secret name and GH_TOKEN/GITHUB_TOKEN key" }}{{ end }}
+{{- end }}
 {{- $nodeRole := printf "%s-%s" (printf "%s-%s-full-worker-node" .Release.Namespace .Release.Name | trunc 50 | trimSuffix "-") ((list .Release.Namespace .Release.Name "full-worker-node") | toJson | sha256sum | trunc 12) }}
 {{- $prepull := printf "%s-full-session-prepull" .Release.Name | trunc 63 | trimSuffix "-" }}
 {{- $egress := printf "%s-session-egress" .Release.Name | trunc 63 | trimSuffix "-" }}
 {{- if not (regexMatch "@sha256:[a-f0-9]{64}$" $f.runnerImage) }}{{ fail "fullWorker.runnerImage must pin a digest" }}{{ end }}
 {{- if not (regexMatch "@sha256:[a-f0-9]{64}$" $f.sessionImage) }}{{ fail "fullWorker.sessionImage must pin a digest" }}{{ end }}
 {{- if not (regexMatch "@sha256:[a-f0-9]{64}$" $f.databaseImage) }}{{ fail "fullWorker.databaseImage must pin a digest" }}{{ end }}
-{{- if or (eq $f.agentSecret "secrets") (eq $f.agentSecret $f.runnerSecret) (and $f.integrationSecret (eq $f.integrationSecret $f.runnerSecret)) }}{{ fail "Agent credentials must not reference consumer Secrets; session credentials must not reference runner Secrets" }}{{ end }}
+{{- if or (eq $f.agentSecret "secrets") (eq ($f.integrationSecret | default "") "secrets") (eq $f.agentSecret $f.runnerSecret) (and $f.integrationSecret (eq $f.integrationSecret $f.runnerSecret)) }}{{ fail "Session integration/model credentials must not reference consumer or runner Secrets" }}{{ end }}
 {{- if not $f.approvedEgressDomains }}{{ fail "Explicit approved package/model/test domains required" }}{{ end }}
 {{- if and $f.observationEnabled (not $f.publicOrigin) }}{{ fail "Exact public observation origin required" }}{{ end }}
 {{- if not (has (toJson $f.sessionProtocol) (list "2" "3")) }}{{ fail "Session protocol must be 2 or 3" }}{{ end }}
@@ -77,7 +81,7 @@ metadata:
   name: {{ (include "deephive.fullWorkerName" .) }}
 data:
   runner.json: |
-    {{ dict "namespace" .Release.Namespace "release" .Release.Name "nodeName" $f.nodeName "image" $f.sessionImage "databaseImage" $f.databaseImage "imagePullSecret" $f.pullSecret "agentSecret" (required "Session agent Secret required" $f.agentSecret) "integrationSecret" ($f.integrationSecret | default "") "workspaceClaim" $f.workspaceClaim "workspaceRoot" $f.workspaceRoot "scratchRoot" "/node-scratch" "cacheRoot" "/node-cache" "runnerUrl" (printf "http://%s:3001" (include "deephive.fullWorkerName" .)) "proxyUrl" (printf "http://%s:3128" $egress) "pressureCommand" $f.pressureCommand "signingKeyFile" "/runner-secret/signing-key" "controlPort" 3001 "observationPort" (ternary 3002 0 $f.observationEnabled) "observationTokenFile" "/runner-secret/observation-token" "approvedBootstraps" $f.approvedBootstraps "sourceReader" $reader "sessionProtocol" $f.sessionProtocol "draining" $f.draining "validationTimeoutMs" $f.validationTimeoutMs | toJson }}
+    {{ dict "namespace" .Release.Namespace "release" .Release.Name "nodeName" $f.nodeName "image" $f.sessionImage "databaseImage" $f.databaseImage "imagePullSecret" $f.pullSecret "agentSecret" (required "Session agent Secret required" $f.agentSecret) "integrationSecret" ($f.integrationSecret | default "") "githubSecretRef" ($f.githubSecretRef | default dict) "workspaceClaim" $f.workspaceClaim "workspaceRoot" $f.workspaceRoot "scratchRoot" "/node-scratch" "cacheRoot" "/node-cache" "runnerUrl" (printf "http://%s:3001" (include "deephive.fullWorkerName" .)) "proxyUrl" (printf "http://%s:3128" $egress) "pressureCommand" $f.pressureCommand "signingKeyFile" "/runner-secret/signing-key" "controlPort" 3001 "observationPort" (ternary 3002 0 $f.observationEnabled) "observationTokenFile" "/runner-secret/observation-token" "approvedBootstraps" $f.approvedBootstraps "sourceReader" $reader "sessionProtocol" $f.sessionProtocol "draining" $f.draining "validationTimeoutMs" $f.validationTimeoutMs | toJson }}
 {{/* The config contains no credentials; signing key is read from runner-only Secret. */}}
 ---
 apiVersion: apps/v1
