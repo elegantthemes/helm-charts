@@ -1,5 +1,6 @@
-{{- if .Values.fullEnvironment.enabled }}
-{{- $f := .Values.fullEnvironment }}
+{{- include "deephive.normalizeWorkerValues" . -}}
+{{- if .Values.fullWorker.enabled }}
+{{- $f := .Values.fullWorker }}
 {{- $identity := printf "%s-%s-session-admission" .Release.Namespace .Release.Name }}
 {{- $name := printf "%s-%s" ($identity | trunc 50 | trimSuffix "-") ((list .Release.Namespace .Release.Name "session-admission") | toJson | sha256sum | trunc 12) }}
 {{- $images := concat (list $f.sessionImage) ($f.compatibleSessionImages | default list) }}
@@ -24,13 +25,15 @@ spec:
         resources: [pods]
   matchConditions:
     - name: runner-identity
-      expression: {{ printf "request.userInfo.username == 'system:serviceaccount:%s:%s-runner'" .Release.Namespace .Release.Name | quote }}
+      expression: {{ printf "request.userInfo.username in ['system:serviceaccount:%s:%s', 'system:serviceaccount:%s:%s-runner']" .Release.Namespace (include "deephive.fullWorkerName" .) .Release.Namespace .Release.Name | quote }}
   variables:
     - name: pod
       expression: "request.operation == 'DELETE' ? oldObject : object"
     - name: containers
       expression: "variables.pod.spec.containers + (has(variables.pod.spec.initContainers) ? variables.pod.spec.initContainers : [])"
   validations:
+    # Require session identity; extra metadata (including API-added topology)
+    # must not impersonate the chart's worker, reader, Redis or DNS selectors.
     - expression: >-
         variables.pod.metadata.namespace == {{ .Release.Namespace | quote }} &&
         variables.pod.metadata.name.matches('^dh-[a-f0-9]{40}$') &&
@@ -38,7 +41,8 @@ spec:
         variables.pod.metadata.labels['app.kubernetes.io/name'] == 'deephive-session' &&
         variables.pod.metadata.labels['app.kubernetes.io/instance'] == {{ .Release.Name | quote }} &&
         variables.pod.metadata.labels['deephive/session'] == variables.pod.metadata.name &&
-        variables.pod.metadata.labels.all(k, k in ['app.kubernetes.io/name', 'app.kubernetes.io/instance', 'deephive/session'])
+        (!('deephive/worker-mode' in variables.pod.metadata.labels) || variables.pod.metadata.labels['deephive/worker-mode'] == 'full') &&
+        variables.pod.metadata.labels.all(k, !(k in ['app', 'release', 'redis-client', 'k8s-app', 'deephive/role', 'deephive/source-reader']))
       message: Runner access is limited to task session pods, without privileged workload labels.
     - expression: >-
         request.operation != 'UPDATE' || (
@@ -57,7 +61,7 @@ spec:
           (!has(variables.pod.spec.hostIPC) || !variables.pod.spec.hostIPC) &&
           variables.pod.spec.restartPolicy == 'Never'
         )
-      message: Sessions must use the execution node and have no host namespaces or API token.
+      message: Sessions must use the Full worker node and have no host namespaces or API token.
     - expression: >-
         request.operation != 'CREATE' || (
           variables.pod.spec.volumes.all(v,

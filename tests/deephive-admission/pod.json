@@ -7,7 +7,9 @@
     "labels": {
       "app.kubernetes.io/name": "deephive-session",
       "app.kubernetes.io/instance": "review",
-      "deephive/session": "dh-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      "deephive/session": "dh-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "deephive/worker-mode": "full",
+      "topology.kubernetes.io/region": "us-ord"
     },
     "annotations": {
       "deephive/protocol": "2",
@@ -168,7 +170,7 @@
           },
           {
             "name": "SESSION_RUNNER_URL",
-            "value": "http://review-runner:3001"
+            "value": "http://review-full-worker:3001"
           },
           {
             "name": "SESSION_TOKEN",
@@ -184,7 +186,7 @@
           },
           {
             "name": "NO_PROXY",
-            "value": "127.0.0.1,localhost,review-runner"
+            "value": "127.0.0.1,localhost,review-full-worker"
           },
           {
             "name": "OPENAI_API_KEY",

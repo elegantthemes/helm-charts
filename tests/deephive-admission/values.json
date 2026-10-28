@@ -1,6 +1,6 @@
 {
   "ENV_FILE": "VALIDATION_ONLY=true",
-  "fullEnvironment": {
+  "fullWorker": {
     "enabled": true,
     "nodeName": "test-execution",
     "runnerImage": "ghcr.io/elegantthemes/runner@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
@@ -27,9 +27,9 @@
       "ghcr.io/elegantthemes/session@sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
       "ghcr.io/elegantthemes/session@sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
     },
-    "ordinaryInstallCommand": [
-      "/infra/ordinary-install"
+    "liteInstallCommand": [
+      "/infra/lite-install"
     ],
-    "ordinaryCacheProbePath": "/var/lib/deephive/cache"
+    "liteCacheProbePath": "/var/lib/deephive/cache"
   }
 }

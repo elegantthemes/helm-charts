@@ -28,3 +28,16 @@ Before applying, verify that the JuiceFS CSI driver and `juicefs-rwx` StorageCla
 `WORKSPACE_COPY_METHOD` controls consumer workspace provisioning. The default `fs.cp` uses portable copying. Set it to `juicefs` to opt into native cloning on a JuiceFS-backed workspace with toolbox image `elegantthemes/deephive:26.10.20` or another image containing the CLI. The application falls back to portable copying if the clone command fails or its source lock times out; Git validation still runs.
 
 Terraform staging exposes this chart value through the `workspace_copy_method` Terraform variable. Set that variable in the Terraform Cloud workspace UI, then plan/apply and verify the consumer rollout and copy-method logs. Set it back to `fs.cp` and apply to disable native cloning. Changing the setting affects future provisioning copies.
+
+
+### App-only releases with existing runtime images
+
+Chart 1.3.22 passes the selected `DEEPHIVE_VERSION` to the existing Full runner
+and includes it in the rollout checksum. Updater-capable recipes fetch the
+compiled release bundle during init only when the baked app version differs.
+The runner selects the same version for its sessions using their existing control
+connection. Image package names/digests and runtime role names are unchanged.
+Older images retain their existing startup command; update to the new recipe once
+before relying on app-only updates. Publish the corresponding DeepHive runtime
+bundle/API and image recipe first. Toolchain, seed, OS and protocol changes still
+need an image build. No new environment setting or secret is introduced.
