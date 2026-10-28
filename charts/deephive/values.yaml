@@ -103,7 +103,7 @@ fullWorker:
   proxyImage: "" # approved Squid image, pinned digest
   pullSecret: ""
   agentSecret: "" # OPENAI_API_KEY only; never the consumer Secret
-  integrationSecret: "" # optional ET_USERNAME, ET_API_KEY, ET_PASSWORD, GITHUB_TOKEN
+  integrationSecret: "" # ET integration keys; "secrets" reuses only the deployed Lite GITHUB_TOKEN
   runnerSecret: "" # Redis, signing key, scoped source-publication credentials
   # Increment on in-place Secret rotation and upgrade Helm to roll envFrom credentials.
   # Alternatively: kubectl rollout restart deployment/<release>-full-worker

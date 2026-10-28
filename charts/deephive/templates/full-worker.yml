@@ -8,7 +8,7 @@
 {{- if not (regexMatch "@sha256:[a-f0-9]{64}$" $f.runnerImage) }}{{ fail "fullWorker.runnerImage must pin a digest" }}{{ end }}
 {{- if not (regexMatch "@sha256:[a-f0-9]{64}$" $f.sessionImage) }}{{ fail "fullWorker.sessionImage must pin a digest" }}{{ end }}
 {{- if not (regexMatch "@sha256:[a-f0-9]{64}$" $f.databaseImage) }}{{ fail "fullWorker.databaseImage must pin a digest" }}{{ end }}
-{{- if or (eq $f.agentSecret "secrets") (eq ($f.integrationSecret | default "") "secrets") (eq $f.agentSecret $f.runnerSecret) (and $f.integrationSecret (eq $f.integrationSecret $f.runnerSecret)) }}{{ fail "Session credentials must not reference consumer or runner Secrets" }}{{ end }}
+{{- if or (eq $f.agentSecret "secrets") (eq $f.agentSecret $f.runnerSecret) (and $f.integrationSecret (eq $f.integrationSecret $f.runnerSecret)) }}{{ fail "Agent credentials must not reference consumer Secrets; session credentials must not reference runner Secrets" }}{{ end }}
 {{- if not $f.approvedEgressDomains }}{{ fail "Explicit approved package/model/test domains required" }}{{ end }}
 {{- if and $f.observationEnabled (not $f.publicOrigin) }}{{ fail "Exact public observation origin required" }}{{ end }}
 {{- if not (has (toJson $f.sessionProtocol) (list "2" "3")) }}{{ fail "Session protocol must be 2 or 3" }}{{ end }}

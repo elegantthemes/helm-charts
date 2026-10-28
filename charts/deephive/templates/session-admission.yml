@@ -96,7 +96,8 @@ spec:
           (!has(c.envFrom) || size(c.envFrom) == 0) &&
           (!has(c.env) || c.env.all(e, !has(e.valueFrom) || !has(e.valueFrom.secretKeyRef) ||
             (e.valueFrom.secretKeyRef.name in {{ toJson $secrets }} &&
-             e.valueFrom.secretKeyRef.key in ['OPENAI_API_KEY', 'ET_USERNAME', 'ET_API_KEY', 'ET_PASSWORD', 'GITHUB_TOKEN']))) &&
+             e.valueFrom.secretKeyRef.key in ['OPENAI_API_KEY', 'ET_USERNAME', 'ET_API_KEY', 'ET_PASSWORD', 'GITHUB_TOKEN'] &&
+             (e.valueFrom.secretKeyRef.name != 'secrets' || e.valueFrom.secretKeyRef.key == 'GITHUB_TOKEN')))) &&
           has(c.securityContext) &&
           has(c.securityContext.allowPrivilegeEscalation) && !c.securityContext.allowPrivilegeEscalation &&
           (!has(c.securityContext.privileged) || !c.securityContext.privileged) &&
