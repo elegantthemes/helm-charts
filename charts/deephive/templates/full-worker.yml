@@ -4,6 +4,7 @@
 {{- $f := .Values.fullWorker }}
 {{- $github := $f.githubSecretRef | default dict }}
 {{- if $github }}
+{{- if eq ($github.name | default "") "secrets" }}{{ fail "GitHub credential reference must not select the consumer Secret" }}{{ end }}
 {{- if or (not ($github.name | default "")) (not (has ($github.key | default "") (list "GH_TOKEN" "GITHUB_TOKEN"))) }}{{ fail "GitHub credential reference requires an existing Secret name and GH_TOKEN/GITHUB_TOKEN key" }}{{ end }}
 {{- end }}
 {{- $nodeRole := printf "%s-%s" (printf "%s-%s-full-worker-node" .Release.Namespace .Release.Name | trunc 50 | trimSuffix "-") ((list .Release.Namespace .Release.Name "full-worker-node") | toJson | sha256sum | trunc 12) }}

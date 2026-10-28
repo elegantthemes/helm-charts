@@ -95,3 +95,12 @@ with tempfile.TemporaryDirectory(prefix='deephive-shared-github-') as temp:
     fixture = Path(temp) / 'fixtures.json'
     fixture.write_text(json.dumps({'Expressions': [v['expression'] for v in shared_policy['spec']['validations']], 'Cases': cases}))
     subprocess.run(['go', '-C', str(root), 'run', '.', str(fixture)], check=True)
+
+consumer_ref = subprocess.run([
+    "helm", "template", "review", str(root.parent.parent / "charts/deephive"),
+    "-n", "dph-app", "-f", str(root / "values.json"),
+    "--set", "fullWorker.githubSecretRef.name=secrets",
+    "--set", "fullWorker.githubSecretRef.key=GITHUB_TOKEN",
+], capture_output=True, text=True)
+assert consumer_ref.returncode != 0
+assert "must not select the consumer Secret" in consumer_ref.stderr
