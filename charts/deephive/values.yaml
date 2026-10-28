@@ -104,6 +104,7 @@ fullWorker:
   pullSecret: ""
   agentSecret: "" # OPENAI_API_KEY only; never the consumer Secret
   integrationSecret: "" # optional ET_USERNAME, ET_API_KEY, ET_PASSWORD, GITHUB_TOKEN
+  githubSecretRef: {} # exact deployed Lite-selected credential, e.g. {name: deephive-full-runner, key: GH_TOKEN}
   runnerSecret: "" # Redis, signing key, scoped source-publication credentials
   # Increment on in-place Secret rotation and upgrade Helm to roll envFrom credentials.
   # Alternatively: kubectl rollout restart deployment/<release>-full-worker

@@ -75,3 +75,32 @@ with tempfile.TemporaryDirectory(prefix='deephive-admission-') as temp:
     fixture = Path(temp) / 'fixtures.json'
     fixture.write_text(json.dumps({'Expressions': [v['expression'] for v in policy['spec']['validations']], 'Cases': cases}))
     subprocess.run(['go', '-C', str(root), 'run', '.', str(fixture)], check=True)
+
+
+# Explicitly reuse only the deployed Lite GitHub key, not the consumer Secret.
+shared_render = subprocess.check_output([
+    'helm', 'template', 'review', str(root.parent.parent / 'charts/deephive'),
+    '-n', 'dph-app', '-f', str(root / 'values.json'),
+    '--set', 'fullWorker.githubSecretRef.name=review-full-runner',
+    '--set', 'fullWorker.githubSecretRef.key=GH_TOKEN',
+], text=True)
+shared_policy = next(p for p in yaml.safe_load_all(shared_render)
+                     if p and p['kind'] == 'ValidatingAdmissionPolicy')
+cases = []
+case('exact Lite GitHub key', True, lambda p: p['spec']['containers'][0]['env'].append({'name': 'GITHUB_TOKEN', 'valueFrom': {'secretKeyRef': {'name': 'review-full-runner', 'key': 'GH_TOKEN'}}}))
+case('unrelated runner database key', False, lambda p: p['spec']['containers'][0]['env'].append({'name': 'BAD', 'valueFrom': {'secretKeyRef': {'name': 'review-full-runner', 'key': 'REDIS_URL'}}}))
+case('unrelated runner model key', False, lambda p: p['spec']['containers'][0]['env'].append({'name': 'BAD', 'valueFrom': {'secretKeyRef': {'name': 'review-full-runner', 'key': 'OPENAI_API_KEY'}}}))
+case('whole consumer Secret still forbidden', False, lambda p: p['spec']['containers'][0].update(envFrom=[{'secretRef': {'name': 'secrets'}}]))
+with tempfile.TemporaryDirectory(prefix='deephive-shared-github-') as temp:
+    fixture = Path(temp) / 'fixtures.json'
+    fixture.write_text(json.dumps({'Expressions': [v['expression'] for v in shared_policy['spec']['validations']], 'Cases': cases}))
+    subprocess.run(['go', '-C', str(root), 'run', '.', str(fixture)], check=True)
+
+consumer_ref = subprocess.run([
+    "helm", "template", "review", str(root.parent.parent / "charts/deephive"),
+    "-n", "dph-app", "-f", str(root / "values.json"),
+    "--set", "fullWorker.githubSecretRef.name=secrets",
+    "--set", "fullWorker.githubSecretRef.key=GITHUB_TOKEN",
+], capture_output=True, text=True)
+assert consumer_ref.returncode != 0
+assert "must not select the consumer Secret" in consumer_ref.stderr
