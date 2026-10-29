@@ -9,12 +9,10 @@
 {{- end }}
 {{- $nodeRole := printf "%s-%s" (printf "%s-%s-full-worker-node" .Release.Namespace .Release.Name | trunc 50 | trimSuffix "-") ((list .Release.Namespace .Release.Name "full-worker-node") | toJson | sha256sum | trunc 12) }}
 {{- $prepull := printf "%s-full-session-prepull" .Release.Name | trunc 63 | trimSuffix "-" }}
-{{- $egress := printf "%s-session-egress" .Release.Name | trunc 63 | trimSuffix "-" }}
 {{- if not (regexMatch "@sha256:[a-f0-9]{64}$" $f.runnerImage) }}{{ fail "fullWorker.runnerImage must pin a digest" }}{{ end }}
 {{- if not (regexMatch "@sha256:[a-f0-9]{64}$" $f.sessionImage) }}{{ fail "fullWorker.sessionImage must pin a digest" }}{{ end }}
 {{- if not (regexMatch "@sha256:[a-f0-9]{64}$" $f.databaseImage) }}{{ fail "fullWorker.databaseImage must pin a digest" }}{{ end }}
 {{- if or (eq $f.agentSecret "secrets") (eq ($f.integrationSecret | default "") "secrets") (eq $f.agentSecret $f.runnerSecret) (and $f.integrationSecret (eq $f.integrationSecret $f.runnerSecret)) }}{{ fail "Session integration/model credentials must not reference consumer or runner Secrets" }}{{ end }}
-{{- if not $f.approvedEgressDomains }}{{ fail "Explicit approved package/model/test domains required" }}{{ end }}
 {{- if and $f.observationEnabled (not $f.publicOrigin) }}{{ fail "Exact public observation origin required" }}{{ end }}
 {{- if not (has (toJson $f.sessionProtocol) (list "2" "3")) }}{{ fail "Session protocol must be 2 or 3" }}{{ end }}
 {{- if and (or $f.routingEnabled $f.taskAllowlist) (ne (int $f.sessionProtocol) 3) }}{{ fail "Phase 3 routing requires session protocol 3" }}{{ end }}
@@ -82,7 +80,7 @@ metadata:
   name: {{ (include "deephive.fullWorkerName" .) }}
 data:
   runner.json: |
-    {{ dict "namespace" .Release.Namespace "release" .Release.Name "nodeName" $f.nodeName "image" $f.sessionImage "databaseImage" $f.databaseImage "imagePullSecret" $f.pullSecret "agentSecret" (required "Session agent Secret required" $f.agentSecret) "integrationSecret" ($f.integrationSecret | default "") "githubSecretRef" ($f.githubSecretRef | default dict) "workspaceClaim" $f.workspaceClaim "workspaceRoot" $f.workspaceRoot "scratchRoot" "/node-scratch" "cacheRoot" "/node-cache" "runnerUrl" (printf "http://%s:3001" (include "deephive.fullWorkerName" .)) "proxyUrl" (printf "http://%s:3128" $egress) "pressureCommand" $f.pressureCommand "signingKeyFile" "/runner-secret/signing-key" "controlPort" 3001 "observationPort" (ternary 3002 0 $f.observationEnabled) "observationTokenFile" "/runner-secret/observation-token" "approvedBootstraps" $f.approvedBootstraps "sourceReader" $reader "sessionProtocol" $f.sessionProtocol "draining" $f.draining "validationTimeoutMs" $f.validationTimeoutMs | toJson }}
+    {{ dict "namespace" .Release.Namespace "release" .Release.Name "nodeName" $f.nodeName "image" $f.sessionImage "databaseImage" $f.databaseImage "imagePullSecret" $f.pullSecret "agentSecret" (required "Session agent Secret required" $f.agentSecret) "integrationSecret" ($f.integrationSecret | default "") "githubSecretRef" ($f.githubSecretRef | default dict) "workspaceClaim" $f.workspaceClaim "workspaceRoot" $f.workspaceRoot "scratchRoot" "/node-scratch" "cacheRoot" "/node-cache" "runnerUrl" (printf "http://%s:3001" (include "deephive.fullWorkerName" .)) "pressureCommand" $f.pressureCommand "signingKeyFile" "/runner-secret/signing-key" "controlPort" 3001 "observationPort" (ternary 3002 0 $f.observationEnabled) "observationTokenFile" "/runner-secret/observation-token" "approvedBootstraps" $f.approvedBootstraps "sourceReader" $reader "sessionProtocol" $f.sessionProtocol "draining" $f.draining "validationTimeoutMs" $f.validationTimeoutMs | toJson }}
 {{/* The config contains no credentials; signing key is read from runner-only Secret. */}}
 ---
 apiVersion: apps/v1
@@ -196,7 +194,7 @@ metadata:
 spec:
   podSelector:
     matchLabels: { app.kubernetes.io/name: deephive-session, app.kubernetes.io/instance: {{ .Release.Name | quote }} }
-  policyTypes: [Ingress, Egress]
+  policyTypes: [Ingress]
 {{- if $f.observationEnabled }}
   ingress:
     - from:
@@ -206,21 +204,6 @@ spec:
 {{- else }}
   ingress: []
 {{- end }}
-  egress:
-    - to:
-        - namespaceSelector:
-            matchLabels: { kubernetes.io/metadata.name: kube-system }
-          podSelector:
-            matchLabels: { k8s-app: kube-dns }
-      ports: [{ protocol: UDP, port: 53 }, { protocol: TCP, port: 53 }]
-    - to:
-        - podSelector:
-            matchExpressions: [{ key: app, operator: In, values: [{{ include "deephive.fullWorkerName" . | quote }}, {{ printf "%s-runner" .Release.Name | quote }}] }]
-      ports: [{ protocol: TCP, port: 3001 }]
-    - to:
-        - podSelector:
-            matchLabels: { app: {{ $egress }} }
-      ports: [{ protocol: TCP, port: 3128 }]
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
