@@ -177,18 +177,6 @@
             "value": "fixture"
           },
           {
-            "name": "HTTPS_PROXY",
-            "value": "http://review-session-egress:3128"
-          },
-          {
-            "name": "HTTP_PROXY",
-            "value": "http://review-session-egress:3128"
-          },
-          {
-            "name": "NO_PROXY",
-            "value": "127.0.0.1,localhost,review-full-worker"
-          },
-          {
             "name": "OPENAI_API_KEY",
             "valueFrom": {
               "secretKeyRef": {

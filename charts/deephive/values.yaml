@@ -100,7 +100,6 @@ fullWorker:
   sessionImage: ""
   compatibleSessionImages: [] # prior approved digests needed during compatible runner upgrades
   databaseImage: ""
-  proxyImage: "" # approved Squid image, pinned digest
   pullSecret: ""
   agentSecret: "" # OPENAI_API_KEY only; never the consumer Secret
   integrationSecret: "" # optional ET_USERNAME, ET_API_KEY, ET_PASSWORD, GITHUB_TOKEN
@@ -114,7 +113,6 @@ fullWorker:
   workspaceRoot: /workspace-root # must match enrolled canonical paths
   scratchProbePath: "" # dedicated DeepHive scratch directory on the kubelet filesystem
   cacheProbePath: "" # retained JuiceFS staging/cache filesystem; must be real node path
-  approvedEgressDomains: []
   # Optional infrastructure pressure notification/cancellation hook; not termination proof.
   pressureCommand: []
 

@@ -49,7 +49,7 @@
 {{- $pods := lookup "v1" "Pod" .Release.Namespace "" }}
 {{- range $pod := $pods.items }}
 {{- if has (index ($pod.metadata.labels | default dict) "app") (list (include "deephive.fullWorkerName" $) (printf "%s-runner" $.Release.Name)) }}{{ fail "Runner pods remain; wait for their deletion before removing session protections" }}{{ end }}
-{{- if and (eq (index ($pod.metadata.labels | default dict) "app.kubernetes.io/name") "deephive-session") (eq (index ($pod.metadata.labels | default dict) "app.kubernetes.io/instance") $.Release.Name) }}{{ fail "Drain and confirm deletion of session pods before disabling fullWorker; keep admission, proxy and network protections installed" }}{{ end }}
+{{- if and (eq (index ($pod.metadata.labels | default dict) "app.kubernetes.io/name") "deephive-session") (eq (index ($pod.metadata.labels | default dict) "app.kubernetes.io/instance") $.Release.Name) }}{{ fail "Drain and confirm deletion of session pods before disabling fullWorker; keep admission and ingress protections installed" }}{{ end }}
 {{- end }}
 {{- end }}
 {{- if $f.enabled }}
@@ -183,7 +183,7 @@ spec:
               }
               const selector = 'app.kubernetes.io/name=deephive-session,app.kubernetes.io/instance=' + {{ .Release.Name | toJson }};
               const pods = await api.call('GET', '/api/v1/namespaces/' + {{ .Release.Namespace | toJson }} + '/pods?labelSelector=' + encodeURIComponent(selector));
-              if (!pods || pods.items.length) throw new Error('Session drain incomplete; retain admission, proxy and network isolation');
+              if (!pods || pods.items.length) throw new Error('Session drain incomplete; retain admission and ingress isolation');
               const reader = await api.call('GET', '/apis/apps/v1/namespaces/' + {{ .Release.Namespace | toJson }} + '/deployments/' + {{ $readerName | toJson }});
               if (reader && (reader.spec.replicas !== 0 || (reader.status.replicas ?? 0) !== 0)) throw new Error('Drain and scale the source reader to zero before uninstall');
               for (const selector of ['app=' + {{ $readerName | toJson }}, 'deephive/role=source-reader,app.kubernetes.io/instance=' + {{ .Release.Name | toJson }}]) {

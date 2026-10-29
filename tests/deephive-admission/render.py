@@ -106,7 +106,9 @@ network_config['fullWorker']['publicOrigin'] = 'https://deephive.example'
 network_config['fullWorker']['runnerSecretRevision'] = '1'
 network_docs = render(config=network_config)
 sessions = next(p for p in network_docs if p['kind'] == 'NetworkPolicy' and p['metadata']['name'] == 'review-sessions')
-for selector in [sessions['spec']['ingress'][0]['from'][0]['podSelector'], sessions['spec']['egress'][1]['to'][0]['podSelector']]:
+assert sessions['spec']['policyTypes'] == ['Ingress']
+assert 'egress' not in sessions['spec']
+for selector in [sessions['spec']['ingress'][0]['from'][0]['podSelector']]:
     assert selector['matchExpressions'] == [{'key': 'app', 'operator': 'In', 'values': ['review-full-worker', 'review-runner']}]
 print('PASS legacy/current worker selectors retain callback and observation access')
 
@@ -137,17 +139,14 @@ after = item(after_docs, 'Deployment', '-full-worker')['spec']['template']
 assert before['metadata']['annotations'] != after['metadata']['annotations']
 assert after['spec']['containers'][0]['readinessProbe']['tcpSocket']['port'] == 'control'
 assert all(t in item(after_docs, 'DaemonSet', '-full-session-prepull')['spec']['template']['spec']['tolerations'] for t in changed['fullWorker']['prepullTolerations'])
-proxy = item(after_docs, 'ConfigMap', '-session-egress')['data']['squid.conf']
-assert 'acl approved dstdomain -n ' in proxy
-print('PASS secret rotation, readiness, taints and proxy lookup configuration')
+assert not any(p['metadata']['name'].endswith('-session-egress') for p in after_docs)
+assert 'proxyUrl' not in json.loads(item(after_docs, 'ConfigMap', '-full-worker')['data']['runner.json'])
+print('PASS secret rotation, readiness, taints and direct session egress')
 
 for name in ['true', 'null', '123']:
     changed['fullWorker'].update(pullSecret=name, runnerSecret=name, workspaceClaim=name)
     runner = item(render(config=changed), 'Deployment', '-full-worker')['spec']['template']['spec']
     assert runner['imagePullSecrets'][0]['name'] == name
-    proxy = item(render(config=changed), 'Deployment', '-session-egress')['spec']['template']['spec']
-    assert proxy['imagePullSecrets'][0]['name'] == name
-    assert proxy['containers'][0]['readinessProbe']['tcpSocket']['port'] == 'proxy'
     assert runner['containers'][0]['envFrom'][0]['secretRef']['name'] == name
     assert next(v for v in runner['volumes'] if 'persistentVolumeClaim' in v)['persistentVolumeClaim']['claimName'] == name
 print('PASS configured object names remain strings')
@@ -159,10 +158,10 @@ for release in ['first', 'second']:
     policies = [p for p in docs if p['kind'] == 'NetworkPolicy']
     sessions = next(p for p in policies if p['metadata']['name'] == release + '-sessions')
     assert sessions['spec']['podSelector']['matchLabels']['app.kubernetes.io/instance'] == release
-    for suffix in ['-full-worker-control', '-session-egress']:
+    for suffix in ['-full-worker-control']:
         ingress = next(p for p in policies if p['metadata']['name'] == release + suffix)
         assert ingress['spec']['ingress'][0]['from'][0]['podSelector']['matchLabels']['app.kubernetes.io/instance'] == release
-print('PASS release-specific session, runner and proxy selectors')
+print('PASS release-specific session and runner selectors')
 
 mysql = copy.deepcopy(values)
 mysql.update(MYSQL_ENABLED=True, MYSQL_PASSWORD='fixture-user-password', MYSQL_ROOT_PASSWORD='fixture-root-password')

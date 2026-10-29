@@ -18,7 +18,7 @@ labels. Required release/session identity remains exact; worker/reader/Redis/DNS
 selector labels are forbidden, and an optional worker-mode label must be `full`.
 
 Run `python3 tests/deephive-admission/render.py` for release-name collisions,
-quoted identifiers, Secret-revision rollouts, readiness, pre-pull taints and proxy
+quoted identifiers, Secret-revision rollouts, readiness, pre-pull taints and direct egress
 lookup configuration. This is rendering validation, not deployed acceptance.
 
 Increment `fullWorker.runnerSecretRevision` and upgrade Helm after rotating
