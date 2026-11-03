@@ -1,0 +1,19 @@
+{{- include "deephive.normalizeWorkerValues" . -}}
+{{- $f := .Values.fullWorker }}
+{{- $c := $f.liteCapacity }}
+{{- if $c.enabled }}
+{{- if not $f.enabled }}{{ fail "Lite capacity requires fullWorker.enabled" }}{{ end }}
+{{- if or (not ($c.pool | trim)) (not (hasPrefix "/" $f.liteScratchRoot)) (eq $f.liteScratchRoot "/") }}{{ fail "Lite capacity requires a stable pool and absolute scratch root" }}{{ end }}
+{{- if or (le (int $c.slots) 0) (le (int $c.memoryMiB) 0) (le (int $c.taskMiB) 0) (gt (int $c.taskMiB) (int $c.memoryMiB)) }}{{ fail "Lite capacity requires positive slot and memory budgets" }}{{ end }}
+{{- if or $f.liteAdmissionCommand $f.liteHandoffCommand }}{{ fail "Choose built-in lite capacity or external hooks, not both" }}{{ end }}
+{{- $scratch := $f.liteScratchRoot }}
+{{- $source := .Values.WORKSPACE_ROOT }}
+{{- if or (not $source) (eq $scratch $source) (ne (clean $scratch) $scratch) (hasPrefix (printf "%s/" $source) $scratch) (hasPrefix (printf "%s/" $scratch) $source) }}{{ fail "Lite scratch must be canonical and outside source" }}{{ end }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-lite-capacity
+data:
+  capacity.json: |
+    {{ dict "pool" $c.pool "workspaceRoot" .Values.WORKSPACE_ROOT "slots" $c.slots "memoryMiB" $c.memoryMiB "taskMiB" $c.taskMiB | toJson }}
+{{- end }}

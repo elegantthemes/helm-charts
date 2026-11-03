@@ -24,14 +24,14 @@ spec:
   tls:
     enabled: true
   allowUnsafeConfigurations: false
-  updateStrategy: RollingUpdate
+  updateStrategy: {{ .Values.update_strategy | quote }}
   upgradeOptions:
   # versionServiceEndpoint: https://check.percona.com
     apply: disabled
   # schedule: "0 4 * * *"
   pxc:
     size: 3
-    image: percona/percona-xtradb-cluster:8.0.45-36.1
+    image: {{ .Values.pxc.image | quote }}
     autoRecovery: true
 {{- with .Values.pxc_expose }}
     expose:
@@ -256,10 +256,10 @@ spec:
         memory: 750M
         cpu: 500m
   backup:
-    image: percona/percona-xtrabackup:8.0.35-35.1
+    image: {{ .Values.backup.image | quote }}
     ttlSecondsAfterFinished: {{ .Values.backup.ttlSecondsAfterFinished }}
     pitr:
-      enabled: true
+      enabled: {{ .Values.pitr.enabled }}
       storageName: backup-pitr-1 
       timeBetweenUploads: 120
       resources:
@@ -328,9 +328,9 @@ spec:
           credentialsSecret: {{ .Values.s3_secret_name_backup_pitr_1 }}
           region: {{ .Values.s3_region_backup_pitr_1 }}
 
+{{- if .Values.backup.schedule }}
     schedule:
-      # At minute 1 past every 12th hour from 6 through 23.
-      - name: aws
-        schedule: "1 6/12 * * *"
-        keep: 60
-        storageName: backup-aws-1
+{{ toYaml .Values.backup.schedule | indent 6 }}
+{{- else }}
+    schedule: []
+{{- end }}

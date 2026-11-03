@@ -7,6 +7,7 @@ label_name:
 label_value:
 pxc_expose:
 replication_channels: []
+update_strategy: RollingUpdate
 s3_bucket_name_backup_aws_1:
 s3_bucket_name_backup_2:
 s3_bucket_name_backup_3:
@@ -33,6 +34,7 @@ ssl_secrets_name:
 storage_class_name:
 vault_secrets_name:
 pxc:
+  image: percona/percona-xtradb-cluster:8.0.45-36.1
   resources:
     requests:
       memory: 1G
@@ -43,8 +45,16 @@ pxc:
   innodb_redo_log_capacity: "104857600"
   mysql_configuration: []
 pitr:
+  enabled: true
   resources: {}
 backup:
+  image: percona/percona-xtrabackup:8.0.35-35.1
+  schedule:
+    # At minute 1 past every 12th hour from 6 through 23.
+    - name: aws
+      schedule: "1 6/12 * * *"
+      keep: 60
+      storageName: backup-aws-1
   ttlSecondsAfterFinished: 3600
 pmm:
   enabled: false

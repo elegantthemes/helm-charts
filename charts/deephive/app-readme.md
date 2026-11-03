@@ -40,8 +40,8 @@ Use the canonical Terraform app workspace (`apps/deephive/stage`, workspace
 shared module generates `ENV_FILE`; this chart already stores it in Secret
 `secrets`, key `.env`, and mounts `/config` read-only into intake and consumer.
 Both deployment checksums roll on changes. Do not add separate Helm values or
-plaintext container environment entries for the same credentials. No chart
-version bump is needed for these existing capabilities.
+plaintext container environment entries for the same credentials. Chart 1.3.25
+packages this guidance; the existing ENV_FILE transport needs no template changes.
 
 Runtime names carried in that file:
 
@@ -62,8 +62,8 @@ Linode `read_write` bucket-scoped identity. That permission is broader than a
 prefix-scoped AWS IAM policy; do not describe it as PutObject/GetObject-only or
 reuse execution-evidence credentials. Terraform manages exact admin-origin POST
 CORS through the Linode S3 endpoint, because the Linode provider's simple CORS
-switch allows all origins. The chart transports configuration only. No new values,
-provider logic, or chart version bump is needed here.
+switch allows all origins. The chart transports configuration only. No new values or provider logic are
+needed here; the chart version is bumped to publish the packaged documentation.
 
 Deploy the endpoint-capable app from #339 before applying Terraform #39; older
 app code ignores the custom endpoint. Then verify both deployments roll and test
@@ -81,3 +81,16 @@ chart companion.
 
 Offline contract check (requires Helm and PyYAML):
 `python3 tests/deepvibe-env/check.py`.
+
+
+### App-only releases with existing runtime images
+
+Chart 1.3.22 passes the selected `DEEPHIVE_VERSION` to the existing Full runner
+and includes it in the rollout checksum. Updater-capable recipes fetch the
+compiled release bundle during init only when the baked app version differs.
+The runner selects the same version for its sessions using their existing control
+connection. Image package names/digests and runtime role names are unchanged.
+Older images retain their existing startup command; update to the new recipe once
+before relying on app-only updates. Publish the corresponding DeepHive runtime
+bundle/API and image recipe first. Toolchain, seed, OS and protocol changes still
+need an image build. No new environment setting or secret is introduced.

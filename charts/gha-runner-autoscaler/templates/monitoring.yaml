@@ -65,4 +65,60 @@ spec:
             oldest_age_metric: gha_node_autoscaler_manual_review_oldest_age_seconds
             procedure: Verify the autoscaler label, Kubernetes node name, and Linode ID correlation before deleting any resource.
             runbook_url: {{ .Values.monitoring.runbookUrl | quote }}
+        - alert: GhaRunnerAutoscalerCapacityDeficit
+          expr: gha_node_autoscaler_capacity_deficit{namespace="{{ .Release.Namespace }}"} > 0
+          for: {{ .Values.monitoring.capacityDeficitAlertFor | quote }}
+          labels:
+            severity: critical
+            source: et
+            cluster: {{ .Values.monitoring.clusterName | quote }}
+          annotations:
+            summary: GitHub Actions runner capacity is not scaling up
+            description: >-
+              Desired runner capacity exceeds healthy, provisioning, and reactivatable capacity. Inspect creation retries and inventory trust before restarting the autoscaler.
+            namespace: {{ .Release.Namespace | quote }}
+            logs: {{ printf "kubectl -n %s logs deployment/%s" .Release.Namespace .Release.Name | quote }}
+            runbook_url: {{ .Values.monitoring.recoveryRunbookUrl | quote }}
+        - alert: GhaRunnerAutoscalerCreationRetries
+          expr: (gha_node_autoscaler_creation_retry_attempts{namespace="{{ .Release.Namespace }}"} >= 5) and (gha_node_autoscaler_capacity_deficit{namespace="{{ .Release.Namespace }}"} > 0)
+          for: {{ .Values.monitoring.creationRetriesAlertFor | quote }}
+          labels:
+            severity: critical
+            source: et
+            cluster: {{ .Values.monitoring.clusterName | quote }}
+          annotations:
+            summary: GitHub Actions runner creation is repeatedly failing
+            description: >-
+              At least five creation attempts have failed and runner capacity is still missing. Automatic retries continue with capped backoff; inspect the provider errors and inventory audits.
+            namespace: {{ .Release.Namespace | quote }}
+            logs: {{ printf "kubectl -n %s logs deployment/%s" .Release.Namespace .Release.Name | quote }}
+            runbook_url: {{ .Values.monitoring.recoveryRunbookUrl | quote }}
+        - alert: GhaRunnerAutoscalerInventoryUntrusted
+          expr: gha_node_autoscaler_inventory_trusted{namespace="{{ .Release.Namespace }}"} == 0
+          for: {{ .Values.monitoring.inventoryUntrustedAlertFor | quote }}
+          labels:
+            severity: critical
+            source: et
+            cluster: {{ .Values.monitoring.clusterName | quote }}
+          annotations:
+            summary: GitHub Actions runner cloud inventory is untrusted
+            description: >-
+              Cloud inventory audits are failing and creation is paused for safety. Inspect provider availability and credentials; do not bypass the inventory gate.
+            namespace: {{ .Release.Namespace | quote }}
+            logs: {{ printf "kubectl -n %s logs deployment/%s" .Release.Namespace .Release.Name | quote }}
+            runbook_url: {{ .Values.monitoring.recoveryRunbookUrl | quote }}
+        - alert: GhaRunnerAutoscalerJobsUnscheduled
+          expr: gha_node_autoscaler_unscheduled_jobs{namespace="{{ .Release.Namespace }}"} > 0
+          for: {{ .Values.monitoring.unscheduledJobsAlertFor | quote }}
+          labels:
+            severity: critical
+            source: et
+            cluster: {{ .Values.monitoring.clusterName | quote }}
+          annotations:
+            summary: GitHub Actions workflow jobs are waiting for a node
+            description: >-
+              Workflow pods remain unscheduled and may hit the ten-minute startup timeout. Inspect scheduling events and runner provisioning progress.
+            namespace: {{ .Release.Namespace | quote }}
+            logs: {{ printf "kubectl -n %s logs deployment/%s" .Release.Namespace .Release.Name | quote }}
+            runbook_url: {{ .Values.monitoring.recoveryRunbookUrl | quote }}
 {{- end }}

@@ -1,0 +1,27 @@
+name: GHA runner autoscaler chart tests
+
+on:
+  pull_request:
+    paths:
+      - 'charts/gha-runner-autoscaler/**'
+      - '.github/workflows/gha-runner-autoscaler.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  monitoring:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: azure/setup-helm@v4.3.0
+        with:
+          version: v3.17.3
+      - run: python3 -m pip install PyYAML==6.0.2
+      - run: helm lint charts/gha-runner-autoscaler
+      - run: bash charts/gha-runner-autoscaler/tests/render-monitoring.sh
+      - run: python3 charts/gha-runner-autoscaler/tests/test-alerts.py

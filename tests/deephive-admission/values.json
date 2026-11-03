@@ -1,12 +1,11 @@
 {
   "ENV_FILE": "VALIDATION_ONLY=true",
-  "fullEnvironment": {
+  "fullWorker": {
     "enabled": true,
     "nodeName": "test-execution",
     "runnerImage": "ghcr.io/elegantthemes/runner@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
     "sessionImage": "ghcr.io/elegantthemes/session@sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
     "databaseImage": "mariadb@sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
-    "proxyImage": "squid@sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
     "pullSecret": "pull",
     "agentSecret": "agent",
     "integrationSecret": "integration",
@@ -14,9 +13,6 @@
     "workspaceClaim": "workspace",
     "cacheProbePath": "/var/lib/deephive/cache",
     "scratchProbePath": "/var/lib/deephive/scratch",
-    "approvedEgressDomains": [
-      "github.com"
-    ],
     "pressureCommand": [
       "/opt/bin/fence"
     ],
@@ -27,9 +23,9 @@
       "ghcr.io/elegantthemes/session@sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
       "ghcr.io/elegantthemes/session@sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
     },
-    "ordinaryInstallCommand": [
-      "/infra/ordinary-install"
+    "liteInstallCommand": [
+      "/infra/lite-install"
     ],
-    "ordinaryCacheProbePath": "/var/lib/deephive/cache"
+    "liteCacheProbePath": "/var/lib/deephive/cache"
   }
 }

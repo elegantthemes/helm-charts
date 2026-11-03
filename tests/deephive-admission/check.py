@@ -31,6 +31,11 @@ def case(name, expected, change=None, operation='CREATE', old=None):
 
 
 case('real session manifest', True)
+case('harmless extra metadata', True, lambda p: p['metadata']['labels'].update({'example.internal/notes': 'demo', 'app.kubernetes.io/version': '1.4.80'}))
+case('legacy session without mode metadata', True, lambda p: p['metadata']['labels'].pop('deephive/worker-mode'))
+case('spoofed Lite mode', False, lambda p: p['metadata']['labels'].update({'deephive/worker-mode': 'lite'}))
+for key in ['app', 'release', 'redis-client', 'k8s-app', 'deephive/role', 'deephive/source-reader']:
+    case('forbidden isolation label ' + key, False, lambda p, key=key: p['metadata']['labels'].update({key: 'true'}))
 case('foreign release', False, lambda p: p['metadata']['labels'].update({'app.kubernetes.io/instance': 'other'}))
 case('missing release', False, lambda p: p['metadata']['labels'].pop('app.kubernetes.io/instance'))
 foreign = copy.deepcopy(original)
@@ -41,8 +46,8 @@ case('hostPath', False, lambda p: p['spec']['volumes'].append({'name': 'host', '
 case('consumer credential env', False, lambda p: p['spec']['containers'][0]['env'].append({'name': 'BAD', 'valueFrom': {'secretKeyRef': {'name': 'secrets', 'key': 'GITHUB_TOKEN'}}}))
 case('consumer envFrom', False, lambda p: p['spec']['containers'][0].update(envFrom=[{'secretRef': {'name': 'secrets'}}]))
 case('missing policy label', False, lambda p: p['metadata']['labels'].clear())
-case('spoofed privileged workload label', False, lambda p: p['metadata']['labels'].update(app='review-runner'))
-case('runner service account', False, lambda p: p['spec'].update(serviceAccountName='review-runner'))
+case('spoofed privileged workload label', False, lambda p: p['metadata']['labels'].update(app='review-full-worker'))
+case('runner service account', False, lambda p: p['spec'].update(serviceAccountName='review-full-worker'))
 case('projected API token', False, lambda p: p['spec']['volumes'].append({'name': 'token', 'projected': {'sources': [{'serviceAccountToken': {'path': 'token'}}]}}))
 case('host network', False, lambda p: p['spec'].update(hostNetwork=True))
 case('host PID', False, lambda p: p['spec'].update(hostPID=True))
@@ -70,3 +75,32 @@ with tempfile.TemporaryDirectory(prefix='deephive-admission-') as temp:
     fixture = Path(temp) / 'fixtures.json'
     fixture.write_text(json.dumps({'Expressions': [v['expression'] for v in policy['spec']['validations']], 'Cases': cases}))
     subprocess.run(['go', '-C', str(root), 'run', '.', str(fixture)], check=True)
+
+
+# Explicitly reuse only the deployed Lite GitHub key, not the consumer Secret.
+shared_render = subprocess.check_output([
+    'helm', 'template', 'review', str(root.parent.parent / 'charts/deephive'),
+    '-n', 'dph-app', '-f', str(root / 'values.json'),
+    '--set', 'fullWorker.githubSecretRef.name=review-full-runner',
+    '--set', 'fullWorker.githubSecretRef.key=GH_TOKEN',
+], text=True)
+shared_policy = next(p for p in yaml.safe_load_all(shared_render)
+                     if p and p['kind'] == 'ValidatingAdmissionPolicy')
+cases = []
+case('exact Lite GitHub key', True, lambda p: p['spec']['containers'][0]['env'].append({'name': 'GITHUB_TOKEN', 'valueFrom': {'secretKeyRef': {'name': 'review-full-runner', 'key': 'GH_TOKEN'}}}))
+case('unrelated runner database key', False, lambda p: p['spec']['containers'][0]['env'].append({'name': 'BAD', 'valueFrom': {'secretKeyRef': {'name': 'review-full-runner', 'key': 'REDIS_URL'}}}))
+case('unrelated runner model key', False, lambda p: p['spec']['containers'][0]['env'].append({'name': 'BAD', 'valueFrom': {'secretKeyRef': {'name': 'review-full-runner', 'key': 'OPENAI_API_KEY'}}}))
+case('whole consumer Secret still forbidden', False, lambda p: p['spec']['containers'][0].update(envFrom=[{'secretRef': {'name': 'secrets'}}]))
+with tempfile.TemporaryDirectory(prefix='deephive-shared-github-') as temp:
+    fixture = Path(temp) / 'fixtures.json'
+    fixture.write_text(json.dumps({'Expressions': [v['expression'] for v in shared_policy['spec']['validations']], 'Cases': cases}))
+    subprocess.run(['go', '-C', str(root), 'run', '.', str(fixture)], check=True)
+
+consumer_ref = subprocess.run([
+    "helm", "template", "review", str(root.parent.parent / "charts/deephive"),
+    "-n", "dph-app", "-f", str(root / "values.json"),
+    "--set", "fullWorker.githubSecretRef.name=secrets",
+    "--set", "fullWorker.githubSecretRef.key=GITHUB_TOKEN",
+], capture_output=True, text=True)
+assert consumer_ref.returncode != 0
+assert "must not select the consumer Secret" in consumer_ref.stderr

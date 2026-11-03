@@ -2,7 +2,7 @@
 {{- if .context.Values.sourceReaderService.enabled -}}
 {{- dict "readerId" (printf "%s-v1" (include "deephive.readerServiceName" .context)) "command" (list "/usr/bin/env" "node" (printf "%s/dist/scripts/environment/remote-source-reader.js" .codeRoot) (printf "http://%s:3003" (include "deephive.readerServiceName" .context)) "/source-reader-token/token") | toJson -}}
 {{- else -}}
-{{- .context.Values.fullEnvironment.sourceReader | toJson -}}
+{{- .context.Values.fullWorker.sourceReader | toJson -}}
 {{- end -}}
 {{- end -}}
 
