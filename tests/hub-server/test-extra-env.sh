@@ -2,7 +2,8 @@
 set -euo pipefail
 chart="$(cd "$(dirname "$0")/../../charts/hub-server" && pwd)"
 helm_bin="${HELM_BIN:-helm}"
-base=(template test "$chart" --show-only templates/secrets.yml --set-string APP_KEY=test-key --set-string DIVI_HUB_PRIVATE_KEY_64=test-key)
+# Synthetic canonical 32-byte key; never use a real application key in tests.
+base=(template test "$chart" --show-only templates/secrets.yml --set-string APP_KEY=base64:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA= --set-string DIVI_HUB_PRIVATE_KEY_64=test-key)
 output="$($helm_bin "${base[@]}" --set-string HUB_SERVER_EXTRA_ENV.APP_DEBUG=false --set-string HUB_SERVER_EXTRA_ENV.APP_PREVIOUS_KEYS=)"
 [[ "$output" == *"    APP_DEBUG='false'"* ]]
 [[ "$output" == *"    APP_PREVIOUS_KEYS=''"* ]]
