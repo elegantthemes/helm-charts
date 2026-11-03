@@ -1,5 +1,7 @@
 API_EXPECTED_REQUEST_SECRET:
 APP_KEY:
+# Optional additional runtime settings; APP_KEY and chart-managed variables cannot be overridden here.
+HUB_SERVER_EXTRA_ENV: {}
 CLOUDFLARE_BYPASS_KEY:
 DASH_EXPECTED_REQUEST_SECRET:
 DIVI_HUB_IP_ADDRESS:
