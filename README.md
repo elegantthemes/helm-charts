@@ -5,3 +5,7 @@
 ## Chart Versioning
 
 When you modify any chart content under `charts/` such as templates, values, helpers, or chart metadata, bump that chart's `version` in its `Chart.yaml` in the same change so the updated chart is packaged and published.
+
+## Deployment guides
+
+- [DeepVibe media and WordPress connections](docs/deepvibe-connections.md)
