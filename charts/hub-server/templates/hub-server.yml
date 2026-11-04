@@ -1,3 +1,6 @@
+{{- if and .Values.ADOPT_STAGING_RUNTIME_INIT (not .Values.RECONCILE_RUNTIME_CONFIG) }}
+{{- fail "ADOPT_STAGING_RUNTIME_INIT requires RECONCILE_RUNTIME_CONFIG" }}
+{{- end }}
 # Divi Hub Service
 apiVersion: v1
 kind: Service
@@ -56,6 +59,10 @@ spec:
       app: {{ .Release.Name }}
   template:
     metadata:
+{{- if .Values.RECONCILE_RUNTIME_CONFIG }}
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/secrets.yml") . | sha256sum }}
+{{- end }}
       labels:
         app: {{ .Release.Name }}
         redis-client: 'true'
@@ -103,7 +110,13 @@ spec:
             - name: PHP_OPCACHE_VALIDATE_TIMESTAMPS
               value: {{ ternary "false" "true" (eq "production" .Values.HUB_SERVER_ENV) | squote }}
           image: {{ .Values.HUB_SERVER_IMAGE | squote }}
+{{- if .Values.RECONCILE_RUNTIME_CONFIG }}
+          command: [ '/bin/bash', '-ec' ]
+          args:
+            - /etc/cont-init.d/init; cd "$HUB_SERVER_PATH"; gosu etdev php artisan config:clear; gosu etdev php artisan config:cache
+{{- else }}
           command: [ '/etc/cont-init.d/init' ]
+{{- end }}
           resources:
             requests:
               cpu: 100m
@@ -118,6 +131,14 @@ spec:
               mountPath: /config
               readOnly: true
 
+{{- if .Values.ADOPT_STAGING_RUNTIME_INIT }}
+        # First adopt the injected init name without reading or merging its overlay.
+        # A subsequent upgrade removes the now-owned no-op init.
+        - name: staging-runtime-config
+          image: {{ .Values.HUB_SERVER_IMAGE | squote }}
+          command: [ '/bin/sh', '-ec' ]
+          args: [ 'true' ]
+{{- end }}
       containers:
         - name: app
           image: {{ .Values.HUB_SERVER_IMAGE | squote }}

@@ -29,3 +29,8 @@ SERVICE_MONITOR_ENABLED: false
 TRUSTED_PROXY_CIDRS:
   - 10.42.0.0/16
 VIRTUAL_HOST:
+
+# Optional, Terraform-owned staging reconciliation. APP_KEY remains a dedicated input.
+HUB_SERVER_EXTRA_ENV: {}
+RECONCILE_RUNTIME_CONFIG: false
+ADOPT_STAGING_RUNTIME_INIT: false
