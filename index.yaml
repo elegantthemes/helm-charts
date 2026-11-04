@@ -556,6 +556,17 @@ entries:
     version: 1.0.0
   bots-server:
   - apiVersion: v1
+    created: "2026-11-04T00:31:07.594254783Z"
+    description: Elegant Themes legacy bots-server
+    digest: dc215b11b783a7381639ad631348ca59acb6eca6bef8598aa608bb95c9038841
+    maintainers:
+    - email: dustin@elegantthemes.com
+      name: Elegant Themes
+    name: bots-server
+    urls:
+    - https://github.com/elegantthemes/helm-charts/releases/download/bots-server-0.1.1/bots-server-0.1.1.tgz
+    version: 0.1.1
+  - apiVersion: v1
     created: "2026-06-12T17:08:38.013273812Z"
     description: Elegant Themes legacy bots-server
     digest: 723e1603eda1044d3b72391d8f7f284ca447b99f2baac9fd9f313000a709a6fa
@@ -4773,4 +4784,4 @@ entries:
     urls:
     - https://github.com/elegantthemes/helm-charts/releases/download/percona-xtradb-cluster-operator-1.0.2/percona-xtradb-cluster-operator-1.0.2.tgz
     version: 1.0.2
-generated: "2026-11-04T00:16:05.50739408Z"
+generated: "2026-11-04T00:31:07.595231887Z"
