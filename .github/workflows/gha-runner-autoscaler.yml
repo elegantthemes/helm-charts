@@ -25,3 +25,4 @@ jobs:
       - run: helm lint charts/gha-runner-autoscaler
       - run: bash charts/gha-runner-autoscaler/tests/render-monitoring.sh
       - run: python3 charts/gha-runner-autoscaler/tests/test-alerts.py
+      - run: python3 charts/gha-runner-autoscaler/tests/test-provisioning-state.py
