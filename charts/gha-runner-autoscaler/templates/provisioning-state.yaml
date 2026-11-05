@@ -1,0 +1,9 @@
+# Helm owns the resource, but never the controller's state.json data key.
+# Keep durable budgets across chart uninstall/reinstall as well as upgrades.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ printf "%s-provisioning-state" .Release.Name }}
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    helm.sh/resource-policy: keep

@@ -28,6 +28,8 @@ spec:
             - configMapRef:
                 name: {{ .Values.configMapName }}
           env:
+            - name: PROVISIONING_STATE_CONFIG_MAP
+              value: {{ printf "%s-provisioning-state" .Release.Name | quote }}
             - name: DRY_RUN
               value: {{ .Values.dryRun | quote }}
             - name: IMAGE_VERSION
