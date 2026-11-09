@@ -27,6 +27,10 @@ monitoring:
   inventoryUntrustedAlertFor: 2m
   unscheduledJobsAlertFor: 5m
   recoveryRunbookUrl: https://github.com/elegantthemes/gha-runner-autoscaler#recovery-alerts
+  # Shared-controller pools reuse the controller namespace and scrape target.
+  arcControllerMonitoringEnabled: true
+  arcControllerNamespace: ""
+  arcRunnerScaleSetName: et-runners
   arcControllerReleaseName: et-runners
   arcRunbookUrl: https://github.com/elegantthemes/terraform/blob/master/apps/gha-runners/README.md#arc-listener-alert
   runbookUrl: https://github.com/elegantthemes/gha-runner-autoscaler#manual-review-alert

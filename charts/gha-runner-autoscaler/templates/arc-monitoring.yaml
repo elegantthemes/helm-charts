@@ -1,4 +1,7 @@
 {{- if .Values.monitoring.enabled }}
+{{- $listenerNamespace := default .Release.Namespace .Values.monitoring.arcControllerNamespace }}
+{{- $scaleSetName := .Values.monitoring.arcRunnerScaleSetName }}
+{{- if .Values.monitoring.arcControllerMonitoringEnabled }}
 apiVersion: v1
 kind: Service
 metadata:
@@ -38,6 +41,7 @@ spec:
     - path: /metrics
       port: metrics
       interval: {{ .Values.monitoring.scrapeInterval | quote }}
+{{- end }}
 ---
 apiVersion: monitoring.coreos.com/v1
 kind: PrometheusRule
@@ -57,7 +61,7 @@ spec:
     - name: {{ .Release.Name }}.arc.rules
       rules:
         - alert: GhaRunnerListenerMissing
-          expr: absent(gha_controller_running_listeners{namespace={{ .Release.Namespace | quote }},name=~{{ printf "%s-.*" .Values.monitoring.arcControllerReleaseName | quote }}})
+          expr: absent(gha_controller_running_listeners{namespace={{ $listenerNamespace | quote }},name=~{{ printf "%s-[^-]+-listener" $scaleSetName | quote }}})
           for: {{ .Values.monitoring.arcListenerAlertFor | quote }}
           labels:
             severity: critical
@@ -66,9 +70,9 @@ spec:
           annotations:
             summary: GitHub Actions runner listener is missing
             description: >-
-              The ARC runner listener in {{ .Release.Namespace }} has not reported a running instance.
+              The ARC runner listener for {{ $scaleSetName }} in {{ $listenerNamespace }} has not reported a running instance.
               Check the AutoscalingRunnerSet status and controller logs; an Outdated scale set can remain stuck without runners.
             namespace: {{ .Release.Namespace | quote }}
-            procedure: Check kubectl -n {{ .Release.Namespace }} get autoscalingrunnerset et-runners and inspect ARC controller logs.
+            procedure: Check kubectl -n {{ .Release.Namespace }} get autoscalingrunnerset {{ $scaleSetName }} and inspect ARC controller logs.
             runbook_url: {{ .Values.monitoring.arcRunbookUrl | quote }}
 {{- end }}
