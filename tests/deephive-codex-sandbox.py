@@ -4,16 +4,22 @@ import json
 import subprocess
 import yaml
 chart = Path(__file__).resolve().parents[1] / 'charts/deephive'
-for profile in ['', 'deephive-codex-sandbox']:
+fixture = json.loads((chart.parents[1] / 'tests/deephive-admission/values.json').read_text())
+for full_enabled, profile in [(False, ''), (False, 'deephive-codex-sandbox'), (True, ''), (True, 'deephive-codex-sandbox')]:
     values = {'ENV_FILE': 'SYNTHETIC=true', 'MYSQL_ENABLED': True,
               'CODEX_SANDBOX_APPARMOR_PROFILE': profile}
+    if full_enabled:
+        values['fullWorker'] = fixture['fullWorker']
     raw = subprocess.check_output(['helm', 'template', 'canary', str(chart), '-n', 'dph-app', '-f', '-'], input=json.dumps(values).encode())
     docs = [d for d in yaml.safe_load_all(raw) if d]
     found = 0
+    deployments = set()
     for doc in docs:
         if doc['kind'] != 'Deployment':
             continue
+        deployments.add(doc['metadata']['name'])
         spec = doc['spec']['template']['spec']
+        assert spec.get('securityContext', {}).get('appArmorProfile') is None
         for container in spec['containers']:
             actual = container.get('securityContext', {}).get('appArmorProfile')
             if doc['metadata']['name'] == 'canary' and container['name'] == 'canary':
@@ -26,4 +32,5 @@ for profile in ['', 'deephive-codex-sandbox']:
             else:
                 assert actual is None, (doc['metadata']['name'], container['name'])
     assert found == 1
-print('PASS configured profile applies only to worker; default, intake and MySQL unchanged; no added capabilities')
+    assert ('canary-full-worker' in deployments) == full_enabled, deployments
+print('PASS configured profile applies only to worker; default, intake, MySQL and enabled Full controller unchanged; no added capabilities')
