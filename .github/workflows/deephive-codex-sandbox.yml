@@ -4,6 +4,7 @@ on:
     paths:
       - charts/deephive/**
       - tests/deephive-codex-sandbox.py
+      - tests/deephive-admission/values.json
       - .github/workflows/deephive-codex-sandbox.yml
 permissions:
   contents: read
