@@ -8,6 +8,9 @@ INGRESS_CLASS_NAME: traefik
 INSTALL_PATH:
 MEMORY_LIMIT:
 NODE_SELECTOR_HOSTNAME:
+# Host-installed profile name. Set only after node sandbox preparation; kubelet
+# refuses to start the worker when this Localhost profile is unavailable.
+CODEX_SANDBOX_APPARMOR_PROFILE: ""
 PORT: 3000
 REPLICAS:
 VIRTUAL_HOST:

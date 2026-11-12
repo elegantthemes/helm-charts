@@ -171,6 +171,14 @@ spec:
 {{- end }}
       containers:
         - name: {{ .Release.Name }}
+{{- if .Values.CODEX_SANDBOX_APPARMOR_PROFILE }}
+          securityContext:
+            capabilities:
+              drop: [SYS_ADMIN]
+            appArmorProfile:
+              type: Localhost
+              localhostProfile: {{ .Values.CODEX_SANDBOX_APPARMOR_PROFILE | quote }}
+{{- end }}
           env:
             - name: WORKSPACE_COPY_METHOD
               value: {{ .Values.WORKSPACE_COPY_METHOD | default "fs.cp" | quote }}
