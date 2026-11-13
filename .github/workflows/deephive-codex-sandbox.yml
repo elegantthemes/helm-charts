@@ -4,6 +4,7 @@ on:
     paths:
       - charts/deephive/**
       - tests/deephive-codex-sandbox.py
+      - tests/deephive-rollout-pod-proof.py
       - tests/deephive-admission/values.json
       - .github/workflows/deephive-codex-sandbox.yml
 permissions:
@@ -18,3 +19,4 @@ jobs:
           version: v3.17.3
       - run: python3 -m pip install PyYAML==6.0.2
       - run: python3 tests/deephive-codex-sandbox.py
+      - run: python3 tests/deephive-rollout-pod-proof.py

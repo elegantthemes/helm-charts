@@ -1,5 +1,6 @@
 {{- include "deephive.normalizeWorkerValues" . -}}
-{{- if .Values.CODEX_AUTH_SECRET_NAME }}
+{{- $liteRecovery := and .Values.fullWorker.enabled .Values.fullWorker.liteCapacity.enabled }}
+{{- if or .Values.CODEX_AUTH_SECRET_NAME $liteRecovery }}
 {{- $secretName := .Values.CODEX_AUTH_SECRET_NAME | toString }}
 # The Secret itself is created by Terraform (empty, with ignore_changes on its data) and
 # DeepHive updates it as Codex refreshes tokens. It is deliberately NOT part of this chart:
@@ -23,10 +24,19 @@ metadata:
   name: {{ .Release.Name }}-codex-auth
   namespace: {{ .Release.Namespace }}
 rules:
+{{- if .Values.CODEX_AUTH_SECRET_NAME }}
   - apiGroups: [""]
     resources: ["secrets"]
     resourceNames: [{{ $secretName | quote }}]
     verbs: ["get", "patch"]
+{{- end }}
+{{- if $liteRecovery }}
+  # Exact predecessor Pod GET proves a rollout's writer is gone. No pod list,
+  # watch, log, exec or mutation permission is required by the consumer.
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get"]
+{{- end }}
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding

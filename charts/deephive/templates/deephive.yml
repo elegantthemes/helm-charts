@@ -139,8 +139,8 @@ spec:
         deephive/worker-mode: lite
         redis-client: 'true'
     spec:
-{{- if .Values.CODEX_AUTH_SECRET_NAME }}
-      # Lets DeepHive read/update the Codex login Secret (see codex-auth.yml).
+{{- if or .Values.CODEX_AUTH_SECRET_NAME (and .Values.fullWorker.enabled .Values.fullWorker.liteCapacity.enabled) }}
+      # Dedicated Secret access and/or read-only rollout Pod proof (codex-auth.yml).
       serviceAccountName: {{ .Release.Name }}-consumer-sa
 {{- end }}
       terminationGracePeriodSeconds: {{ .Values.CONSUMER_TERMINATION_GRACE_SECONDS | default 120 }}
