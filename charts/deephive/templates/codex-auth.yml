@@ -27,6 +27,13 @@ rules:
     resources: ["secrets"]
     resourceNames: [{{ $secretName | quote }}]
     verbs: ["get", "patch"]
+{{- if and .Values.fullWorker.enabled .Values.fullWorker.liteCapacity.enabled }}
+  # Exact predecessor Pod GET proves a rollout's writer is gone. No pod list,
+  # watch, log, exec or mutation permission is required by the consumer.
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get"]
+{{- end }}
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
