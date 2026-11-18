@@ -2,6 +2,8 @@
 {{- $reader := include "deephive.sourceReader" (dict "context" . "codeRoot" "/opt/deephive" "storage" "full") | fromJson }}
 {{- if .Values.fullWorker.enabled }}
 {{- $f := .Values.fullWorker }}
+{{- $liteClaim := default (printf "%s-workspace" .Release.Name) .Values.WORKSPACE_CLAIM_NAME -}}
+{{- if eq $liteClaim $f.workspaceClaim }}{{ fail "Full requires distinct Lite and Full workspace claims" }}{{ end }}
 {{- $github := $f.githubSecretRef | default dict }}
 {{- if $github }}
 {{- if eq ($github.name | default "") "secrets" }}{{ fail "GitHub credential reference must not select the consumer Secret" }}{{ end }}

@@ -208,6 +208,9 @@ def rejected(config, expected):
     activated = config['fullWorker'].get('runnerEnabled') or config.get('sourceReaderService', {}).get('running')
     result = subprocess.run(['helm', 'template', 'review', str(fixture_chart if activated else chart), '-f', '-'], input=json.dumps(config), text=True, capture_output=True)
     assert result.returncode != 0 and expected in result.stderr, result.stderr
+duplicate_claim = copy.deepcopy(values)
+duplicate_claim['WORKSPACE_CLAIM_NAME'] = duplicate_claim['fullWorker']['workspaceClaim']
+rejected(duplicate_claim, 'distinct Lite and Full workspace claims')
 missing = copy.deepcopy(phase3)
 missing['fullWorker']['approvedBootstraps'] = {}
 rejected(missing, 'approved bootstrap/runtime identity')
