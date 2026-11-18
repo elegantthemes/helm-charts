@@ -1,7 +1,27 @@
 {{- include "deephive.normalizeWorkerValues" . -}}
-{{- $reader := include "deephive.sourceReader" (dict "context" . "codeRoot" "/opt/deephive") | fromJson }}
+{{- $reader := include "deephive.sourceReader" (dict "context" . "codeRoot" "/opt/deephive" "storage" "full") | fromJson }}
 {{- if .Values.fullWorker.enabled }}
 {{- $f := .Values.fullWorker }}
+{{- $liteClaim := default (printf "%s-workspace" .Release.Name) .Values.WORKSPACE_CLAIM_NAME -}}
+{{- $localSessions := ge (int $f.sessionProtocol) 4 -}}
+{{- $runnerClaim := $f.workspaceClaim -}}
+{{- $ledgerNode := $f.nodeName -}}
+{{- if $localSessions -}}
+{{- if ne (toJson .Values.WORKSPACE_ACCESS_MODES) (toJson (list "ReadWriteOnce")) }}{{ fail "Protocol 4 controller requires the ReadWriteOnce Lite workspace" }}{{ end }}
+{{- $liteNode := required "Protocol 4 controller requires an explicit Lite consumer node" .Values.NODE_SELECTOR_HOSTNAME -}}
+{{- if or (ne .Values.WORKSPACE_ROOT $f.workspaceRoot) (not (hasPrefix "/" $f.workspaceRoot)) (ne (clean $f.workspaceRoot) $f.workspaceRoot) }}{{ fail "Protocol 4 controller requires the same canonical workspace root as Lite" }}{{ end }}
+{{- $runnerClaim = $liteClaim -}}
+{{- $ledgerNode = default $liteNode $ledgerNode -}}
+{{- end -}}
+{{- if eq $liteClaim $f.workspaceClaim }}{{ fail "Full requires distinct Lite and Full workspace claims" }}{{ end }}
+{{- if and .Values.LEGACY_WORKSPACE_RETAIN (eq $f.workspaceClaim (printf "%s-workspace" .Release.Name)) }}
+{{- fail "Full workspace claim must differ from the retained legacy workspace claim" }}
+{{- end }}
+{{- $storageClassName := required "Full workspace StorageClass required" .Values.WORKSPACE_STORAGE_CLASS_NAME }}
+{{- $storageClass := lookup "storage.k8s.io/v1" "StorageClass" "" $storageClassName }}
+{{- if and $storageClass (ne (default "Immediate" $storageClass.volumeBindingMode) "Immediate") }}
+{{- fail "Full workspace StorageClass must use Immediate binding" }}
+{{- end }}
 {{- $github := $f.githubSecretRef | default dict }}
 {{- if $github }}
 {{- if eq ($github.name | default "") "secrets" }}{{ fail "GitHub credential reference must not select the consumer Secret" }}{{ end }}
@@ -23,6 +43,17 @@
 {{- range $image := append $f.compatibleSessionImages $f.sessionImage }}
 {{- if and (not (has $image $f.legacyProtocol2Images)) (not (regexMatch "^[a-f0-9]{64}$" (index $f.approvedBootstraps $image | default ""))) }}{{ fail "Every pinned and compatible session image requires its approved bootstrap/runtime identity" }}{{ end }}
 {{- end }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ required "Full workspace claim required" $f.workspaceClaim | quote }}
+  annotations: { helm.sh/resource-policy: keep }
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests: { storage: {{ .Values.WORKSPACE_STORAGE_SIZE | quote }} }
+  storageClassName: {{ $storageClassName | quote }}
+---
 apiVersion: v1
 kind: ServiceAccount
 metadata:
@@ -91,7 +122,7 @@ metadata:
 data:
   admission.json: {{ dict "sessionProtocol" $f.sessionProtocol | toJson | quote }}
   runner.json: |
-    {{ dict "namespace" .Release.Namespace "release" .Release.Name "nodeName" $f.nodeName "image" $f.sessionImage "databaseImage" $f.databaseImage "imagePullSecret" $f.pullSecret "agentSecret" (required "Session agent Secret required" $f.agentSecret) "integrationSecret" ($f.integrationSecret | default "") "githubSecretRef" ($f.githubSecretRef | default dict) "workspaceClaim" $f.workspaceClaim "workspaceRoot" $f.workspaceRoot "scratchRoot" "/node-scratch" "cacheRoot" "/node-cache" "runnerUrl" (printf "http://%s:3001" (include "deephive.fullWorkerName" .)) "pressureCommand" $f.pressureCommand "signingKeyFile" "/runner-secret/signing-key" "controlPort" 3001 "observationPort" (ternary 3002 0 $f.observationEnabled) "observationTokenFile" "/runner-secret/observation-token" "approvedBootstraps" $f.approvedBootstraps "sourceReader" $reader "sessionProtocol" $f.sessionProtocol "draining" $f.draining "validationTimeoutMs" $f.validationTimeoutMs | toJson }}
+    {{ dict "namespace" .Release.Namespace "release" .Release.Name "nodeName" $ledgerNode "image" $f.sessionImage "databaseImage" $f.databaseImage "imagePullSecret" $f.pullSecret "agentSecret" (required "Session agent Secret required" $f.agentSecret) "integrationSecret" ($f.integrationSecret | default "") "githubSecretRef" ($f.githubSecretRef | default dict) "workspaceClaim" $runnerClaim "workspaceRoot" $f.workspaceRoot "scratchRoot" "/node-scratch" "cacheRoot" $f.workspaceRoot "runnerUrl" (printf "http://%s:3001" (include "deephive.fullWorkerName" .)) "pressureCommand" $f.pressureCommand "signingKeyFile" "/runner-secret/signing-key" "controlPort" 3001 "observationPort" (ternary 3002 0 $f.observationEnabled) "observationTokenFile" "/runner-secret/observation-token" "approvedBootstraps" $f.approvedBootstraps "sourceReader" $reader "sessionProtocol" $f.sessionProtocol "draining" $f.draining "validationTimeoutMs" $f.validationTimeoutMs | toJson }}
 {{/* The config contains no credentials; signing key is read from runner-only Secret. */}}
 ---
 apiVersion: apps/v1
@@ -100,17 +131,21 @@ metadata:
   name: {{ (include "deephive.fullWorkerName" .) }}
 spec:
   replicas: {{ ternary 1 0 $f.runnerEnabled }}
+  strategy:
+    type: Recreate
+    # Clear the old Deployment's server-defaulted RollingUpdate fields on upgrade.
+    rollingUpdate: null
   selector:
     matchLabels: { app: {{ (include "deephive.fullWorkerName" .) }} }
   template:
     metadata:
       annotations:
-{{- if .Values.sourceReaderService.enabled }}
-        source-reader-token-revision: {{ .Values.sourceReaderService.tokenRevision | quote }}
-{{- end }}
         checksum/runner-config: {{ toJson (list $f .Values.DEEPHIVE_VERSION) | sha256sum | quote }}
       labels: { app: {{ (include "deephive.fullWorkerName" .) }}, deephive/worker-mode: full, redis-client: "true" }
     spec:
+      # Allow an in-flight source transfer (15-minute network deadline) and its
+      # cleanup to finish before Kubernetes forcibly terminates the runner.
+      terminationGracePeriodSeconds: 960
       {{- if lt (int $f.sessionProtocol) 4 }}
       nodeName: {{ $f.nodeName | quote }}
       tolerations:
@@ -122,22 +157,41 @@ spec:
           requiredDuringSchedulingIgnoredDuringExecution:
             nodeSelectorTerms:
               - matchExpressions:
+                  - { key: kubernetes.io/hostname, operator: In, values: [{{ .Values.NODE_SELECTOR_HOSTNAME | quote }}] }
                   - { key: deephive-full, operator: NotIn, values: ["true"] }
       {{- end }}
       serviceAccountName: {{ (include "deephive.fullWorkerName" .) }}
       imagePullSecrets:
         - name: {{ required "Private pull secret required" $f.pullSecret | quote }}
+      {{- if not $localSessions }}
+      initContainers:
+        - name: prepare-workspace-volume
+          image: {{ $f.runnerImage | quote }}
+          command: ["/bin/sh", "-ec", "chown 1000:1000 /full-volume"]
+          securityContext:
+            runAsUser: 0
+            runAsGroup: 0
+            allowPrivilegeEscalation: false
+            capabilities: { drop: [ALL], add: [CHOWN] }
+          volumeMounts:
+            - { name: workspace, mountPath: /full-volume }
+      {{- end }}
       containers:
         - name: runner
+          securityContext: { runAsUser: 1000, runAsGroup: 1000 }
           image: {{ $f.runnerImage | quote }}
           command:
             - /bin/bash
             - -ec
             - |
+              # Recreate covers upgrades. Lock the mounted volume itself for
+              # ReplicaSet replacements while the previous Pod is terminating.
+              command=(node /opt/deephive/dist/src/fullWorker.js)
               if [ -x /usr/local/bin/deephive-app-start ]; then
-                exec /usr/local/bin/deephive-app-start node /opt/deephive/dist/src/fullWorker.js
+                command=(/usr/local/bin/deephive-app-start "${command[@]}")
               fi
-              exec node /opt/deephive/dist/src/fullWorker.js
+              exec flock --nonblock --no-fork "$0" "${command[@]}"
+            - {{ $f.workspaceRoot | quote }}
           env:
             - name: DEEPHIVE_VERSION
               value: {{ .Values.DEEPHIVE_VERSION | quote }}
@@ -166,30 +220,20 @@ spec:
             timeoutSeconds: 2
             failureThreshold: 2
           volumeMounts:
-{{- if .Values.sourceReaderService.enabled }}
-            - { name: source-reader-token, mountPath: /source-reader-token, readOnly: true }
-{{- end }}
             - { name: config, mountPath: /runner-config, readOnly: true }
             - { name: secret, mountPath: /runner-secret, readOnly: true }
             - { name: workspace, mountPath: {{ $f.workspaceRoot | quote }}, mountPropagation: HostToContainer }
-{{- if lt (int $f.sessionProtocol) 4 }}
-            - { name: cache-probe, mountPath: /node-cache, readOnly: true }
+{{- if not $localSessions }}
             - { name: scratch-probe, mountPath: /node-scratch, readOnly: true }
 {{- end }}
       volumes:
-{{- if .Values.sourceReaderService.enabled }}
-        - name: source-reader-token
-          secret: { secretName: {{ .Values.sourceReaderService.tokenSecret | quote }}, items: [{ key: token, path: token }] }
-{{- end }}
         - name: config
           configMap: { name: {{ (include "deephive.fullWorkerName" .) }} }
         - name: secret
           secret: { secretName: {{ $f.runnerSecret | quote }} }
         - name: workspace
-          persistentVolumeClaim: { claimName: {{ required "Workspace claim required" $f.workspaceClaim | quote }} }
-{{- if lt (int $f.sessionProtocol) 4 }}
-        - name: cache-probe
-          hostPath: { path: {{ required "Retained CSI cache path required" $f.cacheProbePath | quote }}, type: Directory }
+          persistentVolumeClaim: { claimName: {{ required "Workspace claim required" $runnerClaim | quote }} }
+{{- if not $localSessions }}
         - name: scratch-probe
           hostPath: { path: {{ required "Dedicated DeepHive scratch probe directory required" $f.scratchProbePath | quote }}, type: Directory }
 {{- end }}
@@ -248,6 +292,10 @@ spec:
     - from:
         - podSelector:
             matchLabels: { app.kubernetes.io/name: deephive-session, app.kubernetes.io/instance: {{ .Release.Name | quote }} }
+      ports: [{ protocol: TCP, port: 3001 }]
+    - from:
+        - podSelector:
+            matchLabels: { app: {{ .Release.Name }} }
       ports: [{ protocol: TCP, port: 3001 }]
 ---
 apiVersion: apps/v1

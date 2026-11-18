@@ -1,5 +1,7 @@
 {
   "ENV_FILE": "VALIDATION_ONLY=true",
+  "NODE_SELECTOR_HOSTNAME": "test-consumer",
+  "WORKSPACE_ROOT": "/workspace-root",
   "fullWorker": {
     "enabled": true,
     "nodeName": "test-execution",

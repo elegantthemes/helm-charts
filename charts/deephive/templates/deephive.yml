@@ -1,12 +1,13 @@
 {{- include "deephive.normalizeWorkerValues" . -}}
+{{- if .Values.sourceReaderService.enabled }}{{ fail "JuiceFS source reader retired: drain it and set sourceReaderService.enabled=false before cutover" }}{{ end }}
 {{- if gt (int .Values.REPLICAS) 1 }}{{ fail "Cache startup recovery requires at most one consumer replica" }}{{ end }}
 {{- $lite := include "deephive.liteCommands" . | fromJson }}
 {{- $reader := include "deephive.sourceReader" (dict "context" . "codeRoot" (default "/srv/deephive" .Values.INSTALL_PATH)) | fromJson }}
 {{- if and (or .Values.fullWorker.routingEnabled .Values.fullWorker.taskAllowlist .Values.fullWorker.observationEnabled) (not .Values.fullWorker.enabled) }}{{ fail "Routing or observation requires fullWorker.enabled" }}{{ end }}
-{{- if and (or .Values.fullWorker.routingEnabled .Values.fullWorker.taskAllowlist) (or (not .Values.fullWorker.sourceSeedPath) (not (hasPrefix "/" .Values.fullWorker.sourceSeedPath)) (not $lite.admit) (not $lite.release) (not (hasPrefix "/" .Values.fullWorker.liteScratchRoot)) (not $reader.command) (not ($reader.readerId | trim)) (not .Values.fullWorker.evidenceBucket) (not .Values.fullWorker.publicOrigin)) }}{{ fail "Routing requires source seed, fresh reader, private evidence bucket and stable origin" }}{{ end }}
+{{- if and (or .Values.fullWorker.routingEnabled .Values.fullWorker.taskAllowlist) (or (not .Values.fullWorker.sourceSeedPath) (not (hasPrefix "/" .Values.fullWorker.sourceSeedPath)) (not $lite.admit) (not $lite.release) (not (hasPrefix "/" .Values.fullWorker.liteScratchRoot)) (not .Values.fullWorker.evidenceBucket) (not .Values.fullWorker.publicOrigin)) }}{{ fail "Routing requires source seed, private evidence bucket and stable origin" }}{{ end }}
 {{- if or .Values.fullWorker.routingEnabled .Values.fullWorker.taskAllowlist }}
-{{- range $command := list $reader.command $lite.admit $lite.release .Values.fullWorker.liteInstallCommand }}
-{{- if and $command (not (hasPrefix "/" (index $command 0))) }}{{ fail "Source reader and lite-worker fencing commands must use absolute executable paths" }}{{ end }}
+{{- range $command := list $lite.admit $lite.release .Values.fullWorker.liteInstallCommand }}
+{{- if and $command (not (hasPrefix "/" (index $command 0))) }}{{ fail "Lite-worker fencing commands must use absolute executable paths" }}{{ end }}
 {{- end }}
 {{- end }}
 {{- if and .Values.fullWorker.evidenceBucket (not .Values.fullWorker.evidenceRegion) }}{{ fail "Private evidence bucket requires its region" }}{{ end }}
@@ -21,18 +22,19 @@
 {{- end }}
 {{- if and .Values.fullWorker.evidenceBucket (has .Values.fullWorker.evidenceReadSecret (list "secrets" .Values.fullWorker.runnerSecret .Values.fullWorker.agentSecret (.Values.fullWorker.integrationSecret | default ""))) }}{{ fail "Evidence requires a dedicated read-only Secret separate from runner, agent and consumer credentials" }}{{ end }}
 {{- if or .Values.fullWorker.routingEnabled .Values.fullWorker.taskAllowlist }}
-{{- if not (has "ReadWriteMany" .Values.WORKSPACE_ACCESS_MODES) }}{{ fail "Routing requires a ReadWriteMany shared workspace claim" }}{{ end }}
-{{- if or (not (hasPrefix "/" .Values.fullWorker.liteCacheProbePath)) (eq .Values.fullWorker.liteCacheProbePath "/") }}{{ fail "Routing requires an actual lite-worker retained-cache probe directory" }}{{ end }}
+{{- if ne (toJson .Values.WORKSPACE_ACCESS_MODES) (toJson (list "ReadWriteOnce")) }}{{ fail "Routing requires a ReadWriteOnce block workspace" }}{{ end }}
+{{- if not .Values.NODE_SELECTOR_HOSTNAME }}{{ fail "Block workspace requires an explicit consumer node" }}{{ end }}
+
 {{- $scratch := .Values.fullWorker.liteScratchRoot }}
 {{- $source := .Values.fullWorker.workspaceRoot }}
 {{- if or (eq $scratch "/") (ne (clean $scratch) $scratch) (eq $scratch $source) (hasPrefix (printf "%s/" $source) $scratch) (hasPrefix (printf "%s/" $scratch) $source) }}{{ fail "Lite scratch must be canonical and disjoint from the shared candidate source workspace" }}{{ end }}
 {{- end }}
 {{- $workspaceClaim := default (printf "%s-workspace" .Release.Name) .Values.WORKSPACE_CLAIM_NAME -}}
-{{- if and (or .Values.fullWorker.routingEnabled .Values.fullWorker.taskAllowlist) (or (ne $workspaceClaim .Values.fullWorker.workspaceClaim) (ne .Values.WORKSPACE_ROOT .Values.fullWorker.workspaceRoot) (not (hasPrefix "/" .Values.fullWorker.workspaceRoot))) }}{{ fail "Routing requires consumer and runner to share the same workspace claim and absolute canonical workspace root" }}{{ end }}
+{{- if and (or .Values.fullWorker.routingEnabled .Values.fullWorker.taskAllowlist) (or (eq $workspaceClaim .Values.fullWorker.workspaceClaim) (ne .Values.WORKSPACE_ROOT .Values.fullWorker.workspaceRoot) (not (hasPrefix "/" .Values.fullWorker.workspaceRoot))) }}{{ fail "Routing requires distinct Lite and Full workspace claims with the same absolute canonical root" }}{{ end }}
 {{- if and (or .Values.fullWorker.routingEnabled .Values.fullWorker.taskAllowlist) (or (ne (clean .Values.fullWorker.sourceSeedPath) .Values.fullWorker.sourceSeedPath) (ne (clean .Values.fullWorker.workspaceRoot) .Values.fullWorker.workspaceRoot) (not (hasPrefix (printf "%s/" .Values.fullWorker.workspaceRoot) .Values.fullWorker.sourceSeedPath))) }}{{ fail "Routing source seed must be a canonical descendant of the shared workspace root" }}{{ end }}
 {{- if or .Values.fullWorker.routingEnabled .Values.fullWorker.taskAllowlist }}
 {{- if not .Values.fullWorker.runnerEnabled }}{{ fail "Routing requires runnerEnabled=true after protection installation" }}{{ end }}
-{{- if and .Values.sourceReaderService.enabled (not .Values.sourceReaderService.running) }}{{ fail "Routing requires the managed source reader running=true" }}{{ end }}
+
 {{- end }}
 {{- if and .Values.LEGACY_WORKSPACE_RETAIN (eq $workspaceClaim (printf "%s-workspace" .Release.Name)) -}}
 {{- fail "LEGACY_WORKSPACE_RETAIN requires a different WORKSPACE_CLAIM_NAME" -}}
@@ -71,10 +73,8 @@ kind: PersistentVolumeClaim
 metadata:
   name: {{ $workspaceClaim }}
   namespace: {{ .Release.Namespace }}
-{{- if .Values.fullWorker.writebackEnabled }}
-  labels:
-    deephive.elegantthemes.com/writeback: enabled
-{{- end }}
+  annotations:
+    helm.sh/resource-policy: keep
 spec:
   accessModes:
 {{ toYaml .Values.WORKSPACE_ACCESS_MODES | indent 4 }}
@@ -123,9 +123,6 @@ spec:
         checksum/full-admission: {{ dict "sessionProtocol" .Values.fullWorker.sessionProtocol | toJson | sha256sum | quote }}
 {{- end }}
         checksum/lite-capacity: {{ toJson .Values.fullWorker.liteCapacity | sha256sum | quote }}
-{{- if .Values.sourceReaderService.enabled }}
-        source-reader-token-revision: {{ .Values.sourceReaderService.tokenRevision | quote }}
-{{- end }}
 {{- if .Values.fullWorker.observationEnabled }}
         observation-secret-revision: {{ required "Runner Secret revision required with observation; increment it after token rotation" .Values.fullWorker.runnerSecretRevision | quote }}
 {{- end }}
@@ -183,8 +180,6 @@ spec:
               localhostProfile: {{ .Values.CODEX_SANDBOX_APPARMOR_PROFILE | quote }}
 {{- end }}
           env:
-            - name: WORKSPACE_COPY_METHOD
-              value: {{ .Values.WORKSPACE_COPY_METHOD | default "fs.cp" | quote }}
 {{- if or .Values.fullWorker.routingEnabled .Values.fullWorker.taskAllowlist }}
             - name: WORKSPACE_ROOT
               value: {{ .Values.WORKSPACE_ROOT | quote }}
@@ -210,7 +205,7 @@ spec:
             - name: LITE_WORKER_SCRATCH_ROOT
               value: {{ .Values.fullWorker.liteScratchRoot | quote }}
             - name: LITE_WORKER_CACHE_ROOT
-              value: {{ ternary "/lite-cache-probe" "" (not (empty .Values.fullWorker.liteCacheProbePath)) | quote }}
+              value: {{ .Values.WORKSPACE_ROOT | quote }}
             - name: FULL_WORKER_READER_CONFIG
               value: {{ toJson $reader | quote }}
 {{- if or .Values.fullWorker.observationEnabled .Values.fullWorker.evidenceBucket }}
@@ -309,14 +304,7 @@ spec:
             - name: lite-scratch
               mountPath: {{ .Values.fullWorker.liteScratchRoot | quote }}
 {{- end }}
-{{- if .Values.sourceReaderService.enabled }}
-            - { name: source-reader-token, mountPath: /source-reader-token, readOnly: true }
-{{- end }}
-{{- if .Values.fullWorker.liteCacheProbePath }}
-            - name: lite-cache-probe
-              mountPath: /lite-cache-probe
-              readOnly: true
-{{- end }}
+
             - name: wordpress
               mountPath: /srv
             - name: workspace
@@ -379,14 +367,7 @@ spec:
         - name: lite-scratch
           emptyDir: { sizeLimit: {{ .Values.fullWorker.liteCapacity.scratchSize | quote }} }
 {{- end }}
-{{- if .Values.sourceReaderService.enabled }}
-        - name: source-reader-token
-          secret: { secretName: {{ .Values.sourceReaderService.tokenSecret | quote }}, items: [{ key: token, path: token }] }
-{{- end }}
-{{- if .Values.fullWorker.liteCacheProbePath }}
-        - name: lite-cache-probe
-          hostPath: { path: {{ .Values.fullWorker.liteCacheProbePath | quote }}, type: Directory }
-{{- end }}
+
         - name: wordpress
           emptyDir: {}
         - name: workspace

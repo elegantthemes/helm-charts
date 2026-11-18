@@ -15,8 +15,6 @@ PORT: 3000
 REPLICAS:
 VIRTUAL_HOST:
 WORKSPACE_ROOT:
-# Native cloning requires the JuiceFS CLI and a JuiceFS-backed workspace.
-WORKSPACE_COPY_METHOD: fs.cp
 WORKSPACE_ACCESS_MODES:
   - ReadWriteOnce
 WORKSPACE_CLAIM_NAME:
@@ -67,7 +65,6 @@ fullWorker:
   runnerEnabled: false # install and verify protections first
   draining: false # stop admission while existing sessions finish
   validationTimeoutMs: 3600000 # capped by each session original deadline
-  writebackEnabled: false # label only this PVC for scoped CSI configuration
   observationEnabled: false
   routingEnabled: false
   taskAllowlist: "" # comma-separated explicit staging issue numbers
@@ -88,10 +85,6 @@ fullWorker:
   legacyRecoveryCommand: [] # operator-confirmed interrupted legacy writer recovery; not a capacity hook
   liteHandoffCommand: [] # override capacity release/recovery hook
   liteScratchRoot: /lite-scratch # mounted emptyDir when liteCapacity.enabled
-  liteCacheProbePath: "" # actual retained CSI cache directory on each lite-worker node
-  sourceReader:
-    readerId: "" # fresh CSI mount/cache identity, never the writer's staging cache
-    command: [] # trusted executable returns a complete SourceManifest as JSON
   publicOrigin: "" # https://<DeepHive host>, exact browser Origin
   evidenceBucket: "" # dedicated private bucket provisioned in Phase 4
   evidenceRegion: ""
@@ -115,17 +108,9 @@ fullWorker:
   workspaceClaim: ""
   workspaceRoot: /workspace-root # must match enrolled canonical paths
   scratchProbePath: "" # dedicated DeepHive scratch directory on the kubelet filesystem
-  cacheProbePath: "" # retained JuiceFS staging/cache filesystem; must be real node path
   # Optional infrastructure pressure notification/cancellation hook; not termination proof.
   pressureCommand: []
 
-# Install reader admission protection before granting the broker identity.
+# Retired broker: keep disabled after draining old reader resources during cutover.
 sourceReaderService:
-  workloadNamespace: "" # Terraform provisions the derived dph-reader-<release hash> namespace
   enabled: false
-  running: false
-  tokenSecret: "" # existing Secret with token key; platform processes only
-  tokenRevision: "" # increment on Secret rotation
-  nodeName: "" # independent reader node
-  filesystemSecretName: juicefs-deephive-workspace
-  filesystemSecretNamespace: kube-system
