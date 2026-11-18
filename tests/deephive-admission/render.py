@@ -358,6 +358,9 @@ pod = job['spec']['template']['spec']
 assert pod['automountServiceAccountToken'] is False
 assert pod['containers'][0]['command'][-1].endswith('/export-source-seed.js')
 assert 'envFrom' not in pod['containers'][0]
+invalid = copy.deepcopy(seed)
+invalid['WORKSPACE_ACCESS_MODES'] = ['ReadWriteMany']
+rejected(invalid, 'Source seed export requires a ReadWriteOnce Lite workspace')
 seed['fullWorker']['sourceSeedPath'] = '/outside'
 rejected(seed, 'canonical workspace descendant')
 print('PASS credential-free, explicit source seed export')

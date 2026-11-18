@@ -1,6 +1,7 @@
 {{- include "deephive.normalizeWorkerValues" . -}}
 {{- $f := .Values.fullWorker }}
 {{- if $f.sourceSeedExportEnabled }}
+{{- if ne (toJson .Values.WORKSPACE_ACCESS_MODES) (toJson (list "ReadWriteOnce")) }}{{ fail "Source seed export requires a ReadWriteOnce Lite workspace" }}{{ end }}
 {{- if or (not $f.enabled) $f.routingEnabled $f.taskAllowlist }}{{ fail "Export source seed with protections enabled and routing disabled" }}{{ end }}
 {{- if or (not (hasPrefix (printf "%s/" $f.workspaceRoot) $f.sourceSeedPath)) (ne (clean $f.sourceSeedPath) $f.sourceSeedPath) }}{{ fail "Source seed export requires a canonical workspace descendant" }}{{ end }}
 {{- $claim := default (printf "%s-workspace" .Release.Name) .Values.WORKSPACE_CLAIM_NAME }}
