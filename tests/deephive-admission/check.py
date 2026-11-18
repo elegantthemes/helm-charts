@@ -228,6 +228,17 @@ def claim(node):
 
 
 node_case('set activation on dedicated Node', True, claim)
+for taints in (None, [], [{'key': 'deephive-full', 'value': 'false', 'effect': 'NoSchedule'}],
+               [{'key': 'deephive-full', 'value': 'true', 'effect': 'PreferNoSchedule'}]):
+    untainted = copy.deepcopy(before)
+    if taints is None:
+        del untainted['spec']['taints']
+    else:
+        untainted['spec']['taints'] = taints
+    node_case(f'Reject activation without exact dedicated taint: {taints}', False, claim, untainted)
+claim(untainted)
+node_case('clear activation after the dedicated taint was changed', True,
+          lambda n: n['metadata']['annotations'].pop('deephive/activation'), untainted)
 claimed = copy.deepcopy(before)
 claim(claimed)
 node_case('clear activation on dedicated Node', True,

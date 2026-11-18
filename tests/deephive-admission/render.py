@@ -657,6 +657,12 @@ narrowed_binding = copy.deepcopy(node_binding)
 narrowed_binding['spec']['matchResources'] = {'objectSelector': {'matchLabels': {'allow': 'false'}}}
 result = enable_protocol4(session_policy, node_policy, narrowed_binding)
 assert result.returncode and 'Node admission boundary' in result.stderr, result.stderr
+old_node = copy.deepcopy(node_policy)
+old_node['spec']['validations'] = [
+    v for v in old_node['spec']['validations'] if 'oldObject.spec.taints.exists' not in v['expression']
+]
+result = enable_protocol4(session_policy, old_node)
+assert result.returncode and 'Node admission boundary' in result.stderr, result.stderr
 result = enable_protocol4(session_policy, node_policy)
 assert result.returncode == 0, result.stderr
 enabled = [p for p in yaml.safe_load_all(result.stdout) if p]

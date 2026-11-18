@@ -31,6 +31,8 @@ spec:
         oldObject.metadata.labels['gha.etdevs.com/managed-by'] == 'gha-runner-autoscaler' &&
         variables.before['gha.etdevs.com/linode-id'].matches('^[1-9][0-9]*$')
       message: The Full worker may only patch an identified DeepHive burst Node.
+    - expression: {{ include "deephive.nodeActivationTaint" . | quote }}
+      message: Activation requires the dedicated DeepHive NoSchedule taint.
     - expression: >-
         object.spec == oldObject.spec &&
         object.metadata.labels == oldObject.metadata.labels &&

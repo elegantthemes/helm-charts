@@ -64,13 +64,13 @@ Terraform integration contract (no Terraform files or live migration here):
   floor; restoring compatible application references must use a safe chart
   revision, never a historical manifest that embeds state. Quiescing alone does
   not make those older rollback targets safe.
-- Keep DeepHive chart **1.3.29**, `fullWorker.runnerEnabled=false` while installing
+- Keep DeepHive chart **1.4.1**, `fullWorker.runnerEnabled=false` while installing
   admission policies/bindings, then observe and accept protection before enabling
   protocol 4. Supply actual compatible digest-pinned artifacts and reviewed
   bootstrap identities. No image build, migration, cluster mutation or deployment
   is authorized by this interface document.
 
-DeepHive chart **1.3.29** adds dedicated-taint admission enforcement for protocol
+DeepHive chart **1.4.1** adds dedicated-taint admission enforcement for protocol
 4. Keep `fullWorker.runnerEnabled=false` for the first installation of the
 protocol 4 admission policies/bindings. Only enable the runner after Kubernetes has observed and type-checked both
 the session Pod and Node admission policies and both bindings enforce Deny.

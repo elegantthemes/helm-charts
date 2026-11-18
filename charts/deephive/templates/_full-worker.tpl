@@ -21,6 +21,10 @@ Explicit new keys win, including false, empty strings and empty command lists. *
 {{- printf "dph-node-activation-%s" (printf "%s/%s" .Release.Namespace .Release.Name | sha256sum | trunc 24) -}}
 {{- end -}}
 
+{{- define "deephive.nodeActivationTaint" -}}
+!('deephive/activation' in variables.after) || (has(oldObject.spec.taints) && oldObject.spec.taints.exists(t, t.key == 'deephive-full' && t.value == 'true' && t.effect == 'NoSchedule'))
+{{- end -}}
+
 {{- define "deephive.nodeAdmissionReady" -}}
 {{- $name := include "deephive.nodeAdmissionName" . -}}
 {{- $policy := lookup "admissionregistration.k8s.io/v1" "ValidatingAdmissionPolicy" "" $name -}}
@@ -29,7 +33,15 @@ Explicit new keys win, including false, empty strings and empty command lists. *
 {{- $identity := printf "request.userInfo.username == 'system:serviceaccount:%s:%s'" .Release.Namespace (include "deephive.fullWorkerName" .) -}}
 {{- $expected := list (dict "name" "runner-identity" "expression" $identity) -}}
 {{- $rules := list (dict "apiGroups" (list "") "apiVersions" (list "v1") "operations" (list "UPDATE") "resources" (list "nodes") "scope" "Cluster") -}}
-{{- if and $policy $binding (eq $policy.spec.failurePolicy "Fail")
+{{- $hasTaintGate := false -}}
+{{- if $policy -}}
+{{- range $policy.spec.validations -}}
+{{- if eq .expression (include "deephive.nodeActivationTaint" $) -}}
+{{- $hasTaintGate = true -}}
+{{- end -}}
+{{- end -}}
+{{- end -}}
+{{- if and $policy $binding $hasTaintGate (eq $policy.spec.failurePolicy "Fail")
     (deepEqual $policy.spec.matchConditions $expected)
     (deepEqual $policy.spec.matchConstraints.resourceRules $rules)
     (not $policy.spec.matchConstraints.excludeResourceRules)
