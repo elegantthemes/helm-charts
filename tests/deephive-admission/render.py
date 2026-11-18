@@ -211,6 +211,32 @@ def rejected(config, expected):
 duplicate_claim = copy.deepcopy(values)
 duplicate_claim['WORKSPACE_CLAIM_NAME'] = duplicate_claim['fullWorker']['workspaceClaim']
 rejected(duplicate_claim, 'distinct Lite and Full workspace claims')
+legacy_claim = copy.deepcopy(values)
+legacy_claim.update(LEGACY_WORKSPACE_RETAIN=True, WORKSPACE_CLAIM_NAME='lite-block')
+legacy_claim['fullWorker']['workspaceClaim'] = 'review-workspace'
+rejected(legacy_claim, 'Full workspace claim must differ from the retained legacy workspace claim')
+
+# Offline helm template has no StorageClass lookup. Model the live API object
+# while keeping the real guard and all other chart rendering intact.
+with tempfile.TemporaryDirectory(prefix='deephive-storage-class-') as tmp:
+    storage_chart = Path(tmp) / 'deephive'
+    shutil.copytree(chart, storage_chart)
+    template = storage_chart / 'templates/full-worker.yml'
+    original = template.read_text()
+    lookup = 'lookup "storage.k8s.io/v1" "StorageClass" "" $storageClassName'
+    assert lookup in original
+    for mode in ['Immediate', 'WaitForFirstConsumer']:
+        template.write_text(original.replace(lookup, f'dict "volumeBindingMode" "{mode}"'))
+        result = subprocess.run(
+            ['helm', 'template', 'review', str(storage_chart), '-f', '-'],
+            input=json.dumps(values), text=True, capture_output=True,
+        )
+        if mode == 'Immediate':
+            assert result.returncode == 0, result.stderr
+        else:
+            assert result.returncode and 'Full workspace StorageClass must use Immediate binding' in result.stderr
+print('PASS Full claims require Immediate binding and cannot reuse the retained legacy claim')
+
 missing = copy.deepcopy(phase3)
 missing['fullWorker']['approvedBootstraps'] = {}
 rejected(missing, 'approved bootstrap/runtime identity')

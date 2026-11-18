@@ -4,6 +4,14 @@
 {{- $f := .Values.fullWorker }}
 {{- $liteClaim := default (printf "%s-workspace" .Release.Name) .Values.WORKSPACE_CLAIM_NAME -}}
 {{- if eq $liteClaim $f.workspaceClaim }}{{ fail "Full requires distinct Lite and Full workspace claims" }}{{ end }}
+{{- if and .Values.LEGACY_WORKSPACE_RETAIN (eq $f.workspaceClaim (printf "%s-workspace" .Release.Name)) }}
+{{- fail "Full workspace claim must differ from the retained legacy workspace claim" }}
+{{- end }}
+{{- $storageClassName := required "Full workspace StorageClass required" .Values.WORKSPACE_STORAGE_CLASS_NAME }}
+{{- $storageClass := lookup "storage.k8s.io/v1" "StorageClass" "" $storageClassName }}
+{{- if and $storageClass (ne (default "Immediate" $storageClass.volumeBindingMode) "Immediate") }}
+{{- fail "Full workspace StorageClass must use Immediate binding" }}
+{{- end }}
 {{- $github := $f.githubSecretRef | default dict }}
 {{- if $github }}
 {{- if eq ($github.name | default "") "secrets" }}{{ fail "GitHub credential reference must not select the consumer Secret" }}{{ end }}
@@ -34,7 +42,7 @@ spec:
   accessModes: [ReadWriteOnce]
   resources:
     requests: { storage: {{ .Values.WORKSPACE_STORAGE_SIZE | quote }} }
-  storageClassName: {{ .Values.WORKSPACE_STORAGE_CLASS_NAME | quote }}
+  storageClassName: {{ $storageClassName | quote }}
 ---
 apiVersion: v1
 kind: ServiceAccount
@@ -102,6 +110,7 @@ metadata:
   name: {{ (include "deephive.fullWorkerName" .) }}
 spec:
   replicas: {{ ternary 1 0 $f.runnerEnabled }}
+  strategy: { type: Recreate }
   selector:
     matchLabels: { app: {{ (include "deephive.fullWorkerName" .) }} }
   template:
@@ -110,6 +119,9 @@ spec:
         checksum/runner-config: {{ toJson (list $f .Values.DEEPHIVE_VERSION) | sha256sum | quote }}
       labels: { app: {{ (include "deephive.fullWorkerName" .) }}, deephive/worker-mode: full, redis-client: "true" }
     spec:
+      # Allow an in-flight source transfer (15-minute network deadline) and its
+      # cleanup to finish before Kubernetes forcibly terminates the runner.
+      terminationGracePeriodSeconds: 960
       nodeName: {{ $f.nodeName | quote }}
       tolerations:
         - { key: deephive-full, operator: Equal, value: "true", effect: NoSchedule }
@@ -135,10 +147,14 @@ spec:
             - /bin/bash
             - -ec
             - |
+              # Recreate covers upgrades. Lock the mounted volume itself for
+              # ReplicaSet replacements while the previous Pod is terminating.
+              command=(node /opt/deephive/dist/src/fullWorker.js)
               if [ -x /usr/local/bin/deephive-app-start ]; then
-                exec /usr/local/bin/deephive-app-start node /opt/deephive/dist/src/fullWorker.js
+                command=(/usr/local/bin/deephive-app-start "${command[@]}")
               fi
-              exec node /opt/deephive/dist/src/fullWorker.js
+              exec flock --nonblock --no-fork "$0" "${command[@]}"
+            - {{ $f.workspaceRoot | quote }}
           env:
             - name: DEEPHIVE_VERSION
               value: {{ .Values.DEEPHIVE_VERSION | quote }}

@@ -26,7 +26,14 @@ for d in docs:
  if d['kind'] == 'Deployment':
   assert not any(v['name'] in ['cache-probe', 'lite-cache-probe', 'source-reader-token'] for v in d['spec']['template']['spec'].get('volumes', []))
 print('PASS block readiness has no JuiceFS reader or cache mounts')
-runner = next(d for d in docs if d['kind'] == 'Deployment' and d['metadata']['name'] == 'review-full-worker')['spec']['template']['spec']
+deployment = next(d for d in docs if d['kind'] == 'Deployment' and d['metadata']['name'] == 'review-full-worker')
+assert deployment['spec']['replicas'] == 0
+assert deployment['spec']['strategy'] == {'type': 'Recreate'}
+runner = deployment['spec']['template']['spec']
+assert runner['terminationGracePeriodSeconds'] == 960
+command = runner['containers'][0]['command']
+assert 'exec flock --nonblock --no-fork "$0"' in command[-2]
+assert command[-1] == config['workspaceRoot']
 assert runner['containers'][0]['securityContext'] == {'runAsUser': 1000, 'runAsGroup': 1000}
 init = runner['initContainers'][0]
 assert init['command'][-1] == 'chown 1000:1000 /full-volume'
