@@ -32,6 +32,7 @@ monitoring:
   unscheduledJobsAlertFor: 5m
   recoveryRunbookUrl: https://github.com/elegantthemes/gha-runner-autoscaler#recovery-alerts
   # Shared-controller pools reuse the controller namespace and scrape target.
+  arcEnabled: true # Enable ARC scraping and listener alerts for runner pools.
   arcControllerMonitoringEnabled: true
   arcControllerNamespace: ""
   arcRunnerScaleSetName: et-runners

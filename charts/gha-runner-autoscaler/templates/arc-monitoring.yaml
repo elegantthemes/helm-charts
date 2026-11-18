@@ -1,4 +1,4 @@
-{{- if .Values.monitoring.enabled }}
+{{- if and .Values.monitoring.enabled .Values.monitoring.arcEnabled }}
 {{- $listenerNamespace := default .Release.Namespace .Values.monitoring.arcControllerNamespace }}
 {{- $scaleSetName := .Values.monitoring.arcRunnerScaleSetName }}
 {{- if .Values.monitoring.arcControllerMonitoringEnabled }}
