@@ -4,10 +4,10 @@
 {{- $lite := include "deephive.liteCommands" . | fromJson }}
 {{- $reader := include "deephive.sourceReader" (dict "context" . "codeRoot" (default "/srv/deephive" .Values.INSTALL_PATH)) | fromJson }}
 {{- if and (or .Values.fullWorker.routingEnabled .Values.fullWorker.taskAllowlist .Values.fullWorker.observationEnabled) (not .Values.fullWorker.enabled) }}{{ fail "Routing or observation requires fullWorker.enabled" }}{{ end }}
-{{- if and (or .Values.fullWorker.routingEnabled .Values.fullWorker.taskAllowlist) (or (not .Values.fullWorker.sourceSeedPath) (not (hasPrefix "/" .Values.fullWorker.sourceSeedPath)) (not $lite.admit) (not $lite.release) (not (hasPrefix "/" .Values.fullWorker.liteScratchRoot)) (not $reader.command) (not ($reader.readerId | trim)) (not .Values.fullWorker.evidenceBucket) (not .Values.fullWorker.publicOrigin)) }}{{ fail "Routing requires source seed, fresh reader, private evidence bucket and stable origin" }}{{ end }}
+{{- if and (or .Values.fullWorker.routingEnabled .Values.fullWorker.taskAllowlist) (or (not .Values.fullWorker.sourceSeedPath) (not (hasPrefix "/" .Values.fullWorker.sourceSeedPath)) (not $lite.admit) (not $lite.release) (not (hasPrefix "/" .Values.fullWorker.liteScratchRoot)) (not .Values.fullWorker.evidenceBucket) (not .Values.fullWorker.publicOrigin)) }}{{ fail "Routing requires source seed, private evidence bucket and stable origin" }}{{ end }}
 {{- if or .Values.fullWorker.routingEnabled .Values.fullWorker.taskAllowlist }}
-{{- range $command := list $reader.command $lite.admit $lite.release .Values.fullWorker.liteInstallCommand }}
-{{- if and $command (not (hasPrefix "/" (index $command 0))) }}{{ fail "Source reader and lite-worker fencing commands must use absolute executable paths" }}{{ end }}
+{{- range $command := list $lite.admit $lite.release .Values.fullWorker.liteInstallCommand }}
+{{- if and $command (not (hasPrefix "/" (index $command 0))) }}{{ fail "Lite-worker fencing commands must use absolute executable paths" }}{{ end }}
 {{- end }}
 {{- end }}
 {{- if and .Values.fullWorker.evidenceBucket (not .Values.fullWorker.evidenceRegion) }}{{ fail "Private evidence bucket requires its region" }}{{ end }}
@@ -23,14 +23,14 @@
 {{- if and .Values.fullWorker.evidenceBucket (has .Values.fullWorker.evidenceReadSecret (list "secrets" .Values.fullWorker.runnerSecret .Values.fullWorker.agentSecret (.Values.fullWorker.integrationSecret | default ""))) }}{{ fail "Evidence requires a dedicated read-only Secret separate from runner, agent and consumer credentials" }}{{ end }}
 {{- if or .Values.fullWorker.routingEnabled .Values.fullWorker.taskAllowlist }}
 {{- if ne (toJson .Values.WORKSPACE_ACCESS_MODES) (toJson (list "ReadWriteOnce")) }}{{ fail "Routing requires a ReadWriteOnce block workspace" }}{{ end }}
-{{- if or (not .Values.NODE_SELECTOR_HOSTNAME) (ne .Values.NODE_SELECTOR_HOSTNAME .Values.fullWorker.nodeName) }}{{ fail "Block workspace requires consumer and Full worker on the same node" }}{{ end }}
+{{- if not .Values.NODE_SELECTOR_HOSTNAME }}{{ fail "Block workspace requires an explicit consumer node" }}{{ end }}
 
 {{- $scratch := .Values.fullWorker.liteScratchRoot }}
 {{- $source := .Values.fullWorker.workspaceRoot }}
 {{- if or (eq $scratch "/") (ne (clean $scratch) $scratch) (eq $scratch $source) (hasPrefix (printf "%s/" $source) $scratch) (hasPrefix (printf "%s/" $scratch) $source) }}{{ fail "Lite scratch must be canonical and disjoint from the shared candidate source workspace" }}{{ end }}
 {{- end }}
 {{- $workspaceClaim := default (printf "%s-workspace" .Release.Name) .Values.WORKSPACE_CLAIM_NAME -}}
-{{- if and (or .Values.fullWorker.routingEnabled .Values.fullWorker.taskAllowlist) (or (ne $workspaceClaim .Values.fullWorker.workspaceClaim) (ne .Values.WORKSPACE_ROOT .Values.fullWorker.workspaceRoot) (not (hasPrefix "/" .Values.fullWorker.workspaceRoot))) }}{{ fail "Routing requires consumer and runner to share the same workspace claim and absolute canonical workspace root" }}{{ end }}
+{{- if and (or .Values.fullWorker.routingEnabled .Values.fullWorker.taskAllowlist) (or (eq $workspaceClaim .Values.fullWorker.workspaceClaim) (ne .Values.WORKSPACE_ROOT .Values.fullWorker.workspaceRoot) (not (hasPrefix "/" .Values.fullWorker.workspaceRoot))) }}{{ fail "Routing requires distinct Lite and Full workspace claims with the same absolute canonical root" }}{{ end }}
 {{- if and (or .Values.fullWorker.routingEnabled .Values.fullWorker.taskAllowlist) (or (ne (clean .Values.fullWorker.sourceSeedPath) .Values.fullWorker.sourceSeedPath) (ne (clean .Values.fullWorker.workspaceRoot) .Values.fullWorker.workspaceRoot) (not (hasPrefix (printf "%s/" .Values.fullWorker.workspaceRoot) .Values.fullWorker.sourceSeedPath))) }}{{ fail "Routing source seed must be a canonical descendant of the shared workspace root" }}{{ end }}
 {{- if or .Values.fullWorker.routingEnabled .Values.fullWorker.taskAllowlist }}
 {{- if not .Values.fullWorker.runnerEnabled }}{{ fail "Routing requires runnerEnabled=true after protection installation" }}{{ end }}

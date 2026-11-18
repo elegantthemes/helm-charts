@@ -4,11 +4,11 @@
 {{- if or (not $f.enabled) $f.routingEnabled $f.taskAllowlist }}{{ fail "Export source seed with protections enabled and routing disabled" }}{{ end }}
 {{- if or (not (hasPrefix (printf "%s/" $f.workspaceRoot) $f.sourceSeedPath)) (ne (clean $f.sourceSeedPath) $f.sourceSeedPath) }}{{ fail "Source seed export requires a canonical workspace descendant" }}{{ end }}
 {{- $claim := default (printf "%s-workspace" .Release.Name) .Values.WORKSPACE_CLAIM_NAME }}
-{{- if or (ne $claim $f.workspaceClaim) (ne .Values.WORKSPACE_ROOT $f.workspaceRoot) }}{{ fail "Source seed export must share the active consumer workspace claim and root" }}{{ end }}
+{{- if or (eq $claim $f.workspaceClaim) (ne .Values.WORKSPACE_ROOT $f.workspaceRoot) }}{{ fail "Source seed export requires the consumer root and a distinct Full workspace claim" }}{{ end }}
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: {{ .Release.Name | trunc 46 | trimSuffix "-" }}-seed-{{ list .Release.Namespace .Release.Name .Chart.Version $f.sessionImage $f.sourceSeedPath $f.workspaceClaim $f.workspaceRoot $f.nodeName $f.pullSecret $f.prepullTolerations | toJson | sha256sum | trunc 10 }}
+  name: {{ .Release.Name | trunc 46 | trimSuffix "-" }}-seed-{{ list .Release.Namespace .Release.Name .Chart.Version $f.sessionImage $f.sourceSeedPath $claim $f.workspaceRoot .Values.NODE_SELECTOR_HOSTNAME $f.pullSecret $f.prepullTolerations | toJson | sha256sum | trunc 10 }}
 spec:
   backoffLimit: 0
   activeDeadlineSeconds: 3600
@@ -21,7 +21,7 @@ spec:
       restartPolicy: Never
       automountServiceAccountToken: false
       nodeSelector:
-        kubernetes.io/hostname: {{ $f.nodeName | quote }}
+        kubernetes.io/hostname: {{ required "Consumer node required for seed export" .Values.NODE_SELECTOR_HOSTNAME | quote }}
       tolerations:
         - { key: deephive-full, operator: Equal, value: "true", effect: NoSchedule }
 {{- with $f.prepullTolerations }}
@@ -43,5 +43,5 @@ spec:
       volumes:
         - name: workspace
           persistentVolumeClaim:
-            claimName: {{ $f.workspaceClaim | quote }}
+            claimName: {{ $claim | quote }}
 {{- end }}

@@ -1,5 +1,12 @@
 {{- define "deephive.sourceReader" -}}
-{{- dict "readerId" "shared-block-readiness-v1" "command" (list "/usr/bin/env" "node" (printf "%s/dist/scripts/environment/block-source-reader.js" .codeRoot) .context.Values.fullWorker.workspaceRoot) | toJson -}}
+{{- $storage := default "ordinary" .storage -}}
+{{- $root := .context.Values.WORKSPACE_ROOT -}}
+{{- $peer := printf "http://%s:3001" (include "deephive.fullWorkerName" .context) -}}
+{{- if eq $storage "full" -}}
+{{- $root = .context.Values.fullWorker.workspaceRoot -}}
+{{- $peer = printf "http://%s-consumer:%v" .context.Release.Name .context.Values.PORT -}}
+{{- end -}}
+{{- dict "transfer" (dict "storage" $storage "workspaceRoot" $root "peer" $peer) | toJson -}}
 {{- end -}}
 
 {{- define "deephive.readerWorkloadNamespace" -}}

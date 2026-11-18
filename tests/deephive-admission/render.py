@@ -184,7 +184,7 @@ plain = render()
 assert item(plain, 'NetworkPolicy', '-sessions')['spec']['ingress'] == []
 assert all(rule['ports'][0]['port'] != 3002 for rule in item(plain, 'NetworkPolicy', '-full-worker-control')['spec']['ingress'])
 phase3 = copy.deepcopy(values)
-phase3.update(WORKSPACE_CLAIM_NAME='workspace', WORKSPACE_ROOT='/workspace-root', WORKSPACE_ACCESS_MODES=['ReadWriteOnce'], NODE_SELECTOR_HOSTNAME='test-execution', VIRTUAL_HOST='deephive.example')
+phase3.update(WORKSPACE_CLAIM_NAME='workspace-lite', WORKSPACE_ROOT='/workspace-root', WORKSPACE_ACCESS_MODES=['ReadWriteOnce'], NODE_SELECTOR_HOSTNAME='test-consumer', VIRTUAL_HOST='deephive.example')
 phase3['fullWorker'].update(
     routingEnabled=True, runnerEnabled=True, observationEnabled=True, sourceSeedPath='/workspace-root/seed',
     sourceReader={'readerId': 'fresh-csi-fixture', 'command': ['/opt/bin/read-source']},
@@ -249,8 +249,8 @@ valid_port['fullWorker']['publicOrigin'] = 'https://deephive.example:8443'
 render(config=valid_port)
 for key in ['WORKSPACE_CLAIM_NAME', 'WORKSPACE_ROOT']:
     missing = copy.deepcopy(phase3)
-    missing[key] = 'different' if key.endswith('NAME') else '/different-root'
-    rejected(missing, 'share the same workspace claim')
+    missing[key] = phase3['fullWorker']['workspaceClaim'] if key.endswith('NAME') else '/different-root'
+    rejected(missing, 'distinct Lite and Full workspace claims')
 print('PASS canonical origin ports and shared workspace claim/root admission')
 
 for seed in ['/workspace/seed', '/workspace-root', '/workspace-root/../seed', '/workspace-root//seed']:
@@ -274,8 +274,8 @@ missing = copy.deepcopy(phase3)
 missing['WORKSPACE_ACCESS_MODES'] = ['ReadWriteMany']
 rejected(missing, 'ReadWriteOnce')
 missing = copy.deepcopy(phase3)
-missing['NODE_SELECTOR_HOSTNAME'] = 'different-node'
-rejected(missing, 'same node')
+missing['NODE_SELECTOR_HOSTNAME'] = ''
+rejected(missing, 'explicit consumer node')
 for secret in ['runner', 'agent', 'integration', 'secrets']:
     missing = copy.deepcopy(phase3)
     missing['fullWorker']['evidenceReadSecret'] = secret
@@ -345,7 +345,8 @@ rejected(invalid, 'not both')
 print('PASS built-in capacity config, commands, scratch and budget validation')
 seed = copy.deepcopy(values)
 seed['WORKSPACE_ROOT'] = seed['fullWorker'].get('workspaceRoot', '/workspace-root')
-seed['WORKSPACE_CLAIM_NAME'] = seed['fullWorker']['workspaceClaim']
+seed['WORKSPACE_CLAIM_NAME'] = 'workspace-lite'
+seed['NODE_SELECTOR_HOSTNAME'] = 'test-consumer'
 seed['fullWorker'].update(sourceSeedExportEnabled=True, sourceSeedPath='/workspace-root/seeds/candidate')
 docs = render(config=seed)
 job = next(p for p in docs if p['kind'] == 'Job' and '-seed-' in p['metadata']['name'])
@@ -370,15 +371,16 @@ print('PASS uninstall hook can read both drained deployment identities')
 # Source export is prepared against the same claim and root even with routing off.
 seed = copy.deepcopy(values)
 seed['WORKSPACE_ROOT'] = seed['fullWorker'].get('workspaceRoot', '/workspace-root')
-seed['WORKSPACE_CLAIM_NAME'] = seed['fullWorker']['workspaceClaim']
+seed['WORKSPACE_CLAIM_NAME'] = 'workspace-lite'
+seed['NODE_SELECTOR_HOSTNAME'] = 'test-consumer'
 seed['fullWorker'].update(sourceSeedExportEnabled=True, sourceSeedPath='/workspace-root/seeds/candidate')
 docs = render(config=seed)
 job = next(p for p in docs if p['kind'] == 'Job' and '-seed-' in p['metadata']['name'])
 assert {'key': 'deephive-full', 'operator': 'Equal', 'value': 'true', 'effect': 'NoSchedule'} in job['spec']['template']['spec']['tolerations']
 for key in ['WORKSPACE_CLAIM_NAME', 'WORKSPACE_ROOT']:
     invalid = copy.deepcopy(seed)
-    invalid[key] = 'other' if key == 'WORKSPACE_CLAIM_NAME' else '/other'
-    rejected(invalid, 'active consumer workspace')
+    invalid[key] = seed['fullWorker']['workspaceClaim'] if key == 'WORKSPACE_CLAIM_NAME' else '/other'
+    rejected(invalid, 'consumer root and a distinct Full workspace claim')
 runner = item(docs, 'Deployment', '-full-worker')['spec']['template']['spec']
 assert all(v['hostPath']['type'] == 'Directory' for v in runner['volumes'] if 'hostPath' in v)
 hook = item(docs, 'Job', '-session-drain-check')

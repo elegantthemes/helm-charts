@@ -1,5 +1,5 @@
 {{- include "deephive.normalizeWorkerValues" . -}}
-{{- $reader := include "deephive.sourceReader" (dict "context" . "codeRoot" "/opt/deephive") | fromJson }}
+{{- $reader := include "deephive.sourceReader" (dict "context" . "codeRoot" "/opt/deephive" "storage" "full") | fromJson }}
 {{- if .Values.fullWorker.enabled }}
 {{- $f := .Values.fullWorker }}
 {{- $github := $f.githubSecretRef | default dict }}
@@ -23,6 +23,17 @@
 {{- range $image := append $f.compatibleSessionImages $f.sessionImage }}
 {{- if and (not (has $image $f.legacyProtocol2Images)) (not (regexMatch "^[a-f0-9]{64}$" (index $f.approvedBootstraps $image | default ""))) }}{{ fail "Every pinned and compatible session image requires its approved bootstrap/runtime identity" }}{{ end }}
 {{- end }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ required "Full workspace claim required" $f.workspaceClaim | quote }}
+  annotations: { helm.sh/resource-policy: keep }
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests: { storage: {{ .Values.WORKSPACE_STORAGE_SIZE | quote }} }
+  storageClassName: {{ .Values.WORKSPACE_STORAGE_CLASS_NAME | quote }}
+---
 apiVersion: v1
 kind: ServiceAccount
 metadata:
@@ -210,6 +221,10 @@ spec:
     - from:
         - podSelector:
             matchLabels: { app.kubernetes.io/name: deephive-session, app.kubernetes.io/instance: {{ .Release.Name | quote }} }
+      ports: [{ protocol: TCP, port: 3001 }]
+    - from:
+        - podSelector:
+            matchLabels: { app: {{ .Release.Name }} }
       ports: [{ protocol: TCP, port: 3001 }]
 ---
 apiVersion: apps/v1
