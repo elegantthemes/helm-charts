@@ -114,8 +114,20 @@ spec:
       serviceAccountName: {{ (include "deephive.fullWorkerName" .) }}
       imagePullSecrets:
         - name: {{ required "Private pull secret required" $f.pullSecret | quote }}
+      initContainers:
+        - name: prepare-workspace-volume
+          image: {{ $f.runnerImage | quote }}
+          command: ["/bin/sh", "-ec", "chown 1000:1000 /full-volume"]
+          securityContext:
+            runAsUser: 0
+            runAsGroup: 0
+            allowPrivilegeEscalation: false
+            capabilities: { drop: [ALL], add: [CHOWN] }
+          volumeMounts:
+            - { name: workspace, mountPath: /full-volume }
       containers:
         - name: runner
+          securityContext: { runAsUser: 1000, runAsGroup: 1000 }
           image: {{ $f.runnerImage | quote }}
           command:
             - /bin/bash

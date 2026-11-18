@@ -26,3 +26,8 @@ for d in docs:
  if d['kind'] == 'Deployment':
   assert not any(v['name'] in ['cache-probe', 'lite-cache-probe', 'source-reader-token'] for v in d['spec']['template']['spec'].get('volumes', []))
 print('PASS block readiness has no JuiceFS reader or cache mounts')
+runner = next(d for d in docs if d['kind'] == 'Deployment' and d['metadata']['name'] == 'review-full-worker')['spec']['template']['spec']
+assert runner['containers'][0]['securityContext'] == {'runAsUser': 1000, 'runAsGroup': 1000}
+init = runner['initContainers'][0]
+assert init['command'][-1] == 'chown 1000:1000 /full-volume'
+assert init['volumeMounts'] == [{'name': 'workspace', 'mountPath': '/full-volume'}]

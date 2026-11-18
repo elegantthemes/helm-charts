@@ -48,21 +48,19 @@ Observation requires a `runnerSecretRevision` value. Increment it and upgrade
 Helm after rotating the observation token: both runner and consumer templates
 include this revision, so both processes reload the token.
 
-Routing requires the consumer and runner to mount the same workspace PVC at the
-same absolute canonical root (`WORKSPACE_CLAIM_NAME`/`WORKSPACE_ROOT` and
-`fullWorker.workspaceClaim`/`workspaceRoot`). Public origins use lowercase
-DNS hosts, matching the chart ingress deployment. IP-literal origins are not
-supported by this chart. Optional nondefault ports must be 1–65535; omit port
-443 and leading zeroes so the configured string matches the browser Origin.
+Routing requires distinct ReadWriteOnce claims for Lite and Full, mounted at
+the same absolute canonical root. Set the Lite claim and mount via
+`WORKSPACE_CLAIM_NAME` and `WORKSPACE_ROOT`, and the Full claim and mount via
+`fullWorker.workspaceClaim` and `fullWorker.workspaceRoot`. Pin Lite with
+`NODE_SELECTOR_HOSTNAME` and retain Full's dedicated `fullWorker.nodeName`.
 
-The trusted credential-free source seed must be a canonical descendant of that
-shared workspace mount, for example `/workspace-root/seed`. Rendering rejects
-outside paths and lexical traversal/aliases. Phase 4 still verifies the actual
-seed contents and fresh CSI mount; Helm cannot establish filesystem freshness.
+The credential-free source seed lives under the Lite mount, for example
+`/workspace-root/seed`. Lite scratch stays outside the workspace root.
+The private transfer copies stopped Lite source before Full starts and returns
+stopped Full edits before releasing its owner. In staging, verify both claims
+bind on their intended nodes and exercise a full round trip with unpublished
+changes. See the [workspace cutover guide](../../charts/deephive/remove-juicefs.md).
 
-Routing participants share a ReadWriteMany claim because consumers and the
-pinned runner can occupy different nodes. Lite scratch must be canonical
-and outside the entire shared candidate workspace. The public-origin hostname
-must match `VIRTUAL_HOST`. Evidence reader credentials use a dedicated Secret,
-separate from runner, agent/integration and lite consumer Secrets; Phase 4
-verifies actual read-only IAM permissions and RWX CSI behavior.
+Public origins use lowercase DNS hosts matching `VIRTUAL_HOST`. Use ports
+1–65535 for a nondefault port and omit port 443 and leading zeroes. Evidence
+reader credentials use a dedicated Secret. Verify read-only IAM in staging.
