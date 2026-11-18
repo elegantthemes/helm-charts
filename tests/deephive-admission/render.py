@@ -16,7 +16,7 @@ fixture = tempfile.TemporaryDirectory(prefix='deephive-installed-admission-')
 fixture_chart = Path(fixture.name) / 'deephive'
 chart = root.parent.parent / 'charts/deephive'
 shutil.copytree(chart, fixture_chart)
-for name in ['session-lifecycle.yml', 'source-reader.yml']:
+for name in ['session-lifecycle.yml']:
     path = fixture_chart / 'templates' / name
     text = path.read_text()
     if name == 'session-lifecycle.yml':
@@ -40,10 +40,6 @@ for name in ['session-lifecycle.yml', 'source-reader.yml']:
 # Model bindings retained from a previously running release for stop/cleanup tests.
 for filename, expressions in {
     'full-worker.yml': ['lookup "rbac.authorization.k8s.io/v1" "RoleBinding" .Release.Namespace (include "deephive.fullWorkerName" .)'],
-    'source-reader.yml': [
-        'lookup "rbac.authorization.k8s.io/v1" "RoleBinding" $readerNS $name',
-        'lookup "rbac.authorization.k8s.io/v1" "RoleBinding" .Release.Namespace (printf "%s-workspace" $name)',
-        'lookup "rbac.authorization.k8s.io/v1" "ClusterRoleBinding" "" $policy'],
 }.items():
     path = fixture_chart / 'templates' / filename
     text = path.read_text()
@@ -81,13 +77,13 @@ with tempfile.TemporaryDirectory(prefix='deephive-legacy-values-') as tmp:
     shutil.copytree(chart, legacy_chart)
     defaults = yaml.safe_load((chart / 'values.yaml').read_text())
     legacy = defaults.pop('fullWorker')
-    for suffix in ['Capacity', 'AdmissionCommand', 'InstallCommand', 'HandoffCommand', 'ScratchRoot', 'CacheProbePath']:
+    for suffix in ['Capacity', 'AdmissionCommand', 'InstallCommand', 'HandoffCommand', 'ScratchRoot']:
         legacy['ordinary' + suffix] = legacy.pop('lite' + suffix)
     defaults['fullEnvironment'] = legacy
     (legacy_chart / 'values.yaml').write_text(yaml.safe_dump(defaults))
     config = copy.deepcopy(values)
     configured = config.pop('fullWorker')
-    for suffix in ['Capacity', 'AdmissionCommand', 'InstallCommand', 'HandoffCommand', 'ScratchRoot', 'CacheProbePath']:
+    for suffix in ['Capacity', 'AdmissionCommand', 'InstallCommand', 'HandoffCommand', 'ScratchRoot']:
         if 'lite' + suffix in configured:
             configured['ordinary' + suffix] = configured.pop('lite' + suffix)
     config['fullEnvironment'] = configured
@@ -188,7 +184,7 @@ plain = render()
 assert item(plain, 'NetworkPolicy', '-sessions')['spec']['ingress'] == []
 assert all(rule['ports'][0]['port'] != 3002 for rule in item(plain, 'NetworkPolicy', '-full-worker-control')['spec']['ingress'])
 phase3 = copy.deepcopy(values)
-phase3.update(WORKSPACE_CLAIM_NAME='workspace', WORKSPACE_ROOT='/workspace-root', WORKSPACE_ACCESS_MODES=['ReadWriteMany'], VIRTUAL_HOST='deephive.example')
+phase3.update(WORKSPACE_CLAIM_NAME='workspace', WORKSPACE_ROOT='/workspace-root', WORKSPACE_ACCESS_MODES=['ReadWriteOnce'], NODE_SELECTOR_HOSTNAME='test-execution', VIRTUAL_HOST='deephive.example')
 phase3['fullWorker'].update(
     routingEnabled=True, runnerEnabled=True, observationEnabled=True, sourceSeedPath='/workspace-root/seed',
     sourceReader={'readerId': 'fresh-csi-fixture', 'command': ['/opt/bin/read-source']},
@@ -212,11 +208,6 @@ def rejected(config, expected):
     activated = config['fullWorker'].get('runnerEnabled') or config.get('sourceReaderService', {}).get('running')
     result = subprocess.run(['helm', 'template', 'review', str(fixture_chart if activated else chart), '-f', '-'], input=json.dumps(config), text=True, capture_output=True)
     assert result.returncode != 0 and expected in result.stderr, result.stderr
-missing = copy.deepcopy(phase3)
-missing['fullWorker']['sourceReader']['readerId'] = ''
-rejected(missing, 'fresh reader')
-missing['fullWorker']['sourceReader']['readerId'] = '  '
-rejected(missing, 'fresh reader')
 missing = copy.deepcopy(phase3)
 missing['fullWorker']['approvedBootstraps'] = {}
 rejected(missing, 'approved bootstrap/runtime identity')
@@ -280,8 +271,11 @@ missing = copy.deepcopy(phase3)
 missing['fullWorker']['publicOrigin'] = 'https://other.example'
 rejected(missing, 'hostname must match')
 missing = copy.deepcopy(phase3)
-missing['WORKSPACE_ACCESS_MODES'] = ['ReadWriteOnce']
-rejected(missing, 'ReadWriteMany')
+missing['WORKSPACE_ACCESS_MODES'] = ['ReadWriteMany']
+rejected(missing, 'ReadWriteOnce')
+missing = copy.deepcopy(phase3)
+missing['NODE_SELECTOR_HOSTNAME'] = 'different-node'
+rejected(missing, 'same node')
 for secret in ['runner', 'agent', 'integration', 'secrets']:
     missing = copy.deepcopy(phase3)
     missing['fullWorker']['evidenceReadSecret'] = secret
@@ -321,13 +315,11 @@ print('PASS protection-first install and drain-before-uninstall gate')
 # Local task cancellation does not require a privileged node-wide fence command.
 changed = copy.deepcopy(values)
 changed['fullWorker']['pressureCommand'] = []
+changed['WORKSPACE_ROOT'] = '/workspace'
 docs = render(config=changed)
 consumer = next(p for p in docs if p['kind'] == 'Deployment' and p['metadata']['name'] == 'review')['spec']['template']['spec']
-probe = next(v for v in consumer['volumes'] if v['name'] == 'lite-cache-probe')
-assert probe['hostPath'] == {'path': '/var/lib/deephive/cache', 'type': 'Directory'}
-mount = next(v for v in consumer['containers'][0]['volumeMounts'] if v['name'] == 'lite-cache-probe')
-assert mount['readOnly'] is True
-assert next(e for e in consumer['containers'][0]['env'] if e['name'] == 'LITE_WORKER_CACHE_ROOT')['value'] == '/lite-cache-probe'
+assert not any(v['name'] == 'lite-cache-probe' for v in consumer['volumes'])
+assert next(e for e in consumer['containers'][0]['env'] if e['name'] == 'LITE_WORKER_CACHE_ROOT')['value'] == changed.get('WORKSPACE_ROOT', '')
 print('PASS local pressure probe and optional infrastructure hook')
 
 # Built-in hooks receive the exact config consumed by the compiled CLI.
@@ -404,76 +396,13 @@ invalid['fullWorker']['runnerEnabled'] = False
 rejected(invalid, 'runnerEnabled=true')
 invalid = copy.deepcopy(phase3)
 invalid['sourceReaderService'] = {'enabled': True, 'running': False, 'tokenSecret': 'reader-token', 'tokenRevision': '1', 'nodeName': 'reader-node'}
-rejected(invalid, 'managed source reader running=true')
+rejected(invalid, 'JuiceFS source reader retired')
 managed = copy.deepcopy(values)
-managed['INSTALL_PATH'] = '/custom/deephive'
-managed['sourceReaderService'] = invalid['sourceReaderService']
-docs = render(config=managed)
-command = json.loads(next(e['value'] for e in consumer_template(docs)['spec']['containers'][0]['env'] if e['name'] == 'FULL_WORKER_READER_CONFIG'))['command']
-assert command[2] == '/custom/deephive/dist/scripts/environment/remote-source-reader.js'
-seed = copy.deepcopy(values)
-seed.update(WORKSPACE_ROOT='/workspace-root', WORKSPACE_CLAIM_NAME='workspace')
-seed['fullWorker'].update(sourceSeedExportEnabled=True, sourceSeedPath='/workspace-root/seeds/candidate')
-def seed_name(config):
-    return next(p['metadata']['name'] for p in render(config=config) if p['kind'] == 'Job' and '-seed-' in p['metadata']['name'])
-original = seed_name(seed)
-for key, value in [('nodeName', 'other-node'), ('pullSecret', 'new-pull'), ('prepullTolerations', [{'key': 'extra', 'operator': 'Exists'}])]:
-    changed = copy.deepcopy(seed)
-    changed['fullWorker'][key] = value
-    assert seed_name(changed) != original
-print('PASS routing activation, custom install root and immutable seed-job replacement')
-
-managed = copy.deepcopy(values)
-managed['sourceReaderService'] = {'enabled': True, 'running': True, 'tokenSecret': 'reader-token', 'tokenRevision': '1', 'nodeName': 'reader-node'}
-docs = render(config=managed)
-reader_namespace = json.loads(item(docs, 'ConfigMap', '-source-reader')['data']['reader.json'])['namespace']
-assert reader_namespace != 'dph-app' and len(reader_namespace) <= 63
-bindings = [d for d in docs if d['kind'] == 'RoleBinding' and d['metadata']['name'] == 'review-source-reader']
-assert len(bindings) == 1 and bindings[0]['metadata']['namespace'] == reader_namespace
-assert bindings[0]['subjects'][0]['namespace'] == 'dph-app'
-roles = [d for d in docs if d['kind'] == 'Role' and any('pods/log' in r['resources'] for r in d['rules'])]
-assert roles and all(d['metadata']['namespace'] == reader_namespace for d in roles)
-workspace = item(docs, 'Role', '-source-reader-workspace')
-assert workspace['rules'] == [{'apiGroups': [''], 'resources': ['persistentvolumeclaims'], 'resourceNames': ['workspace'], 'verbs': ['get']}]
-network = item(docs, 'NetworkPolicy', '-source-reader-workloads')
-assert network['metadata']['namespace'] == reader_namespace and network['spec']['egress'] == []
-for name, volume in [('review', 'source-reader-token'), ('review-full-worker', 'source-reader-token'), ('review-source-reader', 'token')]:
-    pod = next(p for p in docs if p['kind'] == 'Deployment' and p['metadata']['name'] == name)['spec']['template']['spec']
-    secret = next(v['secret'] for v in pod['volumes'] if v['name'] == volume)
-    assert secret['items'] == [{'key': 'token', 'path': 'token'}]
-reader_drain = item(docs, 'Role', '-session-drain-check-reader')
-assert reader_drain['metadata']['namespace'] == reader_namespace
-assert reader_drain['rules'][0]['resources'] == ['pods', 'persistentvolumeclaims']
-script = item(docs, 'Job', '-session-drain-check')['spec']['template']['spec']['containers'][0]['args'][0]
-assert reader_namespace in script and '/persistentvolumeclaims?labelSelector=' in script
-invalid = copy.deepcopy(managed)
-invalid['sourceReaderService']['tokenSecret'] = 'runner'
-rejected(invalid, 'dedicated Secret')
-print('PASS dedicated reader namespace, scoped logs, kubelet-only credentials and token projections')
-
-stopped = copy.deepcopy(managed)
-stopped['sourceReaderService']['running'] = False
+managed['sourceReaderService'] = {'enabled': True}
+rejected(managed, 'JuiceFS source reader retired')
+stopped = copy.deepcopy(values)
 stopped['fullWorker']['runnerEnabled'] = False
-docs = render(config=stopped, installed=True)
-for name in ['review-full-worker', 'review-source-reader', 'review-source-reader-workspace']:
-    assert any(d['kind'] == 'RoleBinding' and d['metadata']['name'] == name for d in docs)
-assert any(d['kind'] == 'ClusterRoleBinding' and d['roleRef']['name'].startswith('dph-reader-') for d in docs)
-print('PASS stopped workloads retain previously granted cleanup permissions')
-
-long_names = set()
-for release in ['a' * 50 + 'one', 'a' * 50 + 'two']:
-    docs = render(release=release, config=managed)
-    broker = next(d for d in docs if d['kind'] == 'Deployment' and d['metadata']['name'].startswith('a') and any(v.get('name') == 'token' for v in d['spec']['template']['spec'].get('volumes', [])))
-    name = broker['metadata']['name']
-    assert len(name) <= 53 and name not in long_names
-    long_names.add(name)
-    assert any(d['kind'] == 'Service' and d['metadata']['name'] == name for d in docs)
-    assert len(broker['spec']['template']['metadata']['labels']['app']) <= 63
-    consumer = next(d for d in docs if d['kind'] == 'Deployment' and d['metadata']['name'] == release)
-    config = json.loads(next(e['value'] for e in consumer['spec']['template']['spec']['containers'][0]['env'] if e['name'] == 'FULL_WORKER_READER_CONFIG'))
-    assert 'http://' + name + ':3003' in config['command']
-    assert all(len(d['metadata']['name']) <= 63 for d in docs if d['kind'] == 'Job')
-print('PASS bounded, collision-resistant reader and drain identities')
+print('PASS retired JuiceFS broker cannot be reactivated')
 
 with tempfile.TemporaryDirectory(prefix='reader-default-off-') as temp:
     target = Path(temp) / 'chart'

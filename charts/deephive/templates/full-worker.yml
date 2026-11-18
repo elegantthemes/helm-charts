@@ -80,7 +80,7 @@ metadata:
   name: {{ (include "deephive.fullWorkerName" .) }}
 data:
   runner.json: |
-    {{ dict "namespace" .Release.Namespace "release" .Release.Name "nodeName" $f.nodeName "image" $f.sessionImage "databaseImage" $f.databaseImage "imagePullSecret" $f.pullSecret "agentSecret" (required "Session agent Secret required" $f.agentSecret) "integrationSecret" ($f.integrationSecret | default "") "githubSecretRef" ($f.githubSecretRef | default dict) "workspaceClaim" $f.workspaceClaim "workspaceRoot" $f.workspaceRoot "scratchRoot" "/node-scratch" "cacheRoot" "/node-cache" "runnerUrl" (printf "http://%s:3001" (include "deephive.fullWorkerName" .)) "pressureCommand" $f.pressureCommand "signingKeyFile" "/runner-secret/signing-key" "controlPort" 3001 "observationPort" (ternary 3002 0 $f.observationEnabled) "observationTokenFile" "/runner-secret/observation-token" "approvedBootstraps" $f.approvedBootstraps "sourceReader" $reader "sessionProtocol" $f.sessionProtocol "draining" $f.draining "validationTimeoutMs" $f.validationTimeoutMs | toJson }}
+    {{ dict "namespace" .Release.Namespace "release" .Release.Name "nodeName" $f.nodeName "image" $f.sessionImage "databaseImage" $f.databaseImage "imagePullSecret" $f.pullSecret "agentSecret" (required "Session agent Secret required" $f.agentSecret) "integrationSecret" ($f.integrationSecret | default "") "githubSecretRef" ($f.githubSecretRef | default dict) "workspaceClaim" $f.workspaceClaim "workspaceRoot" $f.workspaceRoot "scratchRoot" "/node-scratch" "cacheRoot" $f.workspaceRoot "runnerUrl" (printf "http://%s:3001" (include "deephive.fullWorkerName" .)) "pressureCommand" $f.pressureCommand "signingKeyFile" "/runner-secret/signing-key" "controlPort" 3001 "observationPort" (ternary 3002 0 $f.observationEnabled) "observationTokenFile" "/runner-secret/observation-token" "approvedBootstraps" $f.approvedBootstraps "sourceReader" $reader "sessionProtocol" $f.sessionProtocol "draining" $f.draining "validationTimeoutMs" $f.validationTimeoutMs | toJson }}
 {{/* The config contains no credentials; signing key is read from runner-only Secret. */}}
 ---
 apiVersion: apps/v1
@@ -94,9 +94,6 @@ spec:
   template:
     metadata:
       annotations:
-{{- if .Values.sourceReaderService.enabled }}
-        source-reader-token-revision: {{ .Values.sourceReaderService.tokenRevision | quote }}
-{{- end }}
         checksum/runner-config: {{ toJson (list $f .Values.DEEPHIVE_VERSION) | sha256sum | quote }}
       labels: { app: {{ (include "deephive.fullWorkerName" .) }}, deephive/worker-mode: full, redis-client: "true" }
     spec:
@@ -145,27 +142,17 @@ spec:
             timeoutSeconds: 2
             failureThreshold: 2
           volumeMounts:
-{{- if .Values.sourceReaderService.enabled }}
-            - { name: source-reader-token, mountPath: /source-reader-token, readOnly: true }
-{{- end }}
             - { name: config, mountPath: /runner-config, readOnly: true }
             - { name: secret, mountPath: /runner-secret, readOnly: true }
             - { name: workspace, mountPath: {{ $f.workspaceRoot | quote }}, mountPropagation: HostToContainer }
-            - { name: cache-probe, mountPath: /node-cache, readOnly: true }
             - { name: scratch-probe, mountPath: /node-scratch, readOnly: true }
       volumes:
-{{- if .Values.sourceReaderService.enabled }}
-        - name: source-reader-token
-          secret: { secretName: {{ .Values.sourceReaderService.tokenSecret | quote }}, items: [{ key: token, path: token }] }
-{{- end }}
         - name: config
           configMap: { name: {{ (include "deephive.fullWorkerName" .) }} }
         - name: secret
           secret: { secretName: {{ $f.runnerSecret | quote }} }
         - name: workspace
           persistentVolumeClaim: { claimName: {{ required "Workspace claim required" $f.workspaceClaim | quote }} }
-        - name: cache-probe
-          hostPath: { path: {{ required "Retained CSI cache path required" $f.cacheProbePath | quote }}, type: Directory }
         - name: scratch-probe
           hostPath: { path: {{ required "Dedicated DeepHive scratch probe directory required" $f.scratchProbePath | quote }}, type: Directory }
 ---

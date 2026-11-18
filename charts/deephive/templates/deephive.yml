@@ -1,4 +1,5 @@
 {{- include "deephive.normalizeWorkerValues" . -}}
+{{- if .Values.sourceReaderService.enabled }}{{ fail "JuiceFS source reader retired: drain it and set sourceReaderService.enabled=false before cutover" }}{{ end }}
 {{- if gt (int .Values.REPLICAS) 1 }}{{ fail "Cache startup recovery requires at most one consumer replica" }}{{ end }}
 {{- $lite := include "deephive.liteCommands" . | fromJson }}
 {{- $reader := include "deephive.sourceReader" (dict "context" . "codeRoot" (default "/srv/deephive" .Values.INSTALL_PATH)) | fromJson }}
@@ -21,8 +22,9 @@
 {{- end }}
 {{- if and .Values.fullWorker.evidenceBucket (has .Values.fullWorker.evidenceReadSecret (list "secrets" .Values.fullWorker.runnerSecret .Values.fullWorker.agentSecret (.Values.fullWorker.integrationSecret | default ""))) }}{{ fail "Evidence requires a dedicated read-only Secret separate from runner, agent and consumer credentials" }}{{ end }}
 {{- if or .Values.fullWorker.routingEnabled .Values.fullWorker.taskAllowlist }}
-{{- if not (has "ReadWriteMany" .Values.WORKSPACE_ACCESS_MODES) }}{{ fail "Routing requires a ReadWriteMany shared workspace claim" }}{{ end }}
-{{- if or (not (hasPrefix "/" .Values.fullWorker.liteCacheProbePath)) (eq .Values.fullWorker.liteCacheProbePath "/") }}{{ fail "Routing requires an actual lite-worker retained-cache probe directory" }}{{ end }}
+{{- if ne (toJson .Values.WORKSPACE_ACCESS_MODES) (toJson (list "ReadWriteOnce")) }}{{ fail "Routing requires a ReadWriteOnce block workspace" }}{{ end }}
+{{- if or (not .Values.NODE_SELECTOR_HOSTNAME) (ne .Values.NODE_SELECTOR_HOSTNAME .Values.fullWorker.nodeName) }}{{ fail "Block workspace requires consumer and Full worker on the same node" }}{{ end }}
+
 {{- $scratch := .Values.fullWorker.liteScratchRoot }}
 {{- $source := .Values.fullWorker.workspaceRoot }}
 {{- if or (eq $scratch "/") (ne (clean $scratch) $scratch) (eq $scratch $source) (hasPrefix (printf "%s/" $source) $scratch) (hasPrefix (printf "%s/" $scratch) $source) }}{{ fail "Lite scratch must be canonical and disjoint from the shared candidate source workspace" }}{{ end }}
@@ -32,7 +34,7 @@
 {{- if and (or .Values.fullWorker.routingEnabled .Values.fullWorker.taskAllowlist) (or (ne (clean .Values.fullWorker.sourceSeedPath) .Values.fullWorker.sourceSeedPath) (ne (clean .Values.fullWorker.workspaceRoot) .Values.fullWorker.workspaceRoot) (not (hasPrefix (printf "%s/" .Values.fullWorker.workspaceRoot) .Values.fullWorker.sourceSeedPath))) }}{{ fail "Routing source seed must be a canonical descendant of the shared workspace root" }}{{ end }}
 {{- if or .Values.fullWorker.routingEnabled .Values.fullWorker.taskAllowlist }}
 {{- if not .Values.fullWorker.runnerEnabled }}{{ fail "Routing requires runnerEnabled=true after protection installation" }}{{ end }}
-{{- if and .Values.sourceReaderService.enabled (not .Values.sourceReaderService.running) }}{{ fail "Routing requires the managed source reader running=true" }}{{ end }}
+
 {{- end }}
 {{- if and .Values.LEGACY_WORKSPACE_RETAIN (eq $workspaceClaim (printf "%s-workspace" .Release.Name)) -}}
 {{- fail "LEGACY_WORKSPACE_RETAIN requires a different WORKSPACE_CLAIM_NAME" -}}
@@ -71,10 +73,8 @@ kind: PersistentVolumeClaim
 metadata:
   name: {{ $workspaceClaim }}
   namespace: {{ .Release.Namespace }}
-{{- if .Values.fullWorker.writebackEnabled }}
-  labels:
-    deephive.elegantthemes.com/writeback: enabled
-{{- end }}
+  annotations:
+    helm.sh/resource-policy: keep
 spec:
   accessModes:
 {{ toYaml .Values.WORKSPACE_ACCESS_MODES | indent 4 }}
@@ -120,9 +120,6 @@ spec:
     metadata:
       annotations:
         checksum/lite-capacity: {{ toJson .Values.fullWorker.liteCapacity | sha256sum | quote }}
-{{- if .Values.sourceReaderService.enabled }}
-        source-reader-token-revision: {{ .Values.sourceReaderService.tokenRevision | quote }}
-{{- end }}
 {{- if .Values.fullWorker.observationEnabled }}
         observation-secret-revision: {{ required "Runner Secret revision required with observation; increment it after token rotation" .Values.fullWorker.runnerSecretRevision | quote }}
 {{- end }}
@@ -180,8 +177,6 @@ spec:
               localhostProfile: {{ .Values.CODEX_SANDBOX_APPARMOR_PROFILE | quote }}
 {{- end }}
           env:
-            - name: WORKSPACE_COPY_METHOD
-              value: {{ .Values.WORKSPACE_COPY_METHOD | default "fs.cp" | quote }}
 {{- if or .Values.fullWorker.routingEnabled .Values.fullWorker.taskAllowlist }}
             - name: WORKSPACE_ROOT
               value: {{ .Values.WORKSPACE_ROOT | quote }}
@@ -203,7 +198,7 @@ spec:
             - name: LITE_WORKER_SCRATCH_ROOT
               value: {{ .Values.fullWorker.liteScratchRoot | quote }}
             - name: LITE_WORKER_CACHE_ROOT
-              value: {{ ternary "/lite-cache-probe" "" (not (empty .Values.fullWorker.liteCacheProbePath)) | quote }}
+              value: {{ .Values.WORKSPACE_ROOT | quote }}
             - name: FULL_WORKER_READER_CONFIG
               value: {{ toJson $reader | quote }}
 {{- if or .Values.fullWorker.observationEnabled .Values.fullWorker.evidenceBucket }}
@@ -299,14 +294,7 @@ spec:
             - name: lite-scratch
               mountPath: {{ .Values.fullWorker.liteScratchRoot | quote }}
 {{- end }}
-{{- if .Values.sourceReaderService.enabled }}
-            - { name: source-reader-token, mountPath: /source-reader-token, readOnly: true }
-{{- end }}
-{{- if .Values.fullWorker.liteCacheProbePath }}
-            - name: lite-cache-probe
-              mountPath: /lite-cache-probe
-              readOnly: true
-{{- end }}
+
             - name: wordpress
               mountPath: /srv
             - name: workspace
@@ -363,14 +351,7 @@ spec:
         - name: lite-scratch
           emptyDir: { sizeLimit: {{ .Values.fullWorker.liteCapacity.scratchSize | quote }} }
 {{- end }}
-{{- if .Values.sourceReaderService.enabled }}
-        - name: source-reader-token
-          secret: { secretName: {{ .Values.sourceReaderService.tokenSecret | quote }}, items: [{ key: token, path: token }] }
-{{- end }}
-{{- if .Values.fullWorker.liteCacheProbePath }}
-        - name: lite-cache-probe
-          hostPath: { path: {{ .Values.fullWorker.liteCacheProbePath | quote }}, type: Directory }
-{{- end }}
+
         - name: wordpress
           emptyDir: {}
         - name: workspace
