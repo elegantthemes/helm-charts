@@ -110,7 +110,10 @@ metadata:
   name: {{ (include "deephive.fullWorkerName" .) }}
 spec:
   replicas: {{ ternary 1 0 $f.runnerEnabled }}
-  strategy: { type: Recreate }
+  strategy:
+    type: Recreate
+    # Clear the old Deployment's server-defaulted RollingUpdate fields on upgrade.
+    rollingUpdate: null
   selector:
     matchLabels: { app: {{ (include "deephive.fullWorkerName" .) }} }
   template:

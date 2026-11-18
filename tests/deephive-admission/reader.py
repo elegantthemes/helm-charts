@@ -28,7 +28,7 @@ for d in docs:
 print('PASS block readiness has no JuiceFS reader or cache mounts')
 deployment = next(d for d in docs if d['kind'] == 'Deployment' and d['metadata']['name'] == 'review-full-worker')
 assert deployment['spec']['replicas'] == 0
-assert deployment['spec']['strategy'] == {'type': 'Recreate'}
+assert deployment['spec']['strategy'] == {'type': 'Recreate', 'rollingUpdate': None}
 runner = deployment['spec']['template']['spec']
 assert runner['terminationGracePeriodSeconds'] == 960
 command = runner['containers'][0]['command']
