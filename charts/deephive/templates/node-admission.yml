@@ -1,0 +1,54 @@
+{{- include "deephive.normalizeWorkerValues" . -}}
+{{- $f := .Values.fullWorker }}
+{{- if and $f.enabled (ge (int $f.sessionProtocol) 4) }}
+{{- $name := include "deephive.nodeAdmissionName" . }}
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: {{ $name }}
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    resourceRules:
+      - apiGroups: [""]
+        apiVersions: [v1]
+        operations: [UPDATE]
+        resources: [nodes]
+        scope: Cluster
+  matchConditions:
+    - name: runner-identity
+      expression: {{ printf "request.userInfo.username == 'system:serviceaccount:%s:%s'" .Release.Namespace (include "deephive.fullWorkerName" .) | quote }}
+  variables:
+    - name: before
+      expression: "oldObject.metadata.annotations"
+    - name: after
+      expression: "has(object.metadata.annotations) ? object.metadata.annotations : {}"
+  validations:
+    - expression: >-
+        oldObject.metadata.name.startsWith('k8s-cluster-stage-deephive-burst-') &&
+        oldObject.metadata.labels['deephive-full'] == 'true' &&
+        oldObject.metadata.labels['gha.etdevs.com/capacity'] == 'burst' &&
+        oldObject.metadata.labels['gha.etdevs.com/managed-by'] == 'gha-runner-autoscaler' &&
+        variables.before['gha.etdevs.com/linode-id'].matches('^[1-9][0-9]*$')
+      message: The Full worker may only patch an identified DeepHive burst Node.
+    - expression: >-
+        object.spec == oldObject.spec &&
+        object.metadata.labels == oldObject.metadata.labels &&
+        has(object.metadata.finalizers) == has(oldObject.metadata.finalizers) &&
+        (!has(object.metadata.finalizers) || object.metadata.finalizers == oldObject.metadata.finalizers) &&
+        has(object.metadata.ownerReferences) == has(oldObject.metadata.ownerReferences) &&
+        (!has(object.metadata.ownerReferences) || object.metadata.ownerReferences == oldObject.metadata.ownerReferences) &&
+        has(object.metadata.generateName) == has(oldObject.metadata.generateName) &&
+        (!has(object.metadata.generateName) || object.metadata.generateName == oldObject.metadata.generateName) &&
+        variables.before.all(k, k == 'deephive/activation' || (k in variables.after && variables.after[k] == variables.before[k])) &&
+        variables.after.all(k, k == 'deephive/activation' || k in variables.before)
+      message: The Full worker may only set or clear the DeepHive activation annotation.
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: {{ $name }}
+spec:
+  policyName: {{ $name }}
+  validationActions: [Deny]
+{{- end }}

@@ -27,6 +27,10 @@ spec:
   matchConditions:
     - name: runner-identity
       expression: {{ printf "request.userInfo.username in ['system:serviceaccount:%s:%s', 'system:serviceaccount:%s:%s-runner']" .Release.Namespace (include "deephive.fullWorkerName" .) .Release.Namespace .Release.Name | quote }}
+    {{- if ge (int $f.sessionProtocol) 4 }}
+    - name: protocol-4-v1
+      expression: "true"
+    {{- end }}
   variables:
     - name: pod
       expression: "request.operation == 'DELETE' ? oldObject : object"
@@ -55,6 +59,8 @@ spec:
     - expression: >-
         request.operation != 'CREATE' || (
           {{- if ge (int $f.sessionProtocol) 4 }}
+          has(variables.pod.metadata.annotations) &&
+          variables.pod.metadata.annotations['deephive/protocol'] == '4' &&
           (!has(variables.pod.spec.nodeName) || variables.pod.spec.nodeName == '') &&
           variables.pod.spec.nodeSelector['deephive-full'] == 'true' &&
           has(variables.pod.spec.tolerations) &&
@@ -63,13 +69,18 @@ spec:
           has(variables.pod.spec.affinity.podAntiAffinity.requiredDuringSchedulingIgnoredDuringExecution) &&
           variables.pod.spec.affinity.podAntiAffinity.requiredDuringSchedulingIgnoredDuringExecution.exists(t,
             t.topologyKey == 'kubernetes.io/hostname' &&
-            has(t.namespaceSelector) && size(t.namespaceSelector) == 0 &&
+            has(t.namespaceSelector) &&
+            (!has(t.namespaceSelector.matchLabels) || size(t.namespaceSelector.matchLabels) == 0) &&
+            (!has(t.namespaceSelector.matchExpressions) || size(t.namespaceSelector.matchExpressions) == 0) &&
+            (!has(t.matchLabelKeys) || size(t.matchLabelKeys) == 0) &&
+            (!has(t.mismatchLabelKeys) || size(t.mismatchLabelKeys) == 0) &&
             has(t.labelSelector.matchLabels) && size(t.labelSelector.matchLabels) == 1 &&
             t.labelSelector.matchLabels['app.kubernetes.io/name'] == 'deephive-session' &&
             (!has(t.labelSelector.matchExpressions) || size(t.labelSelector.matchExpressions) == 0)) &&
           variables.pod.metadata.labels['deephive/pool'] == 'deephive' &&
           !has(variables.pod.spec.securityContext.fsGroup) &&
           {{- else }}
+          variables.pod.metadata.annotations['deephive/protocol'] in ['2', '3'] &&
           variables.pod.spec.nodeName == {{ $f.nodeName | quote }} &&
           {{- end }}
           variables.pod.spec.serviceAccountName == 'default' &&

@@ -1,6 +1,6 @@
 # Retained autoscaler state and dedicated DeepHive interface
 
-Autoscaler chart **0.1.9** introduces `provisioningStateConfigMapName` (string).
+Autoscaler chart **0.1.10** introduces `provisioningStateConfigMapName` (string).
 Empty selects `<release>-provisioning-state`. Set it explicitly to the existing
 state ConfigMap name when upgrading a pool that already has durable state.
 The Deployment explicitly sets `PROVISIONING_STATE_CONFIG_MAP` to this name;
@@ -43,7 +43,7 @@ semantics checks, not live cluster/uninstall/admission acceptance.
 
 Terraform integration contract (no Terraform files or live migration here):
 
-- Select autoscaler chart **0.1.9**, with stable release/namespace and explicit
+- Select autoscaler chart **0.1.10**, with stable release/namespace and explicit
   `provisioningStateConfigMapName`. Empty still means `<release>-provisioning-state`.
   Preserve distinct pool state names, `configMapName`, `secretName`, and
   `clusterRoleName`; `configMapName` selects ordinary configuration only.
@@ -59,8 +59,8 @@ Terraform integration contract (no Terraform files or live migration here):
   the object to resolve ownership errors.
 - For a predecessor Helm-managed object, its existing `keep` annotation must be
   present before migration; Helm's update removal path retains it while the new
-  revision stops listing it. Historical **0.1.8** manifests remain unsafe rollback
-  targets: they contain mutable snapshots. Establish **0.1.9** as the rollback
+  revision stops listing it. Historical **0.1.9** and older manifests remain
+  unsafe rollback targets because they contain mutable snapshots. Establish **0.1.10** as the rollback
   floor; restoring compatible application references must use a safe chart
   revision, never a historical manifest that embeds state. Quiescing alone does
   not make those older rollback targets safe.
@@ -72,8 +72,8 @@ Terraform integration contract (no Terraform files or live migration here):
 
 DeepHive chart **1.3.29** adds dedicated-taint admission enforcement for protocol
 4. Keep `fullWorker.runnerEnabled=false` for the first installation of the
-protocol 4 admission policies/bindings. Only enable the runner after installed
-admission is observed and accepted through the existing protection-first gate.
+protocol 4 admission policies/bindings. Only enable the runner after Kubernetes has observed and type-checked both
+the session Pod and Node admission policies and both bindings enforce Deny.
 Set `fullWorker.sessionProtocol=4` with compatible, actually built digest-pinned
 runner/session/database references and reviewed bootstrap identities; fixture
 digests are synthetic and cannot be deployed. Protocol 4 uses local volumes,
@@ -82,3 +82,9 @@ startup, dedicated `deephive-full=true:NoSchedule` tolerance, and hostname
 anti-affinity against session Pods across all namespaces. Protocol 2/3 retains
 its compatible legacy policy. Existing Lite/legacy storage and pool defaults
 are retained. Deployment, image builds and runtime acceptance are not performed.
+
+The protocol 4 controller runs on ordinary nodes so it can submit session Pods
+while the dedicated pool is empty. Only the session Pods and image pre-pull
+DaemonSet target dedicated nodes. The controller does not mount the legacy
+disk probes. Node admission limits its write access to the activation claim on
+identified DeepHive burst Nodes.

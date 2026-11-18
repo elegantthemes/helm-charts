@@ -115,11 +115,20 @@ with tempfile.TemporaryDirectory(prefix='deephive-dedicated-policy-') as temp:
     rendered = subprocess.check_output([
         'helm', 'template', 'review', str(root.parent.parent / 'charts/deephive'),
         '-n', 'dph-app', '-f', str(config)], text=True)
+    rendered_node_policy = rendered
     dedicated_policy = next(p for p in yaml.safe_load_all(rendered)
-                            if p and p['kind'] == 'ValidatingAdmissionPolicy')
+                            if p and p['kind'] == 'ValidatingAdmissionPolicy'
+                            and p['spec']['matchConstraints']['resourceRules'][0]['resources'] == ['pods'])
     original = json.loads((root / 'pod-protocol4.json').read_text())
     cases = []
     case('protocol 4 gate first', True)
+    case('protocol 4 rejects legacy protocol annotation', False,
+         lambda p: p['metadata']['annotations'].update({'deephive/protocol': '3'}))
+    case('protocol 4 rejects missing protocol annotation', False,
+         lambda p: p['metadata']['annotations'].pop('deephive/protocol'))
+    case('protocol 4 lets the runner delete a legacy session', True,
+         lambda p: p['metadata']['annotations'].update({'deephive/protocol': '3'}),
+         operation='DELETE')
     case('protocol 4 shared source rejected', False, lambda p: p['spec']['volumes'][0].update(persistentVolumeClaim={'claimName': 'fixture'}))
     case('protocol 4 source subpath rejected', False, lambda p: p['spec']['containers'][0]['volumeMounts'][0].update(subPath='tasks/old'))
     case('protocol 4 unbounded source rejected', False, lambda p: p['spec']['volumes'][0].update(emptyDir={}))
@@ -127,8 +136,21 @@ with tempfile.TemporaryDirectory(prefix='deephive-dedicated-policy-') as temp:
     case('gate Node eval override', False, lambda p: p['spec']['initContainers'][0].update(args=['--eval', 'process.exit(0)']))
     case('gate arbitrary argument', False, lambda p: p['spec']['initContainers'][0].update(args=['ignored']))
 
+    def term(p):
+        return p['spec']['affinity']['podAntiAffinity']['requiredDuringSchedulingIgnoredDuringExecution'][0]
+
     def selector(p):
-        return p['spec']['affinity']['podAntiAffinity']['requiredDuringSchedulingIgnoredDuringExecution'][0]['labelSelector']
+        return term(p)['labelSelector']
+
+    case('anti-affinity namespace selector empty fields', True,
+         lambda p: term(p).update(namespaceSelector={'matchLabels': {}, 'matchExpressions': []}))
+    case('anti-affinity namespace selector with label', False,
+         lambda p: term(p).update(namespaceSelector={'matchLabels': {'team': 'app'}}))
+    case('anti-affinity namespace selector with expression', False,
+         lambda p: term(p).update(namespaceSelector={'matchExpressions': [{'key': 'team', 'operator': 'Exists'}]}))
+    for key in ['matchLabelKeys', 'mismatchLabelKeys']:
+        case(f'anti-affinity {key} narrowing', False,
+             lambda p, key=key: term(p).update({key: ['deephive/session']}))
 
     case('anti-affinity empty expressions', True, lambda p: selector(p).update(matchExpressions=[]))
     case('anti-affinity contradictory expression', False, lambda p: selector(p).update(matchExpressions=[{
@@ -166,9 +188,66 @@ for protocol in [2, 3]:
     original = json.loads((root / f'pod-protocol{protocol}.json').read_text())
     cases = []
     case(f'actual legacy protocol {protocol}', True)
+    case(f'legacy {protocol} rejects protocol 4 without activation', False,
+         lambda p: p['metadata']['annotations'].update({'deephive/protocol': '4'}))
     case(f'legacy {protocol} controller secret forbidden', False, lambda p: p['spec']['containers'][0].update(envFrom=[{'secretRef': {'name': 'secrets'}}]))
     with tempfile.TemporaryDirectory(prefix='deephive-legacy-pod-') as temp:
         fixture = Path(temp) / 'cases.json'
         fixture.write_text(json.dumps({'Expressions': [v['expression'] for v in policy['spec']['validations']], 'Cases': cases}))
         subprocess.run(['go', '-C', str(root), 'run', '.', str(fixture)], check=True)
 print('PASS actual legacy protocol 2/3 manifests')
+
+
+# Evaluate Node mutations against the rendered admission boundary.
+node_policy = next(p for p in yaml.safe_load_all(rendered_node_policy)
+                   if p and p['kind'] == 'ValidatingAdmissionPolicy'
+                   and p['metadata']['name'].startswith('dph-node-activation-'))
+before = {
+    'metadata': {
+        'name': 'k8s-cluster-stage-deephive-burst-fixture',
+        'labels': {'deephive-full': 'true', 'gha.etdevs.com/capacity': 'burst',
+                   'gha.etdevs.com/managed-by': 'gha-runner-autoscaler'},
+        'annotations': {'gha.etdevs.com/linode-id': '123', 'gha.etdevs.com/state': 'ready'},
+    },
+    'spec': {'taints': [{'key': 'deephive-full', 'value': 'true', 'effect': 'NoSchedule'}]},
+}
+cases = []
+
+
+def node_case(name, expected, change, initial=before):
+    after = copy.deepcopy(initial)
+    change(after)
+    cases.append({'Name': name, 'Expect': expected, 'Activation': {
+        'oldObject': initial, 'object': after,
+        'variables': {'before': initial['metadata']['annotations'], 'after': after['metadata']['annotations']},
+    }})
+
+
+def claim(node):
+    node['metadata']['annotations']['deephive/activation'] = 'fixture claim'
+
+
+node_case('set activation on dedicated Node', True, claim)
+claimed = copy.deepcopy(before)
+claim(claimed)
+node_case('clear activation on dedicated Node', True,
+          lambda n: n['metadata']['annotations'].pop('deephive/activation'), claimed)
+for key in before['metadata']['labels']:
+    unrelated = copy.deepcopy(before)
+    del unrelated['metadata']['labels'][key]
+    node_case(f'Node without {key} identity', False, claim, unrelated)
+unrelated = copy.deepcopy(before)
+unrelated['metadata']['name'] = 'another-pool'
+node_case('claim on unrelated Node', False, claim, unrelated)
+node_case('strip a Node taint', False, lambda n: n['spec'].update(taints=[]))
+node_case('cordon an eligible Node', False, lambda n: n['spec'].update(unschedulable=True))
+node_case('alter a Node label', False, lambda n: n['metadata']['labels'].update({'example.test/label': 'true'}))
+node_case('alter retirement state', False, lambda n: n['metadata']['annotations'].update({'gha.etdevs.com/state': 'retiring'}))
+node_case('remove provider identity', False, lambda n: n['metadata']['annotations'].pop('gha.etdevs.com/linode-id'))
+node_case('add a Node annotation', False, lambda n: n['metadata']['annotations'].update({'example.test/annotation': 'value'}))
+node_case('add a Node finalizer', False, lambda n: n['metadata'].update(finalizers=['example.test/hold']))
+node_case('assign a Node owner', False, lambda n: n['metadata'].update(ownerReferences=[{'name': 'other'}]))
+with tempfile.TemporaryDirectory(prefix='deephive-node-admission-') as temp:
+    fixture = Path(temp) / 'cases.json'
+    fixture.write_text(json.dumps({'Expressions': [v['expression'] for v in node_policy['spec']['validations']], 'Cases': cases}))
+    subprocess.run(['go', '-C', str(root), 'run', '.', str(fixture)], check=True)

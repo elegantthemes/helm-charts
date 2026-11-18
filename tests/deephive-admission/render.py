@@ -616,3 +616,80 @@ for protocol in [3, 4]:
     admission_checksums.append(template['metadata']['annotations']['checksum/full-admission'])
 assert admission_checksums[0] != admission_checksums[1]
 print('PASS fresh admission receives the runner protocol without runner credentials')
+
+# Protocol 4 starts on ordinary capacity, even when there are zero session nodes.
+config = copy.deepcopy(values)
+config['fullWorker'].update(sessionProtocol=4, cacheProbePath='', scratchProbePath='')
+docs = render(config=config)
+pod = item(docs, 'Deployment', '-full-worker')['spec']['template']['spec']
+assert 'nodeName' not in pod and 'tolerations' not in pod
+terms = pod['affinity']['nodeAffinity']['requiredDuringSchedulingIgnoredDuringExecution']['nodeSelectorTerms']
+assert terms == [{'matchExpressions': [{'key': 'deephive-full', 'operator': 'NotIn', 'values': ['true']}]}]
+assert {v['name'] for v in pod['volumes']}.isdisjoint({'cache-probe', 'scratch-probe'})
+assert {m['name'] for m in pod['containers'][0]['volumeMounts']}.isdisjoint({'cache-probe', 'scratch-probe'})
+role = next(p for p in docs if p['kind'] == 'ClusterRole' and any(r.get('resources') == ['nodes'] for r in p['rules']))
+assert role['rules'] == [{'apiGroups': [''], 'resources': ['nodes'], 'verbs': ['get']}]
+node_policy = next(p for p in docs if p['kind'] == 'ValidatingAdmissionPolicy' and p['metadata']['name'].startswith('dph-node-activation-'))
+node_binding = next(p for p in docs if p['kind'] == 'ValidatingAdmissionPolicyBinding' and p['metadata']['name'] == node_policy['metadata']['name'])
+assert node_policy['spec']['matchConstraints']['resourceRules'] == [
+    {'apiGroups': [''], 'apiVersions': ['v1'], 'operations': ['UPDATE'], 'resources': ['nodes'], 'scope': 'Cluster'}]
+assert node_policy['spec']['matchConditions'] == [
+    {'name': 'runner-identity', 'expression': "request.userInfo.username == 'system:serviceaccount:dph-app:review-full-worker'"}]
+assert node_binding['spec'] == {'policyName': node_policy['metadata']['name'], 'validationActions': ['Deny']}
+
+# Feed exact rendered resources back as installed lookup fixtures. Compare
+# against the old policy and a new policy whose generation is unobserved.
+session_policy = next(p for p in docs if p['kind'] == 'ValidatingAdmissionPolicy' and p is not node_policy)
+legacy_policy = next(p for p in render() if p['kind'] == 'ValidatingAdmissionPolicy')
+for policy in [session_policy, legacy_policy, node_policy]:
+    policy['metadata']['generation'] = 2
+    policy['status'] = {'observedGeneration': 2, 'typeChecking': {}}
+
+
+def enable_protocol4(installed_session, installed_node, installed_binding=node_binding):
+    config['fullWorker']['runnerEnabled'] = True
+    with tempfile.TemporaryDirectory(prefix='deephive-protocol4-enable-') as tmp:
+        candidate = Path(tmp) / 'deephive'
+        shutil.copytree(chart, candidate)
+        lifecycle = candidate / 'templates/session-lifecycle.yml'
+        source = lifecycle.read_text()
+        source = source.replace('lookup "admissionregistration.k8s.io/v1" "ValidatingAdmissionPolicy" "" $policyName',
+                                '(fromJson ' + json.dumps(json.dumps(installed_session)) + ')')
+        source = source.replace('lookup "admissionregistration.k8s.io/v1" "ValidatingAdmissionPolicyBinding" "" $policyName',
+                                '(dict "spec" (dict "policyName" $policyName "validationActions" (list "Deny")))')
+        lifecycle.write_text(source)
+        helpers = candidate / 'templates/_full-worker.tpl'
+        source = helpers.read_text()
+        for kind, installed in [('ValidatingAdmissionPolicy', installed_node),
+                                ('ValidatingAdmissionPolicyBinding', installed_binding)]:
+            lookup = f'lookup "admissionregistration.k8s.io/v1" "{kind}" "" $name'
+            assert lookup in source
+            source = source.replace(lookup, '(fromJson ' + json.dumps(json.dumps(installed)) + ')')
+        helpers.write_text(source)
+        return subprocess.run(['helm', 'template', 'review', str(candidate), '-n', 'dph-app', '-f', '-'],
+                              input=json.dumps(config), text=True, capture_output=True)
+
+
+result = enable_protocol4(legacy_policy, node_policy)
+assert result.returncode and 'protocol 4 session admission revision' in result.stderr, result.stderr
+pending_session = copy.deepcopy(session_policy)
+pending_session['status']['observedGeneration'] = 1
+result = enable_protocol4(pending_session, node_policy)
+assert result.returncode and 'observe the installed generation' in result.stderr, result.stderr
+result = enable_protocol4(session_policy, {})
+assert result.returncode and 'Node admission boundary' in result.stderr, result.stderr
+pending_node = copy.deepcopy(node_policy)
+pending_node['status'].pop('typeChecking')
+result = enable_protocol4(session_policy, pending_node)
+assert result.returncode and 'Node admission boundary' in result.stderr, result.stderr
+narrowed_binding = copy.deepcopy(node_binding)
+narrowed_binding['spec']['matchResources'] = {'objectSelector': {'matchLabels': {'allow': 'false'}}}
+result = enable_protocol4(session_policy, node_policy, narrowed_binding)
+assert result.returncode and 'Node admission boundary' in result.stderr, result.stderr
+result = enable_protocol4(session_policy, node_policy)
+assert result.returncode == 0, result.stderr
+enabled = [p for p in yaml.safe_load_all(result.stdout) if p]
+assert item(enabled, 'Deployment', '-full-worker')['spec']['replicas'] == 1
+role = next(p for p in enabled if p['kind'] == 'ClusterRole' and p['metadata']['name'] == role['metadata']['name'])
+assert [r['verbs'] for r in role['rules']] == [['get'], ['patch']]
+print('PASS protocol 4 cold-start placement, Node admission boundary and protection-first enablement')

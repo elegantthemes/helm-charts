@@ -31,13 +31,19 @@
 {{- if or (not $policy) (not $binding) }}{{ fail "Install fullWorker with runnerEnabled=false, verify admission, then enable the runner in a second upgrade" }}{{ end }}
 {{- $expectedIdentity := printf "request.userInfo.username in ['system:serviceaccount:%s:%s', 'system:serviceaccount:%s:%s-runner']" .Release.Namespace (include "deephive.fullWorkerName" .) .Release.Namespace .Release.Name }}
 {{- $identityInstalled := false }}
+{{- $protocol4Installed := false }}
 {{- range $condition := $policy.spec.matchConditions | default list }}
 {{- if and (eq $condition.name "runner-identity") (eq $condition.expression $expectedIdentity) }}{{- $identityInstalled = true }}{{- end }}
+{{- if and (eq $condition.name "protocol-4-v1") (eq $condition.expression "true") }}{{- $protocol4Installed = true }}{{- end }}
 {{- end }}
 {{- if not $identityInstalled }}{{ fail "Install admission for the renamed worker with runnerEnabled=false before starting it" }}{{ end }}
+{{- if ge (int $f.sessionProtocol) 4 }}
+{{- if not $protocol4Installed }}{{ fail "Install the protocol 4 session admission revision with runnerEnabled=false before starting it" }}{{ end }}
+{{- if ne (include "deephive.nodeAdmissionReady" .) "true" }}{{ fail "Install and observe the DeepHive Node admission boundary with runnerEnabled=false before starting the runner" }}{{ end }}
+{{- end }}
 {{- if ne ($policy.spec.failurePolicy | default "") "Fail" }}{{ fail "Session admission must fail closed" }}{{ end }}
-{{- if or (ne $binding.spec.policyName $policyName) (not (has "Deny" $binding.spec.validationActions)) }}{{ fail "Session admission binding must enforce Deny" }}{{ end }}
-{{- if not (hasKey $policy "status") }}{{ fail "Admission type checking has not completed" }}{{ end }}
+{{- if or (ne $binding.spec.policyName $policyName) (not (has "Deny" $binding.spec.validationActions)) $binding.spec.matchResources }}{{ fail "Session admission binding must enforce Deny" }}{{ end }}
+{{- if or (not (hasKey $policy "status")) (not (hasKey $policy.status "typeChecking")) }}{{ fail "Admission type checking has not completed" }}{{ end }}
 {{- if ne (int64 ($policy.status.observedGeneration | default 0)) (int64 $policy.metadata.generation) }}{{ fail "Wait for admission policy status to observe the installed generation" }}{{ end }}
 {{- if $policy.status.typeChecking.expressionWarnings }}{{ fail "Resolve session admission expression warnings before runner enablement" }}{{ end }}
 {{- end }}
