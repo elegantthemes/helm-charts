@@ -6,6 +6,10 @@ image: elegantthemes/gha-runner-autoscaler:26.7.15
 imageVersion: 0.1.2
 secretName: gha-runner-autoscaler
 
+# Install-only bootstrap; existing state stays application-owned.
+# Empty selects <release>-provisioning-state. Keep this identity stable per pool.
+provisioningStateConfigMapName: ""
+
 resources:
   limits:
     cpu: 250m

@@ -54,7 +54,24 @@ spec:
     # image after a compatible runner/chart upgrade.
     - expression: >-
         request.operation != 'CREATE' || (
+          {{- if ge (int $f.sessionProtocol) 4 }}
+          (!has(variables.pod.spec.nodeName) || variables.pod.spec.nodeName == '') &&
+          variables.pod.spec.nodeSelector['deephive-full'] == 'true' &&
+          has(variables.pod.spec.tolerations) &&
+          variables.pod.spec.tolerations.exists(t, t.key == 'deephive-full' &&
+            t.operator == 'Equal' && t.value == 'true' && t.effect == 'NoSchedule') &&
+          has(variables.pod.spec.affinity.podAntiAffinity.requiredDuringSchedulingIgnoredDuringExecution) &&
+          variables.pod.spec.affinity.podAntiAffinity.requiredDuringSchedulingIgnoredDuringExecution.exists(t,
+            t.topologyKey == 'kubernetes.io/hostname' &&
+            has(t.namespaceSelector) && size(t.namespaceSelector) == 0 &&
+            has(t.labelSelector.matchLabels) && size(t.labelSelector.matchLabels) == 1 &&
+            t.labelSelector.matchLabels['app.kubernetes.io/name'] == 'deephive-session' &&
+            (!has(t.labelSelector.matchExpressions) || size(t.labelSelector.matchExpressions) == 0)) &&
+          variables.pod.metadata.labels['deephive/pool'] == 'deephive' &&
+          !has(variables.pod.spec.securityContext.fsGroup) &&
+          {{- else }}
           variables.pod.spec.nodeName == {{ $f.nodeName | quote }} &&
+          {{- end }}
           variables.pod.spec.serviceAccountName == 'default' &&
           has(variables.pod.spec.automountServiceAccountToken) && !variables.pod.spec.automountServiceAccountToken &&
           (!has(variables.pod.spec.hostNetwork) || !variables.pod.spec.hostNetwork) &&
@@ -66,30 +83,33 @@ spec:
     - expression: >-
         request.operation != 'CREATE' || (
           variables.pod.spec.volumes.all(v,
-            has(v.emptyDir) ||
-            (v.name == 'source' && has(v.persistentVolumeClaim) &&
+            (has(v.emptyDir) && !has(v.persistentVolumeClaim)) ||
+            (v.name == 'source' && variables.pod.metadata.annotations['deephive/protocol'] != '4' && has(v.persistentVolumeClaim) &&
              v.persistentVolumeClaim.claimName == {{ $f.workspaceClaim | quote }})) &&
           variables.containers.all(c, !has(c.volumeMounts) || c.volumeMounts.all(m,
             m.name != 'source' ||
-            (has(m.subPath) && m.subPath != '' && !m.subPath.startsWith('/') &&
-             m.subPath.split('/').all(p, p != '' && p != '.' && p != '..') && !has(m.subPathExpr))))
+            (variables.pod.metadata.annotations['deephive/protocol'] == '4' ?
+              (c.name == 'session' && m.mountPath == '/workspace' && !has(m.subPath) && !has(m.subPathExpr)) :
+              (has(m.subPath) && m.subPath != '' && !m.subPath.startsWith('/') &&
+               m.subPath.split('/').all(p, p != '' && p != '.' && p != '..') && !has(m.subPathExpr)))))
         )
-      message: Sessions may mount only local scratch and a nonempty task subpath of the workspace claim.
+      message: Full protocol 4 source must be local; older sessions retain task subpaths of the workspace claim.
     - expression: >-
         request.operation != 'CREATE' || (
           variables.pod.spec.volumes.all(v, !has(v.emptyDir) || (
-            v.name in ['dependencies', 'scratch', 'database-run', 'database', 'evidence', 'shm'] &&
+            (v.name in ['dependencies', 'scratch', 'database-run', 'database', 'evidence', 'shm'] ||
+             (v.name == 'source' && variables.pod.metadata.annotations['deephive/protocol'] == '4')) &&
             has(v.emptyDir.sizeLimit) &&
-            v.emptyDir.sizeLimit == {'dependencies': '30Gi', 'scratch': '5Gi', 'database-run': '16Mi', 'database': '5Gi', 'evidence': '5Gi', 'shm': '1Gi'}[v.name] &&
+            v.emptyDir.sizeLimit == {'source': '45Gi', 'dependencies': '30Gi', 'scratch': '5Gi', 'database-run': '16Mi', 'database': '5Gi', 'evidence': '5Gi', 'shm': '1Gi'}[v.name] &&
             (v.name == 'shm' ? (has(v.emptyDir.medium) && v.emptyDir.medium == 'Memory') :
               (!has(v.emptyDir.medium) || v.emptyDir.medium == '')))) &&
           variables.containers.all(c,
-            c.name in ['session', 'database', 'local-mounts'] &&
+            c.name in ['session', 'database', 'local-mounts', 'activation-wait'] &&
             has(c.resources) && has(c.resources.limits) &&
             'memory' in c.resources.limits && 'ephemeral-storage' in c.resources.limits && 'cpu' in c.resources.limits &&
-            c.resources.limits['cpu'] == {'session': '12', 'database': '1', 'local-mounts': '1'}[c.name] &&
-            c.resources.limits['memory'] == {'session': '16Gi', 'database': '1Gi', 'local-mounts': '256Mi'}[c.name] &&
-            c.resources.limits['ephemeral-storage'] == {'session': '45Gi', 'database': '5Gi', 'local-mounts': '30Gi'}[c.name])
+            c.resources.limits['cpu'] == {'session': '12', 'database': '1', 'local-mounts': '1', 'activation-wait': '1'}[c.name] &&
+            c.resources.limits['memory'] == {'session': '16Gi', 'database': '1Gi', 'local-mounts': '256Mi', 'activation-wait': '256Mi'}[c.name] &&
+            c.resources.limits['ephemeral-storage'] == {'session': '45Gi', 'database': '5Gi', 'local-mounts': '30Gi', 'activation-wait': '30Gi'}[c.name])
         )
       message: Sessions must retain the prepared recipe's bounded memory and local scratch resources.
     - expression: >-
@@ -115,8 +135,30 @@ spec:
           variables.pod.spec.containers.all(c,
             (c.name == 'session' && c.image in {{ toJson $images }}) ||
             (c.name == 'database' && c.image == {{ $f.databaseImage | quote }})) &&
-          has(variables.pod.spec.initContainers) && size(variables.pod.spec.initContainers) == 1 &&
+          has(variables.pod.spec.initContainers) &&
+          {{- if ge (int $f.sessionProtocol) 4 }}
+          size(variables.pod.spec.initContainers) == 2 &&
+          variables.pod.spec.initContainers[0].name == 'activation-wait' &&
+          variables.pod.spec.initContainers[0].command == ['node', '-e', {{ .Files.Get "files/activation-wait.js" | toJson }}] &&
+          (!has(variables.pod.spec.initContainers[0].args) || size(variables.pod.spec.initContainers[0].args) == 0) &&
+          (!has(variables.pod.spec.initContainers[0].volumeMounts) || size(variables.pod.spec.initContainers[0].volumeMounts) == 0) &&
+          variables.pod.spec.initContainers[1].name == 'local-mounts' &&
+          variables.containers.all(c, !has(c.lifecycle) && !has(c.restartPolicy) && has(c.command) && size(c.command) > 0) &&
+          variables.pod.spec.initContainers[0].env.size() == 6 &&
+          variables.pod.spec.initContainers[0].env.all(e,
+            (e.name == 'POD_UID' && has(e.valueFrom) && has(e.valueFrom.fieldRef) && e.valueFrom.fieldRef.fieldPath == 'metadata.uid') ||
+            (has(e.value) && !has(e.valueFrom) && (
+              (e.name == 'SESSION_ID' && e.value == variables.pod.metadata.name) ||
+              (e.name == 'EXECUTION_GENERATION' && e.value == variables.pod.metadata.annotations['deephive/execution-generation']) ||
+              (e.name == 'SESSION_RUNNER_URL' && e.value == {{ printf "http://%s:3001" (include "deephive.fullWorkerName" .) | quote }}) ||
+              (e.name in ['SESSION_TOKEN', 'SESSION_STARTUP_DEADLINE'] && e.value != '')))) &&
+          ['POD_UID', 'SESSION_ID', 'EXECUTION_GENERATION', 'SESSION_RUNNER_URL', 'SESSION_TOKEN', 'SESSION_STARTUP_DEADLINE'].all(n,
+            variables.pod.spec.initContainers[0].env.filter(e, e.name == n).size() == 1) &&
+          variables.pod.spec.initContainers.all(c, c.image in {{ toJson $images }})
+          {{- else }}
+          size(variables.pod.spec.initContainers) == 1 &&
           variables.pod.spec.initContainers.all(c, c.name == 'local-mounts' && c.image in {{ toJson $images }})
+          {{- end }}
         )
       message: Only the approved session, database and mount-init images are permitted.
 ---

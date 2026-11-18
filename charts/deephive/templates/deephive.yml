@@ -119,6 +119,9 @@ spec:
   template:
     metadata:
       annotations:
+{{- if .Values.fullWorker.enabled }}
+        checksum/full-admission: {{ dict "sessionProtocol" .Values.fullWorker.sessionProtocol | toJson | sha256sum | quote }}
+{{- end }}
         checksum/lite-capacity: {{ toJson .Values.fullWorker.liteCapacity | sha256sum | quote }}
 {{- if .Values.sourceReaderService.enabled }}
         source-reader-token-revision: {{ .Values.sourceReaderService.tokenRevision | quote }}
@@ -190,6 +193,10 @@ spec:
               value: {{ ternary "1" "0" .Values.fullWorker.routingEnabled | quote }}
             - name: FULL_WORKER_TASK_ALLOWLIST
               value: {{ .Values.fullWorker.taskAllowlist | quote }}
+{{- if .Values.fullWorker.enabled }}
+            - name: FULL_WORKER_CONFIG
+              value: /full-admission/admission.json
+{{- end }}
             - name: FULL_WORKER_SOURCE_SEED
               value: {{ .Values.fullWorker.sourceSeedPath | quote }}
             - name: LITE_WORKER_ADMISSION_COMMAND
@@ -292,6 +299,9 @@ spec:
             periodSeconds: 5
             timeoutSeconds: 3
           volumeMounts:
+{{- if .Values.fullWorker.enabled }}
+            - { name: full-admission, mountPath: /full-admission, readOnly: true }
+{{- end }}
 {{- if .Values.fullWorker.liteCapacity.enabled }}
             - name: lite-config
               mountPath: /lite-config
@@ -357,6 +367,12 @@ spec:
           operator: Exists
           effect: NoSchedule
       volumes:
+{{- if .Values.fullWorker.enabled }}
+        - name: full-admission
+          configMap:
+            name: {{ include "deephive.fullWorkerName" . }}
+            items: [{ key: admission.json, path: admission.json }]
+{{- end }}
 {{- if .Values.fullWorker.liteCapacity.enabled }}
         - name: lite-config
           configMap: { name: {{ .Release.Name }}-lite-capacity }

@@ -66,3 +66,19 @@ and outside the entire shared candidate workspace. The public-origin hostname
 must match `VIRTUAL_HOST`. Evidence reader credentials use a dedicated Secret,
 separate from runner, agent/integration and lite consumer Secrets; Phase 4
 verifies actual read-only IAM permissions and RWX CSI behavior.
+
+Protocol 2/3/4 fixtures `pod-protocol*.json` are generated from the integrated
+DeepHive `sessionPod` implementation, materialized tree
+`36fe0bc36ae2b4041c77e07e372ed4bff74a9a8a`. Regenerate with Node 24+:
+
+```
+node --experimental-vm-modules tests/deephive-admission/generate-pods.mjs /path/to/participating/deephive
+```
+
+Generation strips types from unchanged source modules. It stubs only unused
+object-storage exports imported by retainedArtifacts, never Pod construction;
+calling that stub fails. The only Pod adjustment is Kubernetes' default service
+account. All credentials/digests are synthetic. `pod-contract.py` checks actual
+Pod shapes and chart installation while the CEL cases check admission decisions.
+The original `pod.json` remains the richer historical dependency-mount fixture.
+See `docs/gha-runner-provisioning-state.md` for exact chart/Terraform interface.

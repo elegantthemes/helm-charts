@@ -1,9 +1,20 @@
-# Helm owns the resource, but never the controller's state.json data key.
-# Keep durable budgets across chart uninstall/reinstall as well as upgrades.
+{{- $name := .Values.provisioningStateConfigMapName | default (printf "%s-provisioning-state" .Release.Name) -}}
+{{- $existing := lookup "v1" "ConfigMap" .Release.Namespace $name -}}
+{{- if and .Release.IsUpgrade (not $existing) -}}
+{{- fail "provisioning state ConfigMap is missing; restore the retained object and state before upgrading" -}}
+{{- end -}}
+{{- if and .Release.IsInstall (not $existing) }}
+# Bootstrap only. Application data and its initialized marker must never enter
+# Helm's regular release manifest (including historical rollback manifests).
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: {{ printf "%s-provisioning-state" .Release.Name }}
+  name: {{ $name | quote }}
   namespace: {{ .Release.Namespace }}
   annotations:
+    helm.sh/hook: pre-install
+    helm.sh/hook-weight: "-10"
+    helm.sh/hook-delete-policy: hook-failed
     helm.sh/resource-policy: keep
+data: {}
+{{- end }}

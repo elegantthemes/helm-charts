@@ -14,8 +14,8 @@
 {{- if not (regexMatch "@sha256:[a-f0-9]{64}$" $f.databaseImage) }}{{ fail "fullWorker.databaseImage must pin a digest" }}{{ end }}
 {{- if or (eq $f.agentSecret "secrets") (eq ($f.integrationSecret | default "") "secrets") (eq $f.agentSecret $f.runnerSecret) (and $f.integrationSecret (eq $f.integrationSecret $f.runnerSecret)) }}{{ fail "Session integration/model credentials must not reference consumer or runner Secrets" }}{{ end }}
 {{- if and $f.observationEnabled (not $f.publicOrigin) }}{{ fail "Exact public observation origin required" }}{{ end }}
-{{- if not (has (toJson $f.sessionProtocol) (list "2" "3")) }}{{ fail "Session protocol must be 2 or 3" }}{{ end }}
-{{- if and (or $f.routingEnabled $f.taskAllowlist) (ne (int $f.sessionProtocol) 3) }}{{ fail "Phase 3 routing requires session protocol 3" }}{{ end }}
+{{- if not (has (toJson $f.sessionProtocol) (list "2" "3" "4")) }}{{ fail "Session protocol must be 2, 3 or 4" }}{{ end }}
+{{- if and (or $f.routingEnabled $f.taskAllowlist) (lt (int $f.sessionProtocol) 3) }}{{ fail "Phase 3 routing requires session protocol 3" }}{{ end }}
 {{- range $image := $f.legacyProtocol2Images }}
 {{- if not (has $image (append $f.compatibleSessionImages $f.sessionImage)) }}{{ fail "Legacy protocol 2 images must be retained compatible images" }}{{ end }}
 {{- if and (eq $image $f.sessionImage) (ne (int $f.sessionProtocol) 2) }}{{ fail "Current protocol 3 image cannot be a legacy bootstrap exception" }}{{ end }}
@@ -58,8 +58,12 @@ metadata:
 rules:
   - apiGroups: [""]
     resources: [nodes]
+    {{- if lt (int $f.sessionProtocol) 4 }}
     resourceNames: [{{ required "Full worker node required" $f.nodeName | quote }}]
     verbs: [get]
+    {{- else }}
+    verbs: [get, patch]
+    {{- end }}
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
@@ -79,6 +83,7 @@ kind: ConfigMap
 metadata:
   name: {{ (include "deephive.fullWorkerName" .) }}
 data:
+  admission.json: {{ dict "sessionProtocol" $f.sessionProtocol | toJson | quote }}
   runner.json: |
     {{ dict "namespace" .Release.Namespace "release" .Release.Name "nodeName" $f.nodeName "image" $f.sessionImage "databaseImage" $f.databaseImage "imagePullSecret" $f.pullSecret "agentSecret" (required "Session agent Secret required" $f.agentSecret) "integrationSecret" ($f.integrationSecret | default "") "githubSecretRef" ($f.githubSecretRef | default dict) "workspaceClaim" $f.workspaceClaim "workspaceRoot" $f.workspaceRoot "scratchRoot" "/node-scratch" "cacheRoot" "/node-cache" "runnerUrl" (printf "http://%s:3001" (include "deephive.fullWorkerName" .)) "pressureCommand" $f.pressureCommand "signingKeyFile" "/runner-secret/signing-key" "controlPort" 3001 "observationPort" (ternary 3002 0 $f.observationEnabled) "observationTokenFile" "/runner-secret/observation-token" "approvedBootstraps" $f.approvedBootstraps "sourceReader" $reader "sessionProtocol" $f.sessionProtocol "draining" $f.draining "validationTimeoutMs" $f.validationTimeoutMs | toJson }}
 {{/* The config contains no credentials; signing key is read from runner-only Secret. */}}
@@ -100,7 +105,9 @@ spec:
         checksum/runner-config: {{ toJson (list $f .Values.DEEPHIVE_VERSION) | sha256sum | quote }}
       labels: { app: {{ (include "deephive.fullWorkerName" .) }}, deephive/worker-mode: full, redis-client: "true" }
     spec:
+      {{- if lt (int $f.sessionProtocol) 4 }}
       nodeName: {{ $f.nodeName | quote }}
+      {{- end }}
       tolerations:
         - { key: deephive-full, operator: Equal, value: "true", effect: NoSchedule }
       serviceAccountName: {{ (include "deephive.fullWorkerName" .) }}
@@ -195,7 +202,7 @@ spec:
   podSelector:
     matchLabels: { app.kubernetes.io/name: deephive-session, app.kubernetes.io/instance: {{ .Release.Name | quote }} }
   policyTypes: [Ingress]
-{{- if $f.observationEnabled }}
+{{- if or $f.observationEnabled (ge (int $f.sessionProtocol) 4) }}
   ingress:
     - from:
         - podSelector:
@@ -245,10 +252,17 @@ spec:
         nodeAffinity:
           requiredDuringSchedulingIgnoredDuringExecution:
             nodeSelectorTerms:
+              {{- if ge (int $f.sessionProtocol) 4 }}
+              - matchExpressions:
+                  - key: deephive-full
+                    operator: In
+                    values: ["true"]
+              {{- else }}
               - matchFields:
                   - key: metadata.name
                     operator: In
                     values: [{{ $f.nodeName | quote }}]
+              {{- end }}
       automountServiceAccountToken: false
       imagePullSecrets: [{ name: {{ $f.pullSecret | quote }} }]
       containers:

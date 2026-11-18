@@ -104,3 +104,71 @@ consumer_ref = subprocess.run([
 ], capture_output=True, text=True)
 assert consumer_ref.returncode != 0
 assert "must not select the consumer Secret" in consumer_ref.stderr
+
+# Protocol 4 keeps the first ordinary init mount-free and prevents hooks and
+# restartable sidecars from bypassing activation. This is offline CEL evidence.
+dedicated_values = json.loads((root / 'values.json').read_text())
+dedicated_values['fullWorker']['sessionProtocol'] = 4
+with tempfile.TemporaryDirectory(prefix='deephive-dedicated-policy-') as temp:
+    config = Path(temp) / 'values.json'
+    config.write_text(json.dumps(dedicated_values))
+    rendered = subprocess.check_output([
+        'helm', 'template', 'review', str(root.parent.parent / 'charts/deephive'),
+        '-n', 'dph-app', '-f', str(config)], text=True)
+    dedicated_policy = next(p for p in yaml.safe_load_all(rendered)
+                            if p and p['kind'] == 'ValidatingAdmissionPolicy')
+    original = json.loads((root / 'pod-protocol4.json').read_text())
+    cases = []
+    case('protocol 4 gate first', True)
+    case('protocol 4 shared source rejected', False, lambda p: p['spec']['volumes'][0].update(persistentVolumeClaim={'claimName': 'fixture'}))
+    case('protocol 4 source subpath rejected', False, lambda p: p['spec']['containers'][0]['volumeMounts'][0].update(subPath='tasks/old'))
+    case('protocol 4 unbounded source rejected', False, lambda p: p['spec']['volumes'][0].update(emptyDir={}))
+    case('gate explicit empty args', True, lambda p: p['spec']['initContainers'][0].update(args=[]))
+    case('gate Node eval override', False, lambda p: p['spec']['initContainers'][0].update(args=['--eval', 'process.exit(0)']))
+    case('gate arbitrary argument', False, lambda p: p['spec']['initContainers'][0].update(args=['ignored']))
+
+    def selector(p):
+        return p['spec']['affinity']['podAntiAffinity']['requiredDuringSchedulingIgnoredDuringExecution'][0]['labelSelector']
+
+    case('anti-affinity empty expressions', True, lambda p: selector(p).update(matchExpressions=[]))
+    case('anti-affinity contradictory expression', False, lambda p: selector(p).update(matchExpressions=[{
+        'key': 'app.kubernetes.io/name', 'operator': 'NotIn', 'values': ['deephive-session']}]))
+    case('anti-affinity narrowing expression', False, lambda p: selector(p).update(matchExpressions=[{
+        'key': 'deephive/session', 'operator': 'In', 'values': [p['metadata']['name']]}]))
+    case('anti-affinity narrowing label', False, lambda p: selector(p)['matchLabels'].update({
+        'deephive/session': p['metadata']['name']}))
+    case('anti-affinity missing required label', False, lambda p: selector(p).update(matchLabels={}))
+    case('protocol 4 harmless pod metadata', True, lambda p: p['metadata']['labels'].update({'example.internal/notes': 'demo'}))
+
+    case('pre-init volume ownership mutation', False, lambda p: p['spec']['securityContext'].update(fsGroup=1000))
+    case('fixed worker bypass', False, lambda p: p['spec'].update(nodeName='worker'))
+    case('gate after writer', False, lambda p: p['spec']['initContainers'].reverse())
+    case('gate endpoint bypass', False, lambda p: next(e for e in p['spec']['initContainers'][0]['env'] if e['name'] == 'SESSION_RUNNER_URL').update(value='http://fake-claim'))
+    case('gate command bypass', False, lambda p: p['spec']['initContainers'][0].update(command=['true']))
+    case('gate writable mount', False, lambda p: p['spec']['initContainers'][0].update(volumeMounts=[{'name': 'scratch', 'mountPath': '/scratch'}]))
+    case('restartable init sidecar', False, lambda p: p['spec']['initContainers'][1].update(restartPolicy='Always'))
+    case('startup hook', False, lambda p: p['spec']['containers'][1].update(lifecycle={'postStart': {'exec': {'command': ['true']}}}))
+    case('missing dedicated taint', False, lambda p: p['spec'].update(tolerations=[]))
+    case('namespace-limited anti-affinity', False, lambda p: p['spec']['affinity']['podAntiAffinity']['requiredDuringSchedulingIgnoredDuringExecution'][0].pop('namespaceSelector'))
+    case('missing session anti-affinity', False, lambda p: p['spec'].pop('affinity'))
+    fixture = Path(temp) / 'cases.json'
+    fixture.write_text(json.dumps({'Expressions': [v['expression'] for v in dedicated_policy['spec']['validations']], 'Cases': cases}))
+    subprocess.run(['go', '-C', str(root), 'run', '.', str(fixture)], check=True)
+print('PASS protocol 4 activation ordering and bypass protection')
+
+# Actual legacy Pods remain admissible under their compatible protocol policy.
+for protocol in [2, 3]:
+    rendered = subprocess.check_output([
+        'helm', 'template', 'review', str(root.parent.parent / 'charts/deephive'),
+        '-n', 'dph-app', '-f', str(root / 'values.json'),
+        '--set', 'fullWorker.sessionProtocol=' + str(protocol)], text=True)
+    policy = next(p for p in yaml.safe_load_all(rendered) if p and p['kind'] == 'ValidatingAdmissionPolicy')
+    original = json.loads((root / f'pod-protocol{protocol}.json').read_text())
+    cases = []
+    case(f'actual legacy protocol {protocol}', True)
+    case(f'legacy {protocol} controller secret forbidden', False, lambda p: p['spec']['containers'][0].update(envFrom=[{'secretRef': {'name': 'secrets'}}]))
+    with tempfile.TemporaryDirectory(prefix='deephive-legacy-pod-') as temp:
+        fixture = Path(temp) / 'cases.json'
+        fixture.write_text(json.dumps({'Expressions': [v['expression'] for v in policy['spec']['validations']], 'Cases': cases}))
+        subprocess.run(['go', '-C', str(root), 'run', '.', str(fixture)], check=True)
+print('PASS actual legacy protocol 2/3 manifests')

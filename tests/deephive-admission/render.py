@@ -237,7 +237,7 @@ assert item(phase3_docs, 'Deployment', '-full-worker')['spec']['template']['meta
 for protocol in [3.7, 2.1, '3', True]:
     missing = copy.deepcopy(phase3)
     missing['fullWorker']['sessionProtocol'] = protocol
-    rejected(missing, 'Session protocol must be 2 or 3')
+    rejected(missing, 'Session protocol must be 2, 3 or 4')
 missing = copy.deepcopy(phase3)
 del missing['fullWorker']['approvedBootstraps'][missing['fullWorker']['compatibleSessionImages'][0]]
 rejected(missing, 'approved bootstrap/runtime identity')
@@ -598,3 +598,21 @@ for release in ['review', 'other', 'r' * 53]:
     assert legacy['spec']['ports'] == current['spec']['ports']
     assert {p['port']: p['targetPort'] for p in legacy['spec']['ports']} == {3001: 'control', 3002: 'observation'}
 print('PASS legacy session callback Service resolves to the renamed controller')
+
+# Project only nonsecret protocol metadata into the admission worker.
+admission_checksums = []
+for protocol in [3, 4]:
+    config = copy.deepcopy(values)
+    config['fullWorker']['sessionProtocol'] = protocol
+    docs = render(config=config)
+    template = consumer_template(docs)
+    pod = template['spec']
+    configmap = item(docs, 'ConfigMap', '-full-worker')
+    assert json.loads(configmap['data']['admission.json']) == {'sessionProtocol': protocol}
+    container = pod['containers'][0]
+    assert next(e['value'] for e in container['env'] if e['name'] == 'FULL_WORKER_CONFIG') == '/full-admission/admission.json'
+    assert next(v for v in pod['volumes'] if v['name'] == 'full-admission')['configMap']['items'] == [{'key': 'admission.json', 'path': 'admission.json'}]
+    assert next(m for m in container['volumeMounts'] if m['name'] == 'full-admission')['readOnly'] is True
+    admission_checksums.append(template['metadata']['annotations']['checksum/full-admission'])
+assert admission_checksums[0] != admission_checksums[1]
+print('PASS fresh admission receives the runner protocol without runner credentials')

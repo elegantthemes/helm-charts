@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - 'charts/gha-runner-autoscaler/**'
+      - 'tests/autoscaler-state/**'
       - '.github/workflows/gha-runner-autoscaler.yml'
 
 permissions:
@@ -22,6 +23,13 @@ jobs:
         with:
           version: v3.17.3
       - run: python3 -m pip install PyYAML==6.0.2
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: tests/autoscaler-state/go.mod
+          cache-dependency-path: tests/autoscaler-state/go.sum
+      - run: go test -mod=readonly -v ./...
+        working-directory: tests/autoscaler-state
+      - run: python3 charts/gha-runner-autoscaler/tests/test-state.py
       - run: helm lint charts/gha-runner-autoscaler
       - run: bash charts/gha-runner-autoscaler/tests/render-monitoring.sh
       - run: python3 charts/gha-runner-autoscaler/tests/test-alerts.py
