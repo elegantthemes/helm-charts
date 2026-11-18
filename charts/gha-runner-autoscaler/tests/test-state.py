@@ -37,8 +37,8 @@ for release, name in [('shared', 'shared-provisioning-state'), ('docs', 'docs-pr
     env = next(d for d in docs if d['kind'] == 'Deployment')['spec']['template']['spec']['containers'][0]['env']
     assert next(e['value'] for e in env if e['name'] == 'PROVISIONING_STATE_CONFIG_MAP') == name
     role = next(d for d in docs if d['kind'] == 'Role')
-    assert next(r for r in role['rules'] if r['resources'] == ['configmaps']) == {
-        'apiGroups': [''], 'resources': ['configmaps'], 'resourceNames': [name], 'verbs': ['get', 'patch']}
+    assert [r for r in role['rules'] if 'configmaps' in r['resources']] == [{
+        'apiGroups': [''], 'resources': ['configmaps'], 'resourceNames': [name], 'verbs': ['get', 'patch']}]
     assert not any('configmaps' in r['resources'] for d in docs if d['kind'] == 'ClusterRole' for r in d['rules'])
 assert state_map(render())['metadata']['name'] == 'shared-provisioning-state'
 print('PASS first-install empty state, isolated names, explicit environment and named get/patch RBAC')
