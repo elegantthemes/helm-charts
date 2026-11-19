@@ -1,3 +1,4 @@
+{{- if not .Values.fullWorkerCanaryOnly }}
 {{- include "deephive.normalizeWorkerValues" . -}}
 {{- if .Values.sourceReaderService.enabled }}{{ fail "JuiceFS source reader retired: drain it and set sourceReaderService.enabled=false before cutover" }}{{ end }}
 {{- if gt (int .Values.REPLICAS) 1 }}{{ fail "Cache startup recovery requires at most one consumer replica" }}{{ end }}
@@ -139,8 +140,8 @@ spec:
         deephive/worker-mode: lite
         redis-client: 'true'
     spec:
-{{- if or .Values.CODEX_AUTH_SECRET_NAME (and .Values.fullWorker.enabled .Values.fullWorker.liteCapacity.enabled) }}
-      # Dedicated Secret access and/or read-only rollout Pod proof (codex-auth.yml).
+{{- if or .Values.workerCapacityConfigMapName .Values.CODEX_AUTH_SECRET_NAME (and .Values.fullWorker.enabled .Values.fullWorker.liteCapacity.enabled) }}
+      # Scoped operator, Codex, and rollout permissions.
       serviceAccountName: {{ .Release.Name }}-consumer-sa
 {{- end }}
       terminationGracePeriodSeconds: {{ .Values.CONSUMER_TERMINATION_GRACE_SECONDS | default 120 }}
@@ -180,6 +181,14 @@ spec:
               localhostProfile: {{ .Values.CODEX_SANDBOX_APPARMOR_PROFILE | quote }}
 {{- end }}
           env:
+{{- with .Values.workerCapacityConfigMapName }}
+            - name: DEEPHIVE_WORKER_CAPACITY_CONFIG_MAP
+              value: {{ . | quote }}
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+{{- end }}
 {{- if or .Values.fullWorker.routingEnabled .Values.fullWorker.taskAllowlist }}
             - name: WORKSPACE_ROOT
               value: {{ .Values.WORKSPACE_ROOT | quote }}
@@ -379,4 +388,6 @@ spec:
 {{- if .Values.MYSQL_ENABLED }}
         - name: mysql-data
           emptyDir: {}
+{{- end }}
+
 {{- end }}

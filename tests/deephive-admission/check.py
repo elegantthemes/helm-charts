@@ -122,6 +122,10 @@ with tempfile.TemporaryDirectory(prefix='deephive-dedicated-policy-') as temp:
     original = json.loads((root / 'pod-protocol4.json').read_text())
     cases = []
     case('protocol 4 gate first', True)
+    case('protocol 4 rejects old session disk limit', False,
+         lambda p: p['spec']['containers'][0]['resources']['limits'].update({'ephemeral-storage': '45Gi'}))
+    case('protocol 4 rejects old database disk limit', False,
+         lambda p: p['spec']['containers'][1]['resources']['limits'].update({'ephemeral-storage': '5Gi'}))
     case('protocol 4 rejects legacy protocol annotation', False,
          lambda p: p['metadata']['annotations'].update({'deephive/protocol': '3'}))
     case('protocol 4 rejects missing protocol annotation', False,
@@ -188,6 +192,8 @@ for protocol in [2, 3]:
     original = json.loads((root / f'pod-protocol{protocol}.json').read_text())
     cases = []
     case(f'actual legacy protocol {protocol}', True)
+    case(f'legacy {protocol} rejects protocol 4 disk limit', False,
+         lambda p: p['spec']['containers'][0]['resources']['limits'].update({'ephemeral-storage': '90Gi'}))
     case(f'legacy {protocol} rejects protocol 4 without activation', False,
          lambda p: p['metadata']['annotations'].update({'deephive/protocol': '4'}))
     case(f'legacy {protocol} controller secret forbidden', False, lambda p: p['spec']['containers'][0].update(envFrom=[{'secretRef': {'name': 'secrets'}}]))
@@ -204,12 +210,12 @@ node_policy = next(p for p in yaml.safe_load_all(rendered_node_policy)
                    and p['metadata']['name'].startswith('dph-node-activation-'))
 before = {
     'metadata': {
-        'name': 'k8s-cluster-stage-deephive-burst-fixture',
-        'labels': {'deephive-full': 'true', 'gha.etdevs.com/capacity': 'burst',
+        'name': 'k8s-cluster-stage-deephive-v4-burst-fixture',
+        'labels': {'deephive-full-v4': 'true', 'gha.etdevs.com/capacity': 'burst',
                    'gha.etdevs.com/managed-by': 'gha-runner-autoscaler'},
         'annotations': {'gha.etdevs.com/linode-id': '123', 'gha.etdevs.com/state': 'ready'},
     },
-    'spec': {'taints': [{'key': 'deephive-full', 'value': 'true', 'effect': 'NoSchedule'}]},
+    'spec': {'taints': [{'key': 'deephive-full-v4', 'value': 'true', 'effect': 'NoSchedule'}]},
 }
 cases = []
 
@@ -228,8 +234,14 @@ def claim(node):
 
 
 node_case('set activation on dedicated Node', True, claim)
-for taints in (None, [], [{'key': 'deephive-full', 'value': 'false', 'effect': 'NoSchedule'}],
-               [{'key': 'deephive-full', 'value': 'true', 'effect': 'PreferNoSchedule'}]):
+legacy = copy.deepcopy(before)
+legacy['metadata']['name'] = 'k8s-cluster-stage-deephive-burst-fixture'
+node_case('legacy node name rejected even with the canary label', False, claim, legacy)
+legacy['metadata']['labels']['deephive-full'] = legacy['metadata']['labels'].pop('deephive-full-v4')
+legacy['spec']['taints'][0]['key'] = 'deephive-full'
+node_case('legacy node rejected with its original label and taint', False, claim, legacy)
+for taints in (None, [], [{'key': 'deephive-full-v4', 'value': 'false', 'effect': 'NoSchedule'}],
+               [{'key': 'deephive-full-v4', 'value': 'true', 'effect': 'PreferNoSchedule'}]):
     untainted = copy.deepcopy(before)
     if taints is None:
         del untainted['spec']['taints']

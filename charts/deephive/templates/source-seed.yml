@@ -1,3 +1,4 @@
+{{- if not .Values.fullWorkerCanaryOnly }}
 {{- include "deephive.normalizeWorkerValues" . -}}
 {{- $f := .Values.fullWorker }}
 {{- if $f.sourceSeedExportEnabled }}
@@ -45,4 +46,6 @@ spec:
         - name: workspace
           persistentVolumeClaim:
             claimName: {{ $claim | quote }}
+{{- end }}
+
 {{- end }}

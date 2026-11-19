@@ -36,6 +36,12 @@ rules:
     resources: ["configmaps"]
     resourceNames: [{{ .Values.provisioningStateConfigMapName | default (printf "%s-provisioning-state" .Release.Name) | quote }}]
     verbs: ["get", "patch"]
+  {{- with .Values.workerCapacityConfigMapName }}
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    resourceNames: [{{ . | quote }}]
+    verbs: ["get", "patch"]
+  {{- end }}
   - apiGroups: [""]
     resources: ["pods"]
     verbs: ["get", "list", "watch"]

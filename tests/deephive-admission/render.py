@@ -582,6 +582,7 @@ terms = pod['affinity']['nodeAffinity']['requiredDuringSchedulingIgnoredDuringEx
 assert terms == [{'matchExpressions': [
     {'key': 'kubernetes.io/hostname', 'operator': 'In', 'values': ['test-consumer']},
     {'key': 'deephive-full', 'operator': 'NotIn', 'values': ['true']},
+    {'key': 'deephive-full-v4', 'operator': 'NotIn', 'values': ['true']},
 ]}]
 assert 'initContainers' not in pod  # Do not chown the already-owned Lite volume.
 assert next(v for v in pod['volumes'] if v['name'] == 'workspace')['persistentVolumeClaim']['claimName'] == 'review-workspace'
@@ -670,3 +671,40 @@ assert item(enabled, 'Deployment', '-full-worker')['spec']['replicas'] == 1
 role = next(p for p in enabled if p['kind'] == 'ClusterRole' and p['metadata']['name'] == role['metadata']['name'])
 assert [r['verbs'] for r in role['rules']] == [['get'], ['patch']]
 print('PASS protocol 4 cold-start placement, Node admission boundary and protection-first enablement')
+
+# Install the canary protections alongside the canonical app in the same namespace.
+legacy = render(release='deephive', namespace='dph-app')
+canary = copy.deepcopy(values)
+canary.update(fullWorkerCanaryOnly=True, WORKSPACE_CLAIM_NAME='deephive-workspace-block')
+canary['fullWorker'].update(sessionProtocol=4, runnerEnabled=False, routingEnabled=False,
+                           taskAllowlist='', nodeName='deephive-canary-empty-ledger')
+shadow = render(release='deephive-canary', namespace='dph-app', config=canary)
+assert any(p['kind'] == 'Ingress' for p in legacy)
+assert not any(p['kind'] in {'Ingress', 'PersistentVolumeClaim', 'Secret', 'ServiceMonitor'} for p in shadow)
+deployments = [p for p in shadow if p['kind'] == 'Deployment']
+assert [(p['metadata']['name'], p['spec']['replicas']) for p in deployments] == [('deephive-canary-full-worker', 0)]
+def resource_names(docs):
+    return {(p['kind'], p['metadata']['name']) for p in docs}
+assert resource_names(legacy).isdisjoint(resource_names(shadow))
+workspace = next(v for v in deployments[0]['spec']['template']['spec']['volumes'] if v['name'] == 'workspace')
+assert workspace['persistentVolumeClaim']['claimName'] == 'deephive-workspace-block'
+prepull = item(shadow, 'DaemonSet', '-full-session-prepull')['spec']['template']['spec']
+assert prepull['tolerations'][0]['key'] == 'deephive-full-v4'
+assert item(legacy, 'Deployment', '-full-worker')['spec']['template']['spec']['tolerations'][0]['key'] == 'deephive-full'
+print('PASS worker-only canary shares staging app without overlapping resource identities')
+
+# The canonical consumer serves /admin and needs exact access to capacity state.
+capacity_only = copy.deepcopy(values)
+capacity_only.update(workerCapacityConfigMapName='deephive-worker-capacity',
+                     CODEX_AUTH_SECRET_NAME='')
+capacity_only['fullWorker']['liteCapacity'] = {'enabled': False}
+docs = render(config=capacity_only)
+consumer_pod = consumer_template(docs)['spec']
+intake_pod = item(docs, 'Deployment', '-intake')['spec']['template']['spec']
+assert consumer_pod['serviceAccountName'] == 'review-consumer-sa'
+assert item(docs, 'ServiceAccount', '-consumer-sa')
+assert item(docs, 'RoleBinding', '-worker-capacity')['subjects'][0]['name'] == consumer_pod['serviceAccountName']
+assert item(docs, 'Role', '-worker-capacity')['rules'][0]['resourceNames'] == ['deephive-worker-capacity']
+assert any(e['name'] == 'DEEPHIVE_WORKER_CAPACITY_CONFIG_MAP' for e in consumer_pod['containers'][0]['env'])
+assert not any(e['name'] == 'DEEPHIVE_WORKER_CAPACITY_CONFIG_MAP' for e in intake_pod['containers'][0]['env'])
+print('PASS worker capacity configuration and RBAC follow the canonical admin consumer')

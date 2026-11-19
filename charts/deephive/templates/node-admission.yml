@@ -25,8 +25,8 @@ spec:
       expression: "has(object.metadata.annotations) ? object.metadata.annotations : {}"
   validations:
     - expression: >-
-        oldObject.metadata.name.startsWith('k8s-cluster-stage-deephive-burst-') &&
-        oldObject.metadata.labels['deephive-full'] == 'true' &&
+        oldObject.metadata.name.startsWith('k8s-cluster-stage-deephive-v4-burst-') &&
+        oldObject.metadata.labels['deephive-full-v4'] == 'true' &&
         oldObject.metadata.labels['gha.etdevs.com/capacity'] == 'burst' &&
         oldObject.metadata.labels['gha.etdevs.com/managed-by'] == 'gha-runner-autoscaler' &&
         variables.before['gha.etdevs.com/linode-id'].matches('^[1-9][0-9]*$')

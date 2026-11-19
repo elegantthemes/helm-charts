@@ -23,7 +23,7 @@
     "automountServiceAccountToken": false,
     "restartPolicy": "Never",
     "nodeSelector": {
-      "deephive-full": "true"
+      "deephive-full-v4": "true"
     },
     "affinity": {
       "podAntiAffinity": {
@@ -42,7 +42,7 @@
     },
     "tolerations": [
       {
-        "key": "deephive-full",
+        "key": "deephive-full-v4",
         "operator": "Equal",
         "value": "true",
         "effect": "NoSchedule"
@@ -189,7 +189,7 @@
           "limits": {
             "memory": "16Gi",
             "cpu": "12",
-            "ephemeral-storage": "45Gi"
+            "ephemeral-storage": "90Gi"
           }
         },
         "env": [
@@ -327,7 +327,7 @@
           "limits": {
             "memory": "1Gi",
             "cpu": "1",
-            "ephemeral-storage": "5Gi"
+            "ephemeral-storage": "6Gi"
           }
         },
         "env": [

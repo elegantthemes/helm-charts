@@ -13,6 +13,7 @@
 {{- $runnerClaim = $liteClaim -}}
 {{- $ledgerNode = default $liteNode $ledgerNode -}}
 {{- end -}}
+{{- if and .Values.fullWorkerCanaryOnly (or (not $localSessions) $f.runnerEnabled $f.routingEnabled $f.taskAllowlist) }}{{ fail "The worker canary requires protocol 4 protections with admission and runner startup disabled" }}{{ end }}
 {{- if eq $liteClaim $f.workspaceClaim }}{{ fail "Full requires distinct Lite and Full workspace claims" }}{{ end }}
 {{- if and .Values.LEGACY_WORKSPACE_RETAIN (eq $f.workspaceClaim (printf "%s-workspace" .Release.Name)) }}
 {{- fail "Full workspace claim must differ from the retained legacy workspace claim" }}
@@ -43,6 +44,7 @@
 {{- range $image := append $f.compatibleSessionImages $f.sessionImage }}
 {{- if and (not (has $image $f.legacyProtocol2Images)) (not (regexMatch "^[a-f0-9]{64}$" (index $f.approvedBootstraps $image | default ""))) }}{{ fail "Every pinned and compatible session image requires its approved bootstrap/runtime identity" }}{{ end }}
 {{- end }}
+{{- if not .Values.fullWorkerCanaryOnly }}
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
@@ -54,6 +56,7 @@ spec:
     requests: { storage: {{ .Values.WORKSPACE_STORAGE_SIZE | quote }} }
   storageClassName: {{ $storageClassName | quote }}
 ---
+{{- end }}
 apiVersion: v1
 kind: ServiceAccount
 metadata:
@@ -159,6 +162,7 @@ spec:
               - matchExpressions:
                   - { key: kubernetes.io/hostname, operator: In, values: [{{ .Values.NODE_SELECTOR_HOSTNAME | quote }}] }
                   - { key: deephive-full, operator: NotIn, values: ["true"] }
+                  - { key: deephive-full-v4, operator: NotIn, values: ["true"] }
       {{- end }}
       serviceAccountName: {{ (include "deephive.fullWorkerName" .) }}
       imagePullSecrets:
@@ -310,7 +314,7 @@ spec:
       labels: { app: {{ $prepull }} }
     spec:
       tolerations:
-        - { key: deephive-full, operator: Equal, value: "true", effect: NoSchedule }
+        - { key: {{ ternary "deephive-full-v4" "deephive-full" $localSessions }}, operator: Equal, value: "true", effect: NoSchedule }
       {{- with $f.prepullTolerations }}
         {{- toYaml . | nindent 8 }}
       {{- end }}
@@ -320,7 +324,7 @@ spec:
             nodeSelectorTerms:
               {{- if ge (int $f.sessionProtocol) 4 }}
               - matchExpressions:
-                  - key: deephive-full
+                  - key: deephive-full-v4
                     operator: In
                     values: ["true"]
               {{- else }}

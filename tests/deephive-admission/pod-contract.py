@@ -21,8 +21,8 @@ for protocol in [2, 3, 4]:
         assert gate['command'] == ['node', '-e', (root.parent.parent / 'charts/deephive/files/activation-wait.js').read_text()]
         assert 'nodeName' not in spec and 'fsGroup' not in spec['securityContext']
         assert all('persistentVolumeClaim' not in v for v in spec['volumes'])
-        assert spec['nodeSelector'] == {'deephive-full': 'true'}
-        assert spec['tolerations'] == [{'key': 'deephive-full', 'operator': 'Equal', 'value': 'true', 'effect': 'NoSchedule'}]
+        assert spec['nodeSelector'] == {'deephive-full-v4': 'true'}
+        assert spec['tolerations'] == [{'key': 'deephive-full-v4', 'operator': 'Equal', 'value': 'true', 'effect': 'NoSchedule'}]
         term = spec['affinity']['podAntiAffinity']['requiredDuringSchedulingIgnoredDuringExecution'][0]
         assert term == {'labelSelector': {'matchLabels': {'app.kubernetes.io/name': 'deephive-session'}}, 'topologyKey': 'kubernetes.io/hostname', 'namespaceSelector': {}}
     else:

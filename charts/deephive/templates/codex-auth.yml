@@ -1,6 +1,7 @@
+{{- if not .Values.fullWorkerCanaryOnly }}
 {{- include "deephive.normalizeWorkerValues" . -}}
 {{- $liteRecovery := and .Values.fullWorker.enabled .Values.fullWorker.liteCapacity.enabled }}
-{{- if or .Values.CODEX_AUTH_SECRET_NAME $liteRecovery }}
+{{- if or .Values.CODEX_AUTH_SECRET_NAME $liteRecovery .Values.workerCapacityConfigMapName }}
 {{- $secretName := .Values.CODEX_AUTH_SECRET_NAME | toString }}
 # The Secret itself is created by Terraform (empty, with ignore_changes on its data) and
 # DeepHive updates it as Codex refreshes tokens. It is deliberately NOT part of this chart:
@@ -16,6 +17,7 @@ imagePullSecrets:
   - name: {{ . | quote }}
 {{- end }}
 {{- end }}
+{{- if or .Values.CODEX_AUTH_SECRET_NAME $liteRecovery }}
 ---
 # Least privilege: read and patch only this one Secret (no list/watch/create/delete).
 apiVersion: rbac.authorization.k8s.io/v1
@@ -51,4 +53,7 @@ roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
   name: {{ .Release.Name }}-codex-auth
+{{- end }}
+{{- end }}
+
 {{- end }}

@@ -22,7 +22,7 @@ Explicit new keys win, including false, empty strings and empty command lists. *
 {{- end -}}
 
 {{- define "deephive.nodeActivationTaint" -}}
-!('deephive/activation' in variables.after) || (has(oldObject.spec.taints) && oldObject.spec.taints.exists(t, t.key == 'deephive-full' && t.value == 'true' && t.effect == 'NoSchedule'))
+!('deephive/activation' in variables.after) || (has(oldObject.spec.taints) && oldObject.spec.taints.exists(t, t.key == 'deephive-full-v4' && t.value == 'true' && t.effect == 'NoSchedule'))
 {{- end -}}
 
 {{- define "deephive.nodeAdmissionReady" -}}

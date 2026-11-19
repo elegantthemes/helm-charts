@@ -62,9 +62,9 @@ spec:
           has(variables.pod.metadata.annotations) &&
           variables.pod.metadata.annotations['deephive/protocol'] == '4' &&
           (!has(variables.pod.spec.nodeName) || variables.pod.spec.nodeName == '') &&
-          variables.pod.spec.nodeSelector['deephive-full'] == 'true' &&
+          variables.pod.spec.nodeSelector['deephive-full-v4'] == 'true' &&
           has(variables.pod.spec.tolerations) &&
-          variables.pod.spec.tolerations.exists(t, t.key == 'deephive-full' &&
+          variables.pod.spec.tolerations.exists(t, t.key == 'deephive-full-v4' &&
             t.operator == 'Equal' && t.value == 'true' && t.effect == 'NoSchedule') &&
           has(variables.pod.spec.affinity.podAntiAffinity.requiredDuringSchedulingIgnoredDuringExecution) &&
           variables.pod.spec.affinity.podAntiAffinity.requiredDuringSchedulingIgnoredDuringExecution.exists(t,
@@ -120,7 +120,10 @@ spec:
             'memory' in c.resources.limits && 'ephemeral-storage' in c.resources.limits && 'cpu' in c.resources.limits &&
             c.resources.limits['cpu'] == {'session': '12', 'database': '1', 'local-mounts': '1', 'activation-wait': '1'}[c.name] &&
             c.resources.limits['memory'] == {'session': '16Gi', 'database': '1Gi', 'local-mounts': '256Mi', 'activation-wait': '256Mi'}[c.name] &&
-            c.resources.limits['ephemeral-storage'] == {'session': '45Gi', 'database': '5Gi', 'local-mounts': '30Gi', 'activation-wait': '30Gi'}[c.name])
+            c.resources.limits['ephemeral-storage'] ==
+              (variables.pod.metadata.annotations['deephive/protocol'] == '4'
+                ? {'session': '90Gi', 'database': '6Gi', 'local-mounts': '30Gi', 'activation-wait': '30Gi'}[c.name]
+                : {'session': '45Gi', 'database': '5Gi', 'local-mounts': '30Gi', 'activation-wait': '30Gi'}[c.name]))
         )
       message: Sessions must retain the prepared recipe's bounded memory and local scratch resources.
     - expression: >-

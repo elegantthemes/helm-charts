@@ -1,3 +1,4 @@
+fullWorkerCanaryOnly: false # Render only protocol 4 worker protections; reuse the staging app.
 DEEPHIVE_IMAGE:
 DEEPHIVE_REPO_URL:
 DEEPHIVE_VERSION:
@@ -60,6 +61,8 @@ DB_USERNAME: deephive
 DB_PASSWORD:
 
 # Full worker configuration. Install protections before starting workers.
+workerCapacityConfigMapName: ""
+
 fullWorker:
   enabled: false
   runnerEnabled: false # install and verify protections first
