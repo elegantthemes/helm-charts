@@ -43,7 +43,8 @@ semantics checks, not live cluster/uninstall/admission acceptance.
 
 Terraform integration contract (no Terraform files or live migration here):
 
-- Select autoscaler chart **0.1.10**, with stable release/namespace and explicit
+- Select autoscaler chart **0.1.11** for the protocol 4 canary, with stable
+  release/namespace and explicit
   `provisioningStateConfigMapName`. Empty still means `<release>-provisioning-state`.
   Preserve distinct pool state names, `configMapName`, `secretName`, and
   `clusterRoleName`; `configMapName` selects ordinary configuration only.
@@ -64,27 +65,29 @@ Terraform integration contract (no Terraform files or live migration here):
   floor; restoring compatible application references must use a safe chart
   revision, never a historical manifest that embeds state. Quiescing alone does
   not make those older rollback targets safe.
-- Keep DeepHive chart **1.4.1**, `fullWorker.runnerEnabled=false` while installing
-  admission policies/bindings, then observe and accept protection before enabling
-  protocol 4. Supply actual compatible digest-pinned artifacts and reviewed
-  bootstrap identities. No image build, migration, cluster mutation or deployment
-  is authorized by this interface document.
+- Use DeepHive chart **1.4.2** for the worker-only canary in the existing
+  staging workspace. Set `fullWorkerCanaryOnly=true` and
+  `fullWorker.runnerEnabled=false` to install admission policies and bindings.
+  Supply compatible digest-pinned artifacts and reviewed bootstrap identities.
+  Keep the canonical release on protocol 3.
 
-DeepHive chart **1.4.1** adds dedicated-taint admission enforcement for protocol
-4. Keep `fullWorker.runnerEnabled=false` for the first installation of the
-protocol 4 admission policies/bindings. Only enable the runner after Kubernetes has observed and type-checked both
-the session Pod and Node admission policies and both bindings enforce Deny.
+DeepHive chart **1.4.2** adds the worker-only canary and isolated protocol 4
+node identity. Worker-only mode enforces zero runner replicas and closed
+routing. A later reviewed change can enable it after Kubernetes has observed and
+type-checked the session Pod and Node admission policies, both bindings enforce
+Deny, and label routing and exclusive task ownership are ready.
 Set `fullWorker.sessionProtocol=4` with compatible, actually built digest-pinned
 runner/session/database references and reviewed bootstrap identities; fixture
 digests are synthetic and cannot be deployed. Protocol 4 uses local volumes,
 mount-free activation init0, ordinary local initialization before database
-startup, dedicated `deephive-full=true:NoSchedule` tolerance, and hostname
-anti-affinity against session Pods across all namespaces. Protocol 2/3 retains
-its compatible legacy policy. Existing Lite/legacy storage and pool defaults
+startup, dedicated `deephive-full-v4=true:NoSchedule` tolerance, and hostname
+anti-affinity against session Pods across all namespaces. Protocols 2 and 3
+retain the legacy `deephive-full` policy. Existing Lite/legacy storage and pool defaults
 are retained. Deployment, image builds and runtime acceptance are not performed.
 
 The protocol 4 controller runs on ordinary nodes so it can submit session Pods
 while the dedicated pool is empty. Only the session Pods and image pre-pull
 DaemonSet target dedicated nodes. The controller does not mount the legacy
 disk probes. Node admission limits its write access to the activation claim on
-identified DeepHive burst Nodes.
+nodes with the `k8s-cluster-stage-deephive-v4-burst-` name prefix and the
+`deephive-full-v4=true` label.
