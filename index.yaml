@@ -2481,6 +2481,18 @@ entries:
     version: 1.0.0
   deephive:
   - apiVersion: v1
+    created: "2026-11-20T18:57:21.608632271Z"
+    description: DeepHive
+    digest: 228efbeb9982a3cbfdded45217160054f602d8f2213f7c3e6a521657c3e7486e
+    icon: https://raw.githubusercontent.com/nodejs/nodejs.org/main/public/static/images/logo-hexagon.svg
+    maintainers:
+    - email: dustin@elegantthemes.com
+      name: Elegant Themes
+    name: deephive
+    urls:
+    - https://github.com/elegantthemes/helm-charts/releases/download/deephive-1.4.2/deephive-1.4.2.tgz
+    version: 1.4.2
+  - apiVersion: v1
     created: "2026-11-18T22:09:26.292984956Z"
     description: DeepHive
     digest: 15edd3a694c15f838ee5c288d2ebf550a6879a733e7f959110d3ca2e3f34e16f
@@ -3132,6 +3144,15 @@ entries:
     - https://github.com/elegantthemes/helm-charts/releases/download/et-dot-com-server-1.0.0/et-dot-com-server-1.0.0.tgz
     version: 1.0.0
   gha-runner-autoscaler:
+  - apiVersion: v2
+    created: "2026-11-20T18:57:21.826684783Z"
+    description: GitHub Actions runner node autoscaler
+    digest: 5e759d6012c442fd59cfa0682038119883cb0de93f5371fc4afd8d0f3f7a37a7
+    name: gha-runner-autoscaler
+    type: application
+    urls:
+    - https://github.com/elegantthemes/helm-charts/releases/download/gha-runner-autoscaler-0.1.11/gha-runner-autoscaler-0.1.11.tgz
+    version: 0.1.11
   - apiVersion: v2
     created: "2026-11-09T21:09:57.977152236Z"
     description: GitHub Actions runner node autoscaler
@@ -4838,4 +4859,4 @@ entries:
     urls:
     - https://github.com/elegantthemes/helm-charts/releases/download/percona-xtradb-cluster-operator-1.0.2/percona-xtradb-cluster-operator-1.0.2.tgz
     version: 1.0.2
-generated: "2026-11-18T22:09:26.293945048Z"
+generated: "2026-11-20T18:57:21.827163863Z"
