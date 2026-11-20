@@ -6,6 +6,11 @@ image: elegantthemes/gha-runner-autoscaler:26.7.15
 imageVersion: 0.1.2
 secretName: gha-runner-autoscaler
 
+# Install-only bootstrap; existing state stays application-owned.
+# Empty selects <release>-provisioning-state. Keep this identity stable per pool.
+provisioningStateConfigMapName: ""
+workerCapacityConfigMapName: ""
+
 resources:
   limits:
     cpu: 250m
@@ -28,6 +33,7 @@ monitoring:
   unscheduledJobsAlertFor: 5m
   recoveryRunbookUrl: https://github.com/elegantthemes/gha-runner-autoscaler#recovery-alerts
   # Shared-controller pools reuse the controller namespace and scrape target.
+  arcEnabled: true # Enable ARC scraping and listener alerts for runner pools.
   arcControllerMonitoringEnabled: true
   arcControllerNamespace: ""
   arcRunnerScaleSetName: et-runners

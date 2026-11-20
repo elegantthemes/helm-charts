@@ -3,6 +3,17 @@
 {{- if .Values.fullWorker.enabled }}
 {{- $f := .Values.fullWorker }}
 {{- $liteClaim := default (printf "%s-workspace" .Release.Name) .Values.WORKSPACE_CLAIM_NAME -}}
+{{- $localSessions := ge (int $f.sessionProtocol) 4 -}}
+{{- $runnerClaim := $f.workspaceClaim -}}
+{{- $ledgerNode := $f.nodeName -}}
+{{- if $localSessions -}}
+{{- if ne (toJson .Values.WORKSPACE_ACCESS_MODES) (toJson (list "ReadWriteOnce")) }}{{ fail "Protocol 4 controller requires the ReadWriteOnce Lite workspace" }}{{ end }}
+{{- $liteNode := required "Protocol 4 controller requires an explicit Lite consumer node" .Values.NODE_SELECTOR_HOSTNAME -}}
+{{- if or (ne .Values.WORKSPACE_ROOT $f.workspaceRoot) (not (hasPrefix "/" $f.workspaceRoot)) (ne (clean $f.workspaceRoot) $f.workspaceRoot) }}{{ fail "Protocol 4 controller requires the same canonical workspace root as Lite" }}{{ end }}
+{{- $runnerClaim = $liteClaim -}}
+{{- $ledgerNode = default $liteNode $ledgerNode -}}
+{{- end -}}
+{{- if and .Values.fullWorkerCanaryOnly (or (not $localSessions) $f.runnerEnabled $f.routingEnabled $f.taskAllowlist) }}{{ fail "The worker canary requires protocol 4 protections with admission and runner startup disabled" }}{{ end }}
 {{- if eq $liteClaim $f.workspaceClaim }}{{ fail "Full requires distinct Lite and Full workspace claims" }}{{ end }}
 {{- if and .Values.LEGACY_WORKSPACE_RETAIN (eq $f.workspaceClaim (printf "%s-workspace" .Release.Name)) }}
 {{- fail "Full workspace claim must differ from the retained legacy workspace claim" }}
@@ -24,8 +35,8 @@
 {{- if not (regexMatch "@sha256:[a-f0-9]{64}$" $f.databaseImage) }}{{ fail "fullWorker.databaseImage must pin a digest" }}{{ end }}
 {{- if or (eq $f.agentSecret "secrets") (eq ($f.integrationSecret | default "") "secrets") (eq $f.agentSecret $f.runnerSecret) (and $f.integrationSecret (eq $f.integrationSecret $f.runnerSecret)) }}{{ fail "Session integration/model credentials must not reference consumer or runner Secrets" }}{{ end }}
 {{- if and $f.observationEnabled (not $f.publicOrigin) }}{{ fail "Exact public observation origin required" }}{{ end }}
-{{- if not (has (toJson $f.sessionProtocol) (list "2" "3")) }}{{ fail "Session protocol must be 2 or 3" }}{{ end }}
-{{- if and (or $f.routingEnabled $f.taskAllowlist) (ne (int $f.sessionProtocol) 3) }}{{ fail "Phase 3 routing requires session protocol 3" }}{{ end }}
+{{- if not (has (toJson $f.sessionProtocol) (list "2" "3" "4")) }}{{ fail "Session protocol must be 2, 3 or 4" }}{{ end }}
+{{- if and (or $f.routingEnabled $f.taskAllowlist) (lt (int $f.sessionProtocol) 3) }}{{ fail "Phase 3 routing requires session protocol 3" }}{{ end }}
 {{- range $image := $f.legacyProtocol2Images }}
 {{- if not (has $image (append $f.compatibleSessionImages $f.sessionImage)) }}{{ fail "Legacy protocol 2 images must be retained compatible images" }}{{ end }}
 {{- if and (eq $image $f.sessionImage) (ne (int $f.sessionProtocol) 2) }}{{ fail "Current protocol 3 image cannot be a legacy bootstrap exception" }}{{ end }}
@@ -33,6 +44,7 @@
 {{- range $image := append $f.compatibleSessionImages $f.sessionImage }}
 {{- if and (not (has $image $f.legacyProtocol2Images)) (not (regexMatch "^[a-f0-9]{64}$" (index $f.approvedBootstraps $image | default ""))) }}{{ fail "Every pinned and compatible session image requires its approved bootstrap/runtime identity" }}{{ end }}
 {{- end }}
+{{- if not .Values.fullWorkerCanaryOnly }}
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
@@ -44,6 +56,7 @@ spec:
     requests: { storage: {{ .Values.WORKSPACE_STORAGE_SIZE | quote }} }
   storageClassName: {{ $storageClassName | quote }}
 ---
+{{- end }}
 apiVersion: v1
 kind: ServiceAccount
 metadata:
@@ -79,8 +92,18 @@ metadata:
 rules:
   - apiGroups: [""]
     resources: [nodes]
+    {{- if lt (int $f.sessionProtocol) 4 }}
     resourceNames: [{{ required "Full worker node required" $f.nodeName | quote }}]
     verbs: [get]
+    {{- else }}
+    verbs: [get]
+    {{- if eq (include "deephive.nodeAdmissionReady" .) "true" }}
+  # Enable writes only after the Node admission boundary is observed.
+  - apiGroups: [""]
+    resources: [nodes]
+    verbs: [patch]
+    {{- end }}
+    {{- end }}
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
@@ -100,8 +123,9 @@ kind: ConfigMap
 metadata:
   name: {{ (include "deephive.fullWorkerName" .) }}
 data:
+  admission.json: {{ dict "sessionProtocol" $f.sessionProtocol | toJson | quote }}
   runner.json: |
-    {{ dict "namespace" .Release.Namespace "release" .Release.Name "nodeName" $f.nodeName "image" $f.sessionImage "databaseImage" $f.databaseImage "imagePullSecret" $f.pullSecret "agentSecret" (required "Session agent Secret required" $f.agentSecret) "integrationSecret" ($f.integrationSecret | default "") "githubSecretRef" ($f.githubSecretRef | default dict) "workspaceClaim" $f.workspaceClaim "workspaceRoot" $f.workspaceRoot "scratchRoot" "/node-scratch" "cacheRoot" $f.workspaceRoot "runnerUrl" (printf "http://%s:3001" (include "deephive.fullWorkerName" .)) "pressureCommand" $f.pressureCommand "signingKeyFile" "/runner-secret/signing-key" "controlPort" 3001 "observationPort" (ternary 3002 0 $f.observationEnabled) "observationTokenFile" "/runner-secret/observation-token" "approvedBootstraps" $f.approvedBootstraps "sourceReader" $reader "sessionProtocol" $f.sessionProtocol "draining" $f.draining "validationTimeoutMs" $f.validationTimeoutMs | toJson }}
+    {{ dict "namespace" .Release.Namespace "release" .Release.Name "nodeName" $ledgerNode "image" $f.sessionImage "databaseImage" $f.databaseImage "imagePullSecret" $f.pullSecret "agentSecret" (required "Session agent Secret required" $f.agentSecret) "integrationSecret" ($f.integrationSecret | default "") "githubSecretRef" ($f.githubSecretRef | default dict) "workspaceClaim" $runnerClaim "workspaceRoot" $f.workspaceRoot "scratchRoot" "/node-scratch" "cacheRoot" $f.workspaceRoot "runnerUrl" (printf "http://%s:3001" (include "deephive.fullWorkerName" .)) "pressureCommand" $f.pressureCommand "signingKeyFile" "/runner-secret/signing-key" "controlPort" 3001 "observationPort" (ternary 3002 0 $f.observationEnabled) "observationTokenFile" "/runner-secret/observation-token" "approvedBootstraps" $f.approvedBootstraps "sourceReader" $reader "sessionProtocol" $f.sessionProtocol "draining" $f.draining "validationTimeoutMs" $f.validationTimeoutMs | toJson }}
 {{/* The config contains no credentials; signing key is read from runner-only Secret. */}}
 ---
 apiVersion: apps/v1
@@ -125,12 +149,25 @@ spec:
       # Allow an in-flight source transfer (15-minute network deadline) and its
       # cleanup to finish before Kubernetes forcibly terminates the runner.
       terminationGracePeriodSeconds: 960
+      {{- if lt (int $f.sessionProtocol) 4 }}
       nodeName: {{ $f.nodeName | quote }}
       tolerations:
         - { key: deephive-full, operator: Equal, value: "true", effect: NoSchedule }
+      {{- else }}
+      # The controller creates demand even when the dedicated pool is empty.
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - { key: kubernetes.io/hostname, operator: In, values: [{{ .Values.NODE_SELECTOR_HOSTNAME | quote }}] }
+                  - { key: deephive-full, operator: NotIn, values: ["true"] }
+                  - { key: deephive-full-v4, operator: NotIn, values: ["true"] }
+      {{- end }}
       serviceAccountName: {{ (include "deephive.fullWorkerName" .) }}
       imagePullSecrets:
         - name: {{ required "Private pull secret required" $f.pullSecret | quote }}
+      {{- if not $localSessions }}
       initContainers:
         - name: prepare-workspace-volume
           image: {{ $f.runnerImage | quote }}
@@ -142,6 +179,7 @@ spec:
             capabilities: { drop: [ALL], add: [CHOWN] }
           volumeMounts:
             - { name: workspace, mountPath: /full-volume }
+      {{- end }}
       containers:
         - name: runner
           securityContext: { runAsUser: 1000, runAsGroup: 1000 }
@@ -189,16 +227,20 @@ spec:
             - { name: config, mountPath: /runner-config, readOnly: true }
             - { name: secret, mountPath: /runner-secret, readOnly: true }
             - { name: workspace, mountPath: {{ $f.workspaceRoot | quote }}, mountPropagation: HostToContainer }
+{{- if not $localSessions }}
             - { name: scratch-probe, mountPath: /node-scratch, readOnly: true }
+{{- end }}
       volumes:
         - name: config
           configMap: { name: {{ (include "deephive.fullWorkerName" .) }} }
         - name: secret
           secret: { secretName: {{ $f.runnerSecret | quote }} }
         - name: workspace
-          persistentVolumeClaim: { claimName: {{ required "Workspace claim required" $f.workspaceClaim | quote }} }
+          persistentVolumeClaim: { claimName: {{ required "Workspace claim required" $runnerClaim | quote }} }
+{{- if not $localSessions }}
         - name: scratch-probe
           hostPath: { path: {{ required "Dedicated DeepHive scratch probe directory required" $f.scratchProbePath | quote }}, type: Directory }
+{{- end }}
 ---
 apiVersion: v1
 kind: Service
@@ -226,7 +268,7 @@ spec:
   podSelector:
     matchLabels: { app.kubernetes.io/name: deephive-session, app.kubernetes.io/instance: {{ .Release.Name | quote }} }
   policyTypes: [Ingress]
-{{- if $f.observationEnabled }}
+{{- if or $f.observationEnabled (ge (int $f.sessionProtocol) 4) }}
   ingress:
     - from:
         - podSelector:
@@ -272,7 +314,7 @@ spec:
       labels: { app: {{ $prepull }} }
     spec:
       tolerations:
-        - { key: deephive-full, operator: Equal, value: "true", effect: NoSchedule }
+        - { key: {{ ternary "deephive-full-v4" "deephive-full" $localSessions }}, operator: Equal, value: "true", effect: NoSchedule }
       {{- with $f.prepullTolerations }}
         {{- toYaml . | nindent 8 }}
       {{- end }}
@@ -280,10 +322,17 @@ spec:
         nodeAffinity:
           requiredDuringSchedulingIgnoredDuringExecution:
             nodeSelectorTerms:
+              {{- if ge (int $f.sessionProtocol) 4 }}
+              - matchExpressions:
+                  - key: deephive-full-v4
+                    operator: In
+                    values: ["true"]
+              {{- else }}
               - matchFields:
                   - key: metadata.name
                     operator: In
                     values: [{{ $f.nodeName | quote }}]
+              {{- end }}
       automountServiceAccountToken: false
       imagePullSecrets: [{ name: {{ $f.pullSecret | quote }} }]
       containers:

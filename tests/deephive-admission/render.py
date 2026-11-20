@@ -257,7 +257,7 @@ assert item(phase3_docs, 'Deployment', '-full-worker')['spec']['template']['meta
 for protocol in [3.7, 2.1, '3', True]:
     missing = copy.deepcopy(phase3)
     missing['fullWorker']['sessionProtocol'] = protocol
-    rejected(missing, 'Session protocol must be 2 or 3')
+    rejected(missing, 'Session protocol must be 2, 3 or 4')
 missing = copy.deepcopy(phase3)
 del missing['fullWorker']['approvedBootstraps'][missing['fullWorker']['compatibleSessionImages'][0]]
 rejected(missing, 'approved bootstrap/runtime identity')
@@ -387,6 +387,11 @@ assert 'envFrom' not in pod['containers'][0]
 invalid = copy.deepcopy(seed)
 invalid['WORKSPACE_ACCESS_MODES'] = ['ReadWriteMany']
 rejected(invalid, 'Source seed export requires a ReadWriteOnce Lite workspace')
+assert {'key': 'deephive-full', 'operator': 'Equal', 'value': 'true', 'effect': 'NoSchedule'} in job['spec']['template']['spec']['tolerations']
+for key in ['WORKSPACE_CLAIM_NAME', 'WORKSPACE_ROOT']:
+    invalid = copy.deepcopy(seed)
+    invalid[key] = seed['fullWorker']['workspaceClaim'] if key == 'WORKSPACE_CLAIM_NAME' else '/other'
+    rejected(invalid, 'consumer root and a distinct Full workspace claim')
 seed['fullWorker']['sourceSeedPath'] = '/outside'
 rejected(seed, 'canonical workspace descendant')
 print('PASS credential-free, explicit source seed export')
@@ -400,19 +405,6 @@ for release in ['review', 'other']:
     assert set(deployment_rule['resourceNames']) == {release + '-full-worker', release + '-runner', release + '-source-reader'}
 print('PASS uninstall hook can read both drained deployment identities')
 
-# Source export is prepared against the same claim and root even with routing off.
-seed = copy.deepcopy(values)
-seed['WORKSPACE_ROOT'] = seed['fullWorker'].get('workspaceRoot', '/workspace-root')
-seed['WORKSPACE_CLAIM_NAME'] = 'workspace-lite'
-seed['NODE_SELECTOR_HOSTNAME'] = 'test-consumer'
-seed['fullWorker'].update(sourceSeedExportEnabled=True, sourceSeedPath='/workspace-root/seeds/candidate')
-docs = render(config=seed)
-job = next(p for p in docs if p['kind'] == 'Job' and '-seed-' in p['metadata']['name'])
-assert {'key': 'deephive-full', 'operator': 'Equal', 'value': 'true', 'effect': 'NoSchedule'} in job['spec']['template']['spec']['tolerations']
-for key in ['WORKSPACE_CLAIM_NAME', 'WORKSPACE_ROOT']:
-    invalid = copy.deepcopy(seed)
-    invalid[key] = seed['fullWorker']['workspaceClaim'] if key == 'WORKSPACE_CLAIM_NAME' else '/other'
-    rejected(invalid, 'consumer root and a distinct Full workspace claim')
 runner = item(docs, 'Deployment', '-full-worker')['spec']['template']['spec']
 assert all(v['hostPath']['type'] == 'Directory' for v in runner['volumes'] if 'hostPath' in v)
 hook = item(docs, 'Job', '-session-drain-check')
@@ -561,3 +553,158 @@ for release in ['review', 'other', 'r' * 53]:
     assert legacy['spec']['ports'] == current['spec']['ports']
     assert {p['port']: p['targetPort'] for p in legacy['spec']['ports']} == {3001: 'control', 3002: 'observation'}
 print('PASS legacy session callback Service resolves to the renamed controller')
+
+# Project only nonsecret protocol metadata into the admission worker.
+admission_checksums = []
+for protocol in [3, 4]:
+    config = copy.deepcopy(values)
+    config['fullWorker']['sessionProtocol'] = protocol
+    docs = render(config=config)
+    template = consumer_template(docs)
+    pod = template['spec']
+    configmap = item(docs, 'ConfigMap', '-full-worker')
+    assert json.loads(configmap['data']['admission.json']) == {'sessionProtocol': protocol}
+    container = pod['containers'][0]
+    assert next(e['value'] for e in container['env'] if e['name'] == 'FULL_WORKER_CONFIG') == '/full-admission/admission.json'
+    assert next(v for v in pod['volumes'] if v['name'] == 'full-admission')['configMap']['items'] == [{'key': 'admission.json', 'path': 'admission.json'}]
+    assert next(m for m in container['volumeMounts'] if m['name'] == 'full-admission')['readOnly'] is True
+    admission_checksums.append(template['metadata']['annotations']['checksum/full-admission'])
+assert admission_checksums[0] != admission_checksums[1]
+print('PASS fresh admission receives the runner protocol without runner credentials')
+
+# Protocol 4 starts on ordinary capacity, even when there are zero session nodes.
+config = copy.deepcopy(values)
+config['fullWorker'].update(sessionProtocol=4, cacheProbePath='', scratchProbePath='')
+docs = render(config=config)
+pod = item(docs, 'Deployment', '-full-worker')['spec']['template']['spec']
+assert 'nodeName' not in pod and 'tolerations' not in pod
+terms = pod['affinity']['nodeAffinity']['requiredDuringSchedulingIgnoredDuringExecution']['nodeSelectorTerms']
+assert terms == [{'matchExpressions': [
+    {'key': 'kubernetes.io/hostname', 'operator': 'In', 'values': ['test-consumer']},
+    {'key': 'deephive-full', 'operator': 'NotIn', 'values': ['true']},
+    {'key': 'deephive-full-v4', 'operator': 'NotIn', 'values': ['true']},
+]}]
+assert 'initContainers' not in pod  # Do not chown the already-owned Lite volume.
+assert next(v for v in pod['volumes'] if v['name'] == 'workspace')['persistentVolumeClaim']['claimName'] == 'review-workspace'
+runner_config = json.loads(item(docs, 'ConfigMap', '-full-worker')['data']['runner.json'])
+assert runner_config['workspaceClaim'] == 'review-workspace'
+assert runner_config['nodeName'] == 'test-execution'  # Drain the original node ledger.
+legacy_pvc = next(p for p in docs if p['kind'] == 'PersistentVolumeClaim' and p['metadata']['name'] == config['fullWorker']['workspaceClaim'])
+assert legacy_pvc['metadata']['annotations']['helm.sh/resource-policy'] == 'keep'
+for overrides, error in [
+    ({'NODE_SELECTOR_HOSTNAME': ''}, 'explicit Lite consumer node'),
+    ({'WORKSPACE_ROOT': '/other'}, 'same canonical workspace root'),
+    ({'WORKSPACE_ACCESS_MODES': ['ReadWriteMany']}, 'ReadWriteOnce Lite workspace'),
+]:
+    rejected(dict(config, **overrides), error)
+assert {v['name'] for v in pod['volumes']}.isdisjoint({'cache-probe', 'scratch-probe'})
+assert {m['name'] for m in pod['containers'][0]['volumeMounts']}.isdisjoint({'cache-probe', 'scratch-probe'})
+role = next(p for p in docs if p['kind'] == 'ClusterRole' and any(r.get('resources') == ['nodes'] for r in p['rules']))
+assert role['rules'] == [{'apiGroups': [''], 'resources': ['nodes'], 'verbs': ['get']}]
+node_policy = next(p for p in docs if p['kind'] == 'ValidatingAdmissionPolicy' and p['metadata']['name'].startswith('dph-node-activation-'))
+node_binding = next(p for p in docs if p['kind'] == 'ValidatingAdmissionPolicyBinding' and p['metadata']['name'] == node_policy['metadata']['name'])
+assert node_policy['spec']['matchConstraints']['resourceRules'] == [
+    {'apiGroups': [''], 'apiVersions': ['v1'], 'operations': ['UPDATE'], 'resources': ['nodes'], 'scope': 'Cluster'}]
+assert node_policy['spec']['matchConditions'] == [
+    {'name': 'runner-identity', 'expression': "request.userInfo.username == 'system:serviceaccount:dph-app:review-full-worker'"}]
+assert node_binding['spec'] == {'policyName': node_policy['metadata']['name'], 'validationActions': ['Deny']}
+
+# Feed exact rendered resources back as installed lookup fixtures. Compare
+# against the old policy and a new policy whose generation is unobserved.
+session_policy = next(p for p in docs if p['kind'] == 'ValidatingAdmissionPolicy' and p is not node_policy)
+legacy_policy = next(p for p in render() if p['kind'] == 'ValidatingAdmissionPolicy')
+for policy in [session_policy, legacy_policy, node_policy]:
+    policy['metadata']['generation'] = 2
+    policy['status'] = {'observedGeneration': 2, 'typeChecking': {}}
+
+
+def enable_protocol4(installed_session, installed_node, installed_binding=node_binding):
+    config['fullWorker']['runnerEnabled'] = True
+    with tempfile.TemporaryDirectory(prefix='deephive-protocol4-enable-') as tmp:
+        candidate = Path(tmp) / 'deephive'
+        shutil.copytree(chart, candidate)
+        lifecycle = candidate / 'templates/session-lifecycle.yml'
+        source = lifecycle.read_text()
+        source = source.replace('lookup "admissionregistration.k8s.io/v1" "ValidatingAdmissionPolicy" "" $policyName',
+                                '(fromJson ' + json.dumps(json.dumps(installed_session)) + ')')
+        source = source.replace('lookup "admissionregistration.k8s.io/v1" "ValidatingAdmissionPolicyBinding" "" $policyName',
+                                '(dict "spec" (dict "policyName" $policyName "validationActions" (list "Deny")))')
+        lifecycle.write_text(source)
+        helpers = candidate / 'templates/_full-worker.tpl'
+        source = helpers.read_text()
+        for kind, installed in [('ValidatingAdmissionPolicy', installed_node),
+                                ('ValidatingAdmissionPolicyBinding', installed_binding)]:
+            lookup = f'lookup "admissionregistration.k8s.io/v1" "{kind}" "" $name'
+            assert lookup in source
+            source = source.replace(lookup, '(fromJson ' + json.dumps(json.dumps(installed)) + ')')
+        helpers.write_text(source)
+        return subprocess.run(['helm', 'template', 'review', str(candidate), '-n', 'dph-app', '-f', '-'],
+                              input=json.dumps(config), text=True, capture_output=True)
+
+
+result = enable_protocol4(legacy_policy, node_policy)
+assert result.returncode and 'protocol 4 session admission revision' in result.stderr, result.stderr
+pending_session = copy.deepcopy(session_policy)
+pending_session['status']['observedGeneration'] = 1
+result = enable_protocol4(pending_session, node_policy)
+assert result.returncode and 'observe the installed generation' in result.stderr, result.stderr
+result = enable_protocol4(session_policy, {})
+assert result.returncode and 'Node admission boundary' in result.stderr, result.stderr
+pending_node = copy.deepcopy(node_policy)
+pending_node['status'].pop('typeChecking')
+result = enable_protocol4(session_policy, pending_node)
+assert result.returncode and 'Node admission boundary' in result.stderr, result.stderr
+narrowed_binding = copy.deepcopy(node_binding)
+narrowed_binding['spec']['matchResources'] = {'objectSelector': {'matchLabels': {'allow': 'false'}}}
+result = enable_protocol4(session_policy, node_policy, narrowed_binding)
+assert result.returncode and 'Node admission boundary' in result.stderr, result.stderr
+old_node = copy.deepcopy(node_policy)
+old_node['spec']['validations'] = [
+    v for v in old_node['spec']['validations'] if 'oldObject.spec.taints.exists' not in v['expression']
+]
+result = enable_protocol4(session_policy, old_node)
+assert result.returncode and 'Node admission boundary' in result.stderr, result.stderr
+result = enable_protocol4(session_policy, node_policy)
+assert result.returncode == 0, result.stderr
+enabled = [p for p in yaml.safe_load_all(result.stdout) if p]
+assert item(enabled, 'Deployment', '-full-worker')['spec']['replicas'] == 1
+role = next(p for p in enabled if p['kind'] == 'ClusterRole' and p['metadata']['name'] == role['metadata']['name'])
+assert [r['verbs'] for r in role['rules']] == [['get'], ['patch']]
+print('PASS protocol 4 cold-start placement, Node admission boundary and protection-first enablement')
+
+# Install the canary protections alongside the canonical app in the same namespace.
+legacy = render(release='deephive', namespace='dph-app')
+canary = copy.deepcopy(values)
+canary.update(fullWorkerCanaryOnly=True, WORKSPACE_CLAIM_NAME='deephive-workspace-block')
+canary['fullWorker'].update(sessionProtocol=4, runnerEnabled=False, routingEnabled=False,
+                           taskAllowlist='', nodeName='deephive-canary-empty-ledger')
+shadow = render(release='deephive-canary', namespace='dph-app', config=canary)
+assert any(p['kind'] == 'Ingress' for p in legacy)
+assert not any(p['kind'] in {'Ingress', 'PersistentVolumeClaim', 'Secret', 'ServiceMonitor'} for p in shadow)
+deployments = [p for p in shadow if p['kind'] == 'Deployment']
+assert [(p['metadata']['name'], p['spec']['replicas']) for p in deployments] == [('deephive-canary-full-worker', 0)]
+def resource_names(docs):
+    return {(p['kind'], p['metadata']['name']) for p in docs}
+assert resource_names(legacy).isdisjoint(resource_names(shadow))
+workspace = next(v for v in deployments[0]['spec']['template']['spec']['volumes'] if v['name'] == 'workspace')
+assert workspace['persistentVolumeClaim']['claimName'] == 'deephive-workspace-block'
+prepull = item(shadow, 'DaemonSet', '-full-session-prepull')['spec']['template']['spec']
+assert prepull['tolerations'][0]['key'] == 'deephive-full-v4'
+assert item(legacy, 'Deployment', '-full-worker')['spec']['template']['spec']['tolerations'][0]['key'] == 'deephive-full'
+print('PASS worker-only canary shares staging app without overlapping resource identities')
+
+# The canonical consumer serves /admin and needs exact access to capacity state.
+capacity_only = copy.deepcopy(values)
+capacity_only.update(workerCapacityConfigMapName='deephive-worker-capacity',
+                     CODEX_AUTH_SECRET_NAME='')
+capacity_only['fullWorker']['liteCapacity'] = {'enabled': False}
+docs = render(config=capacity_only)
+consumer_pod = consumer_template(docs)['spec']
+intake_pod = item(docs, 'Deployment', '-intake')['spec']['template']['spec']
+assert consumer_pod['serviceAccountName'] == 'review-consumer-sa'
+assert item(docs, 'ServiceAccount', '-consumer-sa')
+assert item(docs, 'RoleBinding', '-worker-capacity')['subjects'][0]['name'] == consumer_pod['serviceAccountName']
+assert item(docs, 'Role', '-worker-capacity')['rules'][0]['resourceNames'] == ['deephive-worker-capacity']
+assert any(e['name'] == 'DEEPHIVE_WORKER_CAPACITY_CONFIG_MAP' for e in consumer_pod['containers'][0]['env'])
+assert not any(e['name'] == 'DEEPHIVE_WORKER_CAPACITY_CONFIG_MAP' for e in intake_pod['containers'][0]['env'])
+print('PASS worker capacity configuration and RBAC follow the canonical admin consumer')

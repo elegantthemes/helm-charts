@@ -1,3 +1,4 @@
+{{- if not .Values.fullWorkerCanaryOnly }}
 {{- include "deephive.normalizeWorkerValues" . -}}
 {{- $f := .Values.fullWorker }}
 {{- $c := $f.liteCapacity }}
@@ -16,4 +17,6 @@ metadata:
 data:
   capacity.json: |
     {{ dict "pool" $c.pool "workspaceRoot" .Values.WORKSPACE_ROOT "slots" $c.slots "memoryMiB" $c.memoryMiB "taskMiB" $c.taskMiB | toJson }}
+{{- end }}
+
 {{- end }}

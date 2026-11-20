@@ -8,6 +8,13 @@ stopped Full changes return to Lite before ownership is released. Drain and copy
 the old workspace before cutover, and retain prior storage. No migration, merge,
 image publication, deployment or Terraform apply is performed by these PRs.
 
+With protocol 4, the controller runs on the Lite consumer node and mounts
+the Lite claim at the same canonical path to read stopped source. Disposable
+sessions use their own node-local volumes. Retain the separate Full claim for
+protocol 2/3 and rollback. When upgrading an existing Full runner, keep
+`fullWorker.nodeName` set to its legacy node so the controller checks the
+correct ledger before starting protocol 4.
+
 The stopped-volume cutover requires an `Immediate` workspace StorageClass.
 Before the protection-first install, confirm the selected class's
 `volumeBindingMode`. `WaitForFirstConsumer` cannot bind while the runner is

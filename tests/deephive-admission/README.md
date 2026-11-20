@@ -64,3 +64,25 @@ changes. See the [workspace cutover guide](../../charts/deephive/remove-juicefs.
 Public origins use lowercase DNS hosts matching `VIRTUAL_HOST`. Use ports
 1–65535 for a nondefault port and omit port 443 and leading zeroes. Evidence
 reader credentials use a dedicated Secret. Verify read-only IAM in staging.
+
+Protocol 4 runs the controller on the Lite node with the Lite block claim so it
+can open retained source during handoff. The configured Full node name remains
+the legacy ledger identity for upgrade draining. Session Pods keep node-local
+volumes on disposable nodes. Protocols 2 and 3 keep the separate Full claim,
+runner placement and stopped-source transfer from the block-storage cutover.
+
+Protocol 2/3/4 fixtures `pod-protocol*.json` are generated from the integrated
+DeepHive `sessionPod` implementation, materialized tree
+`36fe0bc36ae2b4041c77e07e372ed4bff74a9a8a`. Regenerate with Node 24+:
+
+```
+node --experimental-vm-modules tests/deephive-admission/generate-pods.mjs /path/to/participating/deephive
+```
+
+Generation strips types from unchanged source modules. It stubs only unused
+object-storage exports imported by retainedArtifacts, never Pod construction;
+calling that stub fails. The only Pod adjustment is Kubernetes' default service
+account. All credentials/digests are synthetic. `pod-contract.py` checks actual
+Pod shapes and chart installation while the CEL cases check admission decisions.
+The original `pod.json` remains the richer historical dependency-mount fixture.
+See `docs/gha-runner-provisioning-state.md` for exact chart/Terraform interface.

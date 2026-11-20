@@ -1,3 +1,4 @@
+{{- if not .Values.fullWorkerCanaryOnly }}
 {{- include "deephive.normalizeWorkerValues" . -}}
 apiVersion: v1
 kind: Service
@@ -133,3 +134,5 @@ spec:
         - name: config
           secret:
             secretName: secrets
+
+{{- end }}

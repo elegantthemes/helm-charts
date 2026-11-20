@@ -1,0 +1,407 @@
+{
+  "apiVersion": "v1",
+  "kind": "Pod",
+  "metadata": {
+    "name": "dh-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "namespace": "dph-app",
+    "labels": {
+      "app.kubernetes.io/name": "deephive-session",
+      "app.kubernetes.io/instance": "review",
+      "deephive/session": "dh-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "deephive/worker-mode": "full",
+      "deephive/pool": "deephive",
+      "deephive/execution": "dh-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    "annotations": {
+      "deephive/protocol": "4",
+      "deephive/owner-generation": "1",
+      "deephive/execution-generation": "1",
+      "deephive/task": "fixture-task"
+    }
+  },
+  "spec": {
+    "automountServiceAccountToken": false,
+    "restartPolicy": "Never",
+    "nodeSelector": {
+      "deephive-full-v4": "true"
+    },
+    "affinity": {
+      "podAntiAffinity": {
+        "requiredDuringSchedulingIgnoredDuringExecution": [
+          {
+            "labelSelector": {
+              "matchLabels": {
+                "app.kubernetes.io/name": "deephive-session"
+              }
+            },
+            "topologyKey": "kubernetes.io/hostname",
+            "namespaceSelector": {}
+          }
+        ]
+      }
+    },
+    "tolerations": [
+      {
+        "key": "deephive-full-v4",
+        "operator": "Equal",
+        "value": "true",
+        "effect": "NoSchedule"
+      }
+    ],
+    "terminationGracePeriodSeconds": 3605,
+    "imagePullSecrets": [
+      {
+        "name": "pull"
+      }
+    ],
+    "securityContext": {
+      "runAsUser": 1000,
+      "runAsGroup": 1000
+    },
+    "initContainers": [
+      {
+        "name": "activation-wait",
+        "image": "ghcr.io/elegantthemes/session@sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "command": [
+          "node",
+          "-e",
+          "\nconst url = process.env.SESSION_RUNNER_URL + '/sessions/' + process.env.SESSION_ID + '/activation';\n(async () => {\n  while (Date.now() < Number(process.env.SESSION_STARTUP_DEADLINE)) {\n    try {\n      const r = await fetch(url, {method:'POST', signal:AbortSignal.timeout(15000),\n        headers:{authorization:'Bearer '+process.env.SESSION_TOKEN,'content-type':'application/json'},\n        body:JSON.stringify({uid:process.env.POD_UID,generation:Number(process.env.EXECUTION_GENERATION)})});\n      const result = r.ok ? await r.json() : undefined;\n      if (result?.activated === true && result.uid === process.env.POD_UID &&\n          result.generation === Number(process.env.EXECUTION_GENERATION)) return;\n    } catch {}\n    await new Promise(resolve => setTimeout(resolve,1000));\n  }\n  process.exitCode = 1;\n})();"
+        ],
+        "securityContext": {
+          "allowPrivilegeEscalation": false,
+          "capabilities": {
+            "drop": [
+              "ALL"
+            ]
+          }
+        },
+        "resources": {
+          "requests": {
+            "memory": "128Mi",
+            "cpu": "100m"
+          },
+          "limits": {
+            "memory": "256Mi",
+            "cpu": "1",
+            "ephemeral-storage": "30Gi"
+          }
+        },
+        "env": [
+          {
+            "name": "SESSION_ID",
+            "value": "dh-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          {
+            "name": "SESSION_RUNNER_URL",
+            "value": "http://review-full-worker:3001"
+          },
+          {
+            "name": "SESSION_TOKEN",
+            "value": "fixture"
+          },
+          {
+            "name": "POD_UID",
+            "valueFrom": {
+              "fieldRef": {
+                "fieldPath": "metadata.uid"
+              }
+            }
+          },
+          {
+            "name": "EXECUTION_GENERATION",
+            "value": "1"
+          },
+          {
+            "name": "SESSION_STARTUP_DEADLINE",
+            "value": "12345"
+          }
+        ]
+      },
+      {
+        "name": "local-mounts",
+        "image": "ghcr.io/elegantthemes/session@sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "command": [
+          "node",
+          "-e",
+          "const fs=require('fs');fs.mkdirSync('/local-evidence/database',{recursive:true});fs.closeSync(fs.openSync('/local-evidence/database/console.log','a'));for(const [i,m] of [].entries()){const p='/dependencies/mount-'+i;if(m.kind==='file')fs.closeSync(fs.openSync(p,'a'));else fs.mkdirSync(p,{recursive:true});}"
+        ],
+        "securityContext": {
+          "allowPrivilegeEscalation": false,
+          "capabilities": {
+            "drop": [
+              "ALL"
+            ]
+          }
+        },
+        "volumeMounts": [
+          {
+            "name": "dependencies",
+            "mountPath": "/dependencies"
+          },
+          {
+            "name": "evidence",
+            "mountPath": "/local-evidence"
+          }
+        ],
+        "resources": {
+          "requests": {
+            "memory": "128Mi",
+            "cpu": "100m"
+          },
+          "limits": {
+            "memory": "256Mi",
+            "cpu": "1",
+            "ephemeral-storage": "30Gi"
+          }
+        }
+      }
+    ],
+    "containers": [
+      {
+        "name": "session",
+        "image": "ghcr.io/elegantthemes/session@sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "command": [
+          "/usr/local/bin/deephive-session-init"
+        ],
+        "securityContext": {
+          "runAsUser": 0,
+          "runAsGroup": 0,
+          "allowPrivilegeEscalation": false,
+          "capabilities": {
+            "drop": [
+              "ALL"
+            ],
+            "add": [
+              "CHOWN",
+              "DAC_OVERRIDE",
+              "FOWNER",
+              "SETUID",
+              "SETGID",
+              "KILL"
+            ]
+          }
+        },
+        "resources": {
+          "requests": {
+            "memory": "3Gi",
+            "cpu": "1"
+          },
+          "limits": {
+            "memory": "16Gi",
+            "cpu": "12",
+            "ephemeral-storage": "90Gi"
+          }
+        },
+        "env": [
+          {
+            "name": "ET_USERNAME",
+            "valueFrom": {
+              "secretKeyRef": {
+                "name": "integration",
+                "key": "ET_USERNAME",
+                "optional": true
+              }
+            }
+          },
+          {
+            "name": "ET_API_KEY",
+            "valueFrom": {
+              "secretKeyRef": {
+                "name": "integration",
+                "key": "ET_API_KEY",
+                "optional": true
+              }
+            }
+          },
+          {
+            "name": "ET_PASSWORD",
+            "valueFrom": {
+              "secretKeyRef": {
+                "name": "integration",
+                "key": "ET_PASSWORD",
+                "optional": true
+              }
+            }
+          },
+          {
+            "name": "GITHUB_TOKEN",
+            "valueFrom": {
+              "secretKeyRef": {
+                "name": "integration",
+                "key": "GITHUB_TOKEN",
+                "optional": true
+              }
+            }
+          },
+          {
+            "name": "HOME",
+            "value": "/scratch/home"
+          },
+          {
+            "name": "TMPDIR",
+            "value": "/scratch/tmp"
+          },
+          {
+            "name": "DISPLAY",
+            "value": ":1"
+          },
+          {
+            "name": "SESSION_ID",
+            "value": "dh-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          {
+            "name": "SESSION_STARTUP_DEADLINE",
+            "value": "12345"
+          },
+          {
+            "name": "DEEPHIVE_POD_SANDBOX",
+            "value": "1"
+          },
+          {
+            "name": "SESSION_PROTOCOL",
+            "value": "4"
+          },
+          {
+            "name": "SESSION_RUNNER_URL",
+            "value": "http://review-full-worker:3001"
+          },
+          {
+            "name": "SESSION_TOKEN",
+            "value": "fixture"
+          },
+          {
+            "name": "OPENAI_API_KEY",
+            "valueFrom": {
+              "secretKeyRef": {
+                "name": "agent",
+                "key": "OPENAI_API_KEY"
+              }
+            }
+          }
+        ],
+        "volumeMounts": [
+          {
+            "name": "source",
+            "mountPath": "/workspace"
+          },
+          {
+            "name": "scratch",
+            "mountPath": "/scratch"
+          },
+          {
+            "name": "evidence",
+            "mountPath": "/evidence"
+          },
+          {
+            "name": "shm",
+            "mountPath": "/dev/shm"
+          }
+        ]
+      },
+      {
+        "name": "database",
+        "image": "mariadb@sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "command": [
+          "/bin/bash",
+          "-c",
+          "exec /usr/local/bin/docker-entrypoint.sh \"$@\" >>/var/log/deephive-session.log 2>&1",
+          "database-capture"
+        ],
+        "args": [
+          "--bind-address=127.0.0.1",
+          "--skip-log-bin"
+        ],
+        "securityContext": {
+          "allowPrivilegeEscalation": false,
+          "capabilities": {
+            "drop": [
+              "ALL"
+            ]
+          }
+        },
+        "resources": {
+          "requests": {
+            "memory": "1Gi",
+            "cpu": "100m"
+          },
+          "limits": {
+            "memory": "1Gi",
+            "cpu": "1",
+            "ephemeral-storage": "6Gi"
+          }
+        },
+        "env": [
+          {
+            "name": "MARIADB_ALLOW_EMPTY_ROOT_PASSWORD",
+            "value": "1"
+          },
+          {
+            "name": "MARIADB_DATABASE",
+            "value": "wordpress"
+          }
+        ],
+        "volumeMounts": [
+          {
+            "name": "database",
+            "mountPath": "/var/lib/mysql"
+          },
+          {
+            "name": "database-run",
+            "mountPath": "/run/mysqld"
+          },
+          {
+            "name": "evidence",
+            "subPath": "database/console.log",
+            "mountPath": "/var/log/deephive-session.log"
+          }
+        ]
+      }
+    ],
+    "volumes": [
+      {
+        "name": "source",
+        "emptyDir": {
+          "sizeLimit": "45Gi"
+        }
+      },
+      {
+        "name": "evidence",
+        "emptyDir": {
+          "sizeLimit": "5Gi"
+        }
+      },
+      {
+        "name": "dependencies",
+        "emptyDir": {
+          "sizeLimit": "30Gi"
+        }
+      },
+      {
+        "name": "scratch",
+        "emptyDir": {
+          "sizeLimit": "5Gi"
+        }
+      },
+      {
+        "name": "database-run",
+        "emptyDir": {
+          "sizeLimit": "16Mi"
+        }
+      },
+      {
+        "name": "database",
+        "emptyDir": {
+          "sizeLimit": "5Gi"
+        }
+      },
+      {
+        "name": "shm",
+        "emptyDir": {
+          "medium": "Memory",
+          "sizeLimit": "1Gi"
+        }
+      }
+    ],
+    "serviceAccountName": "default"
+  }
+}

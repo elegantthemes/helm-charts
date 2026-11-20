@@ -1,3 +1,4 @@
+{{- if not .Values.fullWorkerCanaryOnly }}
 {{- include "deephive.normalizeWorkerValues" . -}}
 {{- if .Values.sourceReaderService.enabled }}{{ fail "JuiceFS source reader retired: drain it and set sourceReaderService.enabled=false before cutover" }}{{ end }}
 {{- if gt (int .Values.REPLICAS) 1 }}{{ fail "Cache startup recovery requires at most one consumer replica" }}{{ end }}
@@ -119,6 +120,9 @@ spec:
   template:
     metadata:
       annotations:
+{{- if .Values.fullWorker.enabled }}
+        checksum/full-admission: {{ dict "sessionProtocol" .Values.fullWorker.sessionProtocol | toJson | sha256sum | quote }}
+{{- end }}
         checksum/lite-capacity: {{ toJson .Values.fullWorker.liteCapacity | sha256sum | quote }}
 {{- if .Values.fullWorker.observationEnabled }}
         observation-secret-revision: {{ required "Runner Secret revision required with observation; increment it after token rotation" .Values.fullWorker.runnerSecretRevision | quote }}
@@ -136,8 +140,8 @@ spec:
         deephive/worker-mode: lite
         redis-client: 'true'
     spec:
-{{- if or .Values.CODEX_AUTH_SECRET_NAME (and .Values.fullWorker.enabled .Values.fullWorker.liteCapacity.enabled) }}
-      # Dedicated Secret access and/or read-only rollout Pod proof (codex-auth.yml).
+{{- if or .Values.workerCapacityConfigMapName .Values.CODEX_AUTH_SECRET_NAME (and .Values.fullWorker.enabled .Values.fullWorker.liteCapacity.enabled) }}
+      # Scoped operator, Codex, and rollout permissions.
       serviceAccountName: {{ .Release.Name }}-consumer-sa
 {{- end }}
       terminationGracePeriodSeconds: {{ .Values.CONSUMER_TERMINATION_GRACE_SECONDS | default 120 }}
@@ -177,6 +181,14 @@ spec:
               localhostProfile: {{ .Values.CODEX_SANDBOX_APPARMOR_PROFILE | quote }}
 {{- end }}
           env:
+{{- with .Values.workerCapacityConfigMapName }}
+            - name: DEEPHIVE_WORKER_CAPACITY_CONFIG_MAP
+              value: {{ . | quote }}
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+{{- end }}
 {{- if or .Values.fullWorker.routingEnabled .Values.fullWorker.taskAllowlist }}
             - name: WORKSPACE_ROOT
               value: {{ .Values.WORKSPACE_ROOT | quote }}
@@ -185,6 +197,10 @@ spec:
               value: {{ ternary "1" "0" .Values.fullWorker.routingEnabled | quote }}
             - name: FULL_WORKER_TASK_ALLOWLIST
               value: {{ .Values.fullWorker.taskAllowlist | quote }}
+{{- if .Values.fullWorker.enabled }}
+            - name: FULL_WORKER_CONFIG
+              value: /full-admission/admission.json
+{{- end }}
             - name: FULL_WORKER_SOURCE_SEED
               value: {{ .Values.fullWorker.sourceSeedPath | quote }}
             - name: LITE_WORKER_ADMISSION_COMMAND
@@ -287,6 +303,9 @@ spec:
             periodSeconds: 5
             timeoutSeconds: 3
           volumeMounts:
+{{- if .Values.fullWorker.enabled }}
+            - { name: full-admission, mountPath: /full-admission, readOnly: true }
+{{- end }}
 {{- if .Values.fullWorker.liteCapacity.enabled }}
             - name: lite-config
               mountPath: /lite-config
@@ -345,6 +364,12 @@ spec:
           operator: Exists
           effect: NoSchedule
       volumes:
+{{- if .Values.fullWorker.enabled }}
+        - name: full-admission
+          configMap:
+            name: {{ include "deephive.fullWorkerName" . }}
+            items: [{ key: admission.json, path: admission.json }]
+{{- end }}
 {{- if .Values.fullWorker.liteCapacity.enabled }}
         - name: lite-config
           configMap: { name: {{ .Release.Name }}-lite-capacity }
@@ -363,4 +388,6 @@ spec:
 {{- if .Values.MYSQL_ENABLED }}
         - name: mysql-data
           emptyDir: {}
+{{- end }}
+
 {{- end }}

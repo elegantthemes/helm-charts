@@ -1,3 +1,4 @@
+{{- if not .Values.fullWorkerCanaryOnly }}
 {{- include "deephive.normalizeWorkerValues" . -}}
 apiVersion: networking.k8s.io/v1
 kind: Ingress
@@ -51,3 +52,5 @@ spec:
                 name: {{ .Release.Name }}
                 port:
                   number: {{ .Values.PORT }}
+
+{{- end }}

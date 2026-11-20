@@ -29,7 +29,11 @@ spec:
                 name: {{ .Values.configMapName }}
           env:
             - name: PROVISIONING_STATE_CONFIG_MAP
-              value: {{ printf "%s-provisioning-state" .Release.Name | quote }}
+              value: {{ .Values.provisioningStateConfigMapName | default (printf "%s-provisioning-state" .Release.Name) | quote }}
+            {{- with .Values.workerCapacityConfigMapName }}
+            - name: DEEPHIVE_WORKER_CAPACITY_CONFIG_MAP
+              value: {{ . | quote }}
+            {{- end }}
             - name: DRY_RUN
               value: {{ .Values.dryRun | quote }}
             - name: IMAGE_VERSION

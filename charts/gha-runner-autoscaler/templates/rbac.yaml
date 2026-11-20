@@ -33,12 +33,18 @@ metadata:
   namespace: {{ .Release.Namespace }}
 rules:
   - apiGroups: [""]
-    resources: ["pods"]
-    verbs: ["get", "list", "watch"]
+    resources: ["configmaps"]
+    resourceNames: [{{ .Values.provisioningStateConfigMapName | default (printf "%s-provisioning-state" .Release.Name) | quote }}]
+    verbs: ["get", "patch"]
+  {{- with .Values.workerCapacityConfigMapName }}
   - apiGroups: [""]
     resources: ["configmaps"]
-    resourceNames: [{{ printf "%s-provisioning-state" .Release.Name | quote }}]
+    resourceNames: [{{ . | quote }}]
     verbs: ["get", "patch"]
+  {{- end }}
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding

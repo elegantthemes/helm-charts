@@ -42,3 +42,15 @@ if [[ $(grep -c '^kind: Service$' "${rendered}") != 1 ]] || [[ $(grep -c '^kind:
   echo "shared ARC controller scrape target duplicated in docs namespace" >&2
   exit 1
 fi
+
+# The DeepHive pool has no ARC listener, but still needs autoscaler monitoring.
+helm template deephive-autoscaler "${chart_dir}" \
+  --namespace dph-app \
+  --set monitoring.enabled=true \
+  --set monitoring.arcEnabled=false > "${rendered}"
+grep -q '^kind: ServiceMonitor$' "${rendered}"
+grep -q 'expr: gha_node_autoscaler_manual_review_resources > 0' "${rendered}"
+if grep -Eq 'deephive-autoscaler-arc-controller|alert: GhaRunnerListenerMissing' "${rendered}"; then
+  echo "ARC monitoring rendered for the DeepHive pool" >&2
+  exit 1
+fi
