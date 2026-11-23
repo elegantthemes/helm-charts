@@ -128,11 +128,20 @@ spec:
             - name: config
               mountPath: /config
               readOnly: true
+            {{- if .Values.INTAKE_WEBHOOK_ARCHIVE_CLAIM_NAME }}
+            - name: webhook-archive
+              mountPath: /webhook-archive
+            {{- end }}
       volumes:
         - name: wordpress
           emptyDir: {}
         - name: config
           secret:
             secretName: secrets
+        {{- with .Values.INTAKE_WEBHOOK_ARCHIVE_CLAIM_NAME }}
+        - name: webhook-archive
+          persistentVolumeClaim:
+            claimName: {{ . | quote }}
+        {{- end }}
 
 {{- end }}

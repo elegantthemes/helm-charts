@@ -39,6 +39,8 @@ LEGACY_WORKSPACE_STORAGE_SIZE: 250Gi
 
 # Intake Deployment (DeepHive#164). Ingress / → intake Service.
 INTAKE_REPLICAS: 2
+# Existing shared persistent claim. Leave empty to omit the archive mount.
+INTAKE_WEBHOOK_ARCHIVE_CLAIM_NAME: ""
 INTAKE_MEMORY_LIMIT: 2Gi
 INTAKE_TERMINATION_GRACE_SECONDS: 30
 CONSUMER_TERMINATION_GRACE_SECONDS: 120
