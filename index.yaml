@@ -1072,6 +1072,18 @@ entries:
     version: 0.5.0
   cloud-server:
   - apiVersion: v1
+    created: "2026-11-23T09:38:30.86515989Z"
+    description: Elegant Themes Cloud Server
+    digest: b3d9beb4e4930ae2f0bbc4c6cedf3b356a0e254b3c5f6739eb9f931cd4d7285b
+    icon: https://bitnami.com/assets/stacks/wordpress/img/wordpress-stack-220x234.png
+    maintainers:
+    - email: dustin@elegantthemes.com
+      name: Elegant Themes
+    name: cloud-server
+    urls:
+    - https://github.com/elegantthemes/helm-charts/releases/download/cloud-server-1.1.10/cloud-server-1.1.10.tgz
+    version: 1.1.10
+  - apiVersion: v1
     created: "2026-10-21T18:25:56.384659044Z"
     description: Elegant Themes Cloud Server
     digest: fc2d8cc4e8ec0eb62b8468cb3c6779e6dea81877cc1218226c0fa53fe028c79c
@@ -4895,4 +4907,4 @@ entries:
     urls:
     - https://github.com/elegantthemes/helm-charts/releases/download/percona-xtradb-cluster-operator-1.0.2/percona-xtradb-cluster-operator-1.0.2.tgz
     version: 1.0.2
-generated: "2026-11-23T09:37:26.427171156Z"
+generated: "2026-11-23T09:38:30.865893056Z"
