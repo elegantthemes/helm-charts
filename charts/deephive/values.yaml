@@ -1,4 +1,4 @@
-fullWorkerCanaryOnly: false # Render only protocol 4 worker protections; reuse the staging app.
+fullWorkerCanaryOnly: false # Render the protocol 4 worker only and reuse the staging app.
 DEEPHIVE_IMAGE:
 DEEPHIVE_REPO_URL:
 DEEPHIVE_VERSION:
@@ -62,6 +62,8 @@ DB_PASSWORD:
 
 # Full worker configuration. Install protections before starting workers.
 workerCapacityConfigMapName: ""
+fullWorkerCanaryConsumer: "" # canonical release allowed to check the private canary Service
+fullWorkerCanaryRoute: {} # canonical staging consumer only: enabled, repository and private Service
 
 fullWorker:
   enabled: false

@@ -6,14 +6,21 @@
 {{- $localSessions := ge (int $f.sessionProtocol) 4 -}}
 {{- $runnerClaim := $f.workspaceClaim -}}
 {{- $ledgerNode := $f.nodeName -}}
+{{- $canary := .Values.fullWorkerCanaryOnly -}}
+{{- $canaryConsumer := .Values.fullWorkerCanaryConsumer | default "" -}}
+{{- if $canary -}}
+{{- if or (not $localSessions) $f.routingEnabled $f.taskAllowlist .Values.fullWorkerCanaryRoute }}{{ fail "The worker-only canary requires protocol 4 and routes new admissions only from the canonical consumer" }}{{ end }}
+{{- if ne $ledgerNode (printf "%s-empty-ledger" .Release.Name) }}{{ fail "The canary requires its explicit empty legacy ledger identity" }}{{ end }}
+{{- if and $f.runnerEnabled (or (not (regexMatch "^[a-z][a-z0-9-]{0,52}$" $canaryConsumer)) (eq $canaryConsumer .Release.Name)) }}{{ fail "Starting the canary requires a separate canonical consumer release" }}{{ end }}
+{{- end -}}
+{{- if and $localSessions $f.runnerEnabled (not $ledgerNode) }}{{ fail "Starting protocol 4 requires an explicit legacy ledger identity" }}{{ end -}}
 {{- if $localSessions -}}
 {{- if ne (toJson .Values.WORKSPACE_ACCESS_MODES) (toJson (list "ReadWriteOnce")) }}{{ fail "Protocol 4 controller requires the ReadWriteOnce Lite workspace" }}{{ end }}
 {{- $liteNode := required "Protocol 4 controller requires an explicit Lite consumer node" .Values.NODE_SELECTOR_HOSTNAME -}}
 {{- if or (ne .Values.WORKSPACE_ROOT $f.workspaceRoot) (not (hasPrefix "/" $f.workspaceRoot)) (ne (clean $f.workspaceRoot) $f.workspaceRoot) }}{{ fail "Protocol 4 controller requires the same canonical workspace root as Lite" }}{{ end }}
 {{- $runnerClaim = $liteClaim -}}
-{{- $ledgerNode = default $liteNode $ledgerNode -}}
+
 {{- end -}}
-{{- if and .Values.fullWorkerCanaryOnly (or (not $localSessions) $f.runnerEnabled $f.routingEnabled $f.taskAllowlist) }}{{ fail "The worker canary requires protocol 4 protections with admission and runner startup disabled" }}{{ end }}
 {{- if eq $liteClaim $f.workspaceClaim }}{{ fail "Full requires distinct Lite and Full workspace claims" }}{{ end }}
 {{- if and .Values.LEGACY_WORKSPACE_RETAIN (eq $f.workspaceClaim (printf "%s-workspace" .Release.Name)) }}
 {{- fail "Full workspace claim must differ from the retained legacy workspace claim" }}
@@ -125,7 +132,13 @@ metadata:
 data:
   admission.json: {{ dict "sessionProtocol" $f.sessionProtocol | toJson | quote }}
   runner.json: |
-    {{ dict "namespace" .Release.Namespace "release" .Release.Name "nodeName" $ledgerNode "image" $f.sessionImage "databaseImage" $f.databaseImage "imagePullSecret" $f.pullSecret "agentSecret" (required "Session agent Secret required" $f.agentSecret) "integrationSecret" ($f.integrationSecret | default "") "githubSecretRef" ($f.githubSecretRef | default dict) "workspaceClaim" $runnerClaim "workspaceRoot" $f.workspaceRoot "scratchRoot" "/node-scratch" "cacheRoot" $f.workspaceRoot "runnerUrl" (printf "http://%s:3001" (include "deephive.fullWorkerName" .)) "pressureCommand" $f.pressureCommand "signingKeyFile" "/runner-secret/signing-key" "controlPort" 3001 "observationPort" (ternary 3002 0 $f.observationEnabled) "observationTokenFile" "/runner-secret/observation-token" "approvedBootstraps" $f.approvedBootstraps "sourceReader" $reader "sessionProtocol" $f.sessionProtocol "draining" $f.draining "validationTimeoutMs" $f.validationTimeoutMs | toJson }}
+    {{- $runnerConfig := dict "namespace" .Release.Namespace "release" .Release.Name "nodeName" $ledgerNode "image" $f.sessionImage "databaseImage" $f.databaseImage "imagePullSecret" $f.pullSecret "agentSecret" (required "Session agent Secret required" $f.agentSecret) "integrationSecret" ($f.integrationSecret | default "") "githubSecretRef" ($f.githubSecretRef | default dict) "workspaceClaim" $runnerClaim "workspaceRoot" $f.workspaceRoot "scratchRoot" "/node-scratch" "cacheRoot" $f.workspaceRoot "runnerUrl" (printf "http://%s:3001" (include "deephive.fullWorkerName" .)) "pressureCommand" $f.pressureCommand "signingKeyFile" "/runner-secret/signing-key" "controlPort" 3001 "observationPort" (ternary 3002 0 $f.observationEnabled) "observationTokenFile" "/runner-secret/observation-token" "approvedBootstraps" $f.approvedBootstraps "sourceReader" $reader "sessionProtocol" $f.sessionProtocol "draining" $f.draining "validationTimeoutMs" $f.validationTimeoutMs }}
+    {{- if $localSessions }}{{- $_ := set $runnerConfig "legacyLedgerNode" $ledgerNode }}{{- end }}
+    {{- if $canary }}
+    {{- $_ := set $runnerConfig "startupMode" "fresh-canary" }}
+    {{- $_ := set $runnerConfig "canaryService" (include "deephive.fullWorkerName" .) }}
+    {{- end }}
+    {{ $runnerConfig | toJson }}
 {{/* The config contains no credentials; signing key is read from runner-only Secret. */}}
 ---
 apiVersion: apps/v1
@@ -301,6 +314,12 @@ spec:
         - podSelector:
             matchLabels: { app: {{ .Release.Name }} }
       ports: [{ protocol: TCP, port: 3001 }]
+{{- if and $canary $f.runnerEnabled }}
+    - from:
+        - podSelector:
+            matchLabels: { app: {{ $canaryConsumer | quote }}, deephive/role: consumer }
+      ports: [{ protocol: TCP, port: 3001 }]
+{{- end }}
 ---
 apiVersion: apps/v1
 kind: DaemonSet

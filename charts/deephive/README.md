@@ -20,3 +20,22 @@ Validation: `python3 tests/deephive-codex-sandbox.py` (PyYAML), plus the existin
 `tests/deephive-admission/render.py` suite. The controlled live canary established
 successful reads and rejected overwrite/create/delete using the proposed host
 profile; all temporary node/profile changes were restored afterward.
+
+## Staging protocol 4 canary
+
+Chart 1.4.3 keeps the worker-only release and its admission identities. Install
+the protections with `fullWorkerCanaryOnly: true` and
+`fullWorker.runnerEnabled: false`. Set `fullWorker.nodeName` to
+`<canary-release>-empty-ledger` and `fullWorkerCanaryConsumer` to the canonical
+release name. The node selector still identifies the canonical Lite node and its
+block-backed workspace.
+
+After the admission policies are observed and enforce Deny, enable one canary
+controller and set `fullWorkerCanaryRoute.enabled` on the canonical staging
+release in the same rollout. Specify the repository and the canary Service
+name. The consumer checks the private protocol 4 readiness endpoint before it
+accepts a signed `issues:labeled` delivery for `deephive-canary`. Apply the label
+to the first test issue once the controller and autoscaler are Ready. Keep the
+canonical Full worker on protocol 3. Set
+`fullWorkerCanaryRoute.enabled: false` to close admission while existing
+protocol 4 work drains.

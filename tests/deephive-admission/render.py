@@ -501,9 +501,9 @@ with tempfile.TemporaryDirectory(prefix='deephive-worker-identities-') as tmp:
 for name in ['review-runner', 'review-full-worker']:
     for live in ['deployment', 'pod', 'drained']:
         with tempfile.TemporaryDirectory(prefix='deephive-worker-drain-') as tmp:
-            fixture_chart = Path(tmp) / 'deephive'
-            shutil.copytree(chart, fixture_chart)
-            lifecycle = fixture_chart / 'templates/session-lifecycle.yml'
+            drain_fixture_chart = Path(tmp) / 'deephive'
+            shutil.copytree(chart, drain_fixture_chart)
+            lifecycle = drain_fixture_chart / 'templates/session-lifecycle.yml'
             text = lifecycle.read_text()
             lookup = 'lookup "apps/v1" "Deployment" $.Release.Namespace $runnerName'
             assert lookup in text
@@ -516,7 +516,7 @@ for name in ['review-runner', 'review-full-worker']:
             lifecycle.write_text(text)
             config = copy.deepcopy(values)
             config['fullWorker']['enabled'] = False
-            result = subprocess.run(['helm', 'template', 'review', str(fixture_chart), '--is-upgrade', '-n', 'dph-app', '-f', '-'], input=json.dumps(config), text=True, capture_output=True)
+            result = subprocess.run(['helm', 'template', 'review', str(drain_fixture_chart), '--is-upgrade', '-n', 'dph-app', '-f', '-'], input=json.dumps(config), text=True, capture_output=True)
             if live == 'drained':
                 assert result.returncode == 0, result.stderr
             else:
@@ -618,8 +618,10 @@ for policy in [session_policy, legacy_policy, node_policy]:
     policy['status'] = {'observedGeneration': 2, 'typeChecking': {}}
 
 
-def enable_protocol4(installed_session, installed_node, installed_binding=node_binding):
-    config['fullWorker']['runnerEnabled'] = True
+def enable_protocol4(installed_session, installed_node, installed_binding=node_binding,
+                     release='review', worker_config=None):
+    worker_config = copy.deepcopy(config if worker_config is None else worker_config)
+    worker_config['fullWorker']['runnerEnabled'] = True
     with tempfile.TemporaryDirectory(prefix='deephive-protocol4-enable-') as tmp:
         candidate = Path(tmp) / 'deephive'
         shutil.copytree(chart, candidate)
@@ -638,8 +640,8 @@ def enable_protocol4(installed_session, installed_node, installed_binding=node_b
             assert lookup in source
             source = source.replace(lookup, '(fromJson ' + json.dumps(json.dumps(installed)) + ')')
         helpers.write_text(source)
-        return subprocess.run(['helm', 'template', 'review', str(candidate), '-n', 'dph-app', '-f', '-'],
-                              input=json.dumps(config), text=True, capture_output=True)
+        return subprocess.run(['helm', 'template', release, str(candidate), '-n', 'dph-app', '-f', '-'],
+                              input=json.dumps(worker_config), text=True, capture_output=True)
 
 
 result = enable_protocol4(legacy_policy, node_policy)
@@ -692,6 +694,51 @@ prepull = item(shadow, 'DaemonSet', '-full-session-prepull')['spec']['template']
 assert prepull['tolerations'][0]['key'] == 'deephive-full-v4'
 assert item(legacy, 'Deployment', '-full-worker')['spec']['template']['spec']['tolerations'][0]['key'] == 'deephive-full'
 print('PASS worker-only canary shares staging app without overlapping resource identities')
+
+canary.update(fullWorkerCanaryConsumer='deephive')
+canary_policies = [copy.deepcopy(p) for p in shadow if p['kind'] == 'ValidatingAdmissionPolicy']
+for policy in canary_policies:
+    policy['metadata']['generation'] = 1
+    policy['status'] = {'observedGeneration': 1, 'typeChecking': {}}
+canary_node = next(p for p in canary_policies if p['metadata']['name'].startswith('dph-node-activation-'))
+canary_session = next(p for p in canary_policies if p is not canary_node)
+canary_binding = item(shadow, 'ValidatingAdmissionPolicyBinding', canary_node['metadata']['name'])
+result = enable_protocol4(canary_session, canary_node, canary_binding, 'deephive-canary', canary)
+assert result.returncode == 0, result.stderr
+started = [p for p in yaml.safe_load_all(result.stdout) if p]
+runner = item(started, 'Deployment', '-full-worker')
+assert runner['spec']['replicas'] == 1 and runner['spec']['strategy']['type'] == 'Recreate'
+runner_config = json.loads(item(started, 'ConfigMap', '-full-worker')['data']['runner.json'])
+assert runner_config['startupMode'] == 'fresh-canary'
+assert runner_config['legacyLedgerNode'] == 'deephive-canary-empty-ledger'
+assert runner_config['canaryService'] == 'deephive-canary-full-worker'
+policy_kinds = {'ValidatingAdmissionPolicy', 'ValidatingAdmissionPolicyBinding'}
+assert resource_names([p for p in shadow if p['kind'] in policy_kinds]) == resource_names(
+    [p for p in started if p['kind'] in policy_kinds])
+rule = item(started, 'NetworkPolicy', '-full-worker-control')['spec']['ingress'][-1]
+assert rule['from'] == [{'podSelector': {'matchLabels': {'app': 'deephive', 'deephive/role': 'consumer'}}}]
+assert rule['ports'] == [{'protocol': 'TCP', 'port': 3001}]
+
+# The canonical worker remains protocol 3. Only the consumer processes the signed
+# intake queue and receives the separate readiness destination.
+routed = copy.deepcopy(phase3)
+routed['fullWorkerCanaryRoute'] = {'enabled': True, 'repository': 'elegantthemes/Divi', 'service': 'deephive-canary-full-worker'}
+route_docs = render(release='deephive', namespace='dph-app', config=routed, installed=True)
+consumer = item(route_docs, 'Deployment', 'deephive')['spec']['template']['spec']['containers'][0]
+env = {v['name']: v.get('value') for v in consumer['env']}
+assert json.loads(env['FULL_WORKER_CANARY_ROUTE']) == {key: routed['fullWorkerCanaryRoute'][key] for key in ('repository', 'service')}
+assert env['FULL_WORKER_ROUTING'] == '1'
+assert json.loads(item(route_docs, 'ConfigMap', '-full-worker')['data']['admission.json']) == {'sessionProtocol': 3}
+assert 'FULL_WORKER_CANARY_ROUTE' not in {
+    v['name'] for v in item(route_docs, 'Deployment', '-intake')['spec']['template']['spec']['containers'][0]['env']
+}
+routed['fullWorkerCanaryRoute']['enabled'] = False
+closed = render(release='deephive', namespace='dph-app', config=routed, installed=True)
+assert 'FULL_WORKER_CANARY_ROUTE' not in {
+    v['name'] for v in item(closed, 'Deployment', 'deephive')['spec']['template']['spec']['containers'][0]['env']
+}
+print('PASS canary startup stays separate from canonical label routing and preserves installed protections')
+
 
 # The canonical consumer serves /admin and needs exact access to capacity state.
 capacity_only = copy.deepcopy(values)
