@@ -298,7 +298,7 @@ spec:
               readOnly: true
 
         - name: nginx
-          image: 'nginx:1.27.5-alpine'
+          image: {{ ternary .Values.NGINX_STAGING_IMAGE .Values.NGINX_IMAGE (eq "staging" .Values.WP_ENV) | squote }}
           livenessProbe:
             httpGet:
               path: /healthz
