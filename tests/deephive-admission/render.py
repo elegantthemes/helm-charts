@@ -383,6 +383,9 @@ assert job['spec']['backoffLimit'] == 0
 pod = job['spec']['template']['spec']
 assert pod['automountServiceAccountToken'] is False
 assert pod['containers'][0]['command'][-1].endswith('/export-source-seed.js')
+assert pod['containers'][0]['args'] == ['/seed-export', '/seed-export/seeds/candidate']
+assert pod['containers'][0]['volumeMounts'] == [{'name': 'workspace', 'mountPath': '/seed-export'}]
+assert pod['volumes'][0]['persistentVolumeClaim']['claimName'] == 'workspace-lite'
 assert 'envFrom' not in pod['containers'][0]
 invalid = copy.deepcopy(seed)
 invalid['WORKSPACE_ACCESS_MODES'] = ['ReadWriteMany']

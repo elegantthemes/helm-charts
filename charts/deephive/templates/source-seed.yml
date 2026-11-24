@@ -5,6 +5,8 @@
 {{- if ne (toJson .Values.WORKSPACE_ACCESS_MODES) (toJson (list "ReadWriteOnce")) }}{{ fail "Source seed export requires a ReadWriteOnce Lite workspace" }}{{ end }}
 {{- if or (not $f.enabled) $f.routingEnabled $f.taskAllowlist }}{{ fail "Export source seed with protections enabled and routing disabled" }}{{ end }}
 {{- if or (not (hasPrefix (printf "%s/" $f.workspaceRoot) $f.sourceSeedPath)) (ne (clean $f.sourceSeedPath) $f.sourceSeedPath) }}{{ fail "Source seed export requires a canonical workspace descendant" }}{{ end }}
+{{- $exportRoot := "/seed-export" }}
+{{- $destination := printf "%s/%s" $exportRoot (trimPrefix (printf "%s/" $f.workspaceRoot) $f.sourceSeedPath) }}
 {{- $claim := default (printf "%s-workspace" .Release.Name) .Values.WORKSPACE_CLAIM_NAME }}
 {{- if or (eq $claim $f.workspaceClaim) (ne .Values.WORKSPACE_ROOT $f.workspaceRoot) }}{{ fail "Source seed export requires the consumer root and a distinct Full workspace claim" }}{{ end }}
 apiVersion: batch/v1
@@ -35,13 +37,13 @@ spec:
         - name: export
           image: {{ $f.sessionImage | quote }}
           command: ["node", "/opt/deephive/dist/scripts/environment/export-source-seed.js"]
-          args: {{ list $f.workspaceRoot $f.sourceSeedPath | toJson }}
+          args: {{ list $exportRoot $destination | toJson }}
           resources:
             requests: {cpu: "250m", memory: "256Mi"}
             limits: {cpu: "2", memory: "2Gi"}
           volumeMounts:
             - name: workspace
-              mountPath: {{ $f.workspaceRoot | quote }}
+              mountPath: {{ $exportRoot | quote }}
       volumes:
         - name: workspace
           persistentVolumeClaim:
